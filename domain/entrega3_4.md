@@ -102,12 +102,11 @@ Generar el diagrama (herramienta libre: dbdiagram.io, MySQL Workbench, draw.io, 
 sirve porque el diagrama es agnóstico de motor) a partir del esquema anterior, exportarlo como PNG/JPG legible y
 acompañarlo, en el documento PDF, de la justificación de las decisiones de normalización arriba señaladas.
 
-**Pendiente**: `doc/er-diagram.png` y `doc/schema.png` fueron generados desde la versión anterior del esquema y
-quedaron desactualizados. Hay que regenerarlos desde el `db_definition.sql` corregido; los cambios visibles en el
-diagrama son la baja de `convocatoria.activo`, las altas de `partido.estado` y `arbitro.fecha_nacimiento`,
-`pais.huso_horario`/`sede.huso_horario` pasando de nombre de zona a offset fijo `CHAR(6)`, y la agrupación de las
-tablas en cinco esquemas (`torneo`, `plantel`, `evento`, `arbitraje`, `publicidad`). Como la Entrega 3 se entrega
-justamente como imagen, esto es parte del entregable y no un extra.
+**Estado actual**: los diagramas viejos (`doc/er-diagram.png`, `doc/schema.png`) quedaron obsoletos y se
+reemplazaron por `doc/herramienta1.mmd`/`.png` y `doc/herramienta2.mmd`/`.png` — DER en formato Mermaid (`erDiagram`)
+generado directamente desde `doc/db_definition.sql`, con las 24 entidades, sus columnas PK/FK y la cardinalidad de
+cada relación. Falta confirmar que la imagen final entregada sea legible como archivo único (JPG/PNG) tal como pide
+el enunciado, no solo el `.mmd` fuente.
 
 ---
 
@@ -153,19 +152,19 @@ concretas adoptadas son:
 | Parámetro | Valor | Justificación |
 |---|---|---|
 | Collation | `Latin1_General_CI_AI` | Es la familia de collation estándar en **inglés** de SQL Server: viene del code page 1252, el mismo que usa una instalación "English (United States)" ([mssqltips.com](https://www.mssqltips.com/sqlservertip/6386/sql-server-collation-overview-and-examples/), [sqlservercentral.com](https://www.sqlservercentral.com/blogs/revised-difference-between-collation-sql_latin1_general_cp1_ci_as-and-latin1_general_ci_as)). El nombre "Latin1" no tiene relación con español/Latinoamérica: es el nombre del code page ISO 8859-1; la collation en español sería `Modern_Spanish_CI_AS` o `Traditional_Spanish_CI_AS`, que es justamente lo que se descartó. CI: los valores de dominio de los `CHECK` se aceptan con cualquier capitalización, lo que evita normalizar los archivos de origen en la importación. AI: `'Peru' = 'Perú'`, `'Mbappe' = 'Mbappé'`, clave para deduplicar en el upsert de la Entrega 6, donde los datasets de FIFA y Wikipedia conviven con y sin tildes. |
-| Idioma de instancia | `us_english` | Unifica el formato de mensajes y fechas del motor. |
 | Recovery model | `FULL` | Habilita backup de log y restauración a un punto en el tiempo; es el prerrequisito de la política de RPO de la Entrega 8, necesaria por el pico de escritura en días de partido. |
 | Tamaño inicial | 1024 MB datos / 512 MB log | Pre-asignado para evitar autogrowth durante los partidos: el crecimiento de archivo es bloqueante y coincidiría con el pico de escritura. |
 | Autogrowth | MB fijos (256 / 128), no porcentaje | El crecimiento porcentual se encarece progresivamente a medida que el archivo crece. |
 | Ubicación de archivos | `.mdf` y `.ldf` en volúmenes distintos | El archivo de datos tiene acceso aleatorio y el de log secuencial; competir por el mismo cabezal degrada ambos. |
 | Tipos numéricos | `INT` (no `INTEGER`) | `INTEGER` es el sinónimo ANSI de `INT` en T-SQL; se usa la forma nativa del motor por consistencia de estilo en todo el script. |
-| Tipos de texto | `NVARCHAR` sólo en `jugador.nombre/apellido`, `arbitro.nombre/apellido` y `cuerpo_tecnico.nombre/apellido` | Duplicar el ancho de almacenamiento con `NVARCHAR` en toda columna de texto es un costo innecesario para un ~1 GB de base. Se reserva para el nombre real de personas (los únicos seis campos donde una transliteración forzada a Latin1 alteraría la identidad de alguien), y se usa `VARCHAR` en el resto: países, sedes, clubes, anunciantes, idiomas y motivos son datos que FIFA y las fuentes que se van a importar publican siempre en alfabeto latino. |
+| Tipos de texto | `VARCHAR` en todo el script, sin `NVARCHAR` | Las fuentes reales del proyecto (fifa.com, Wikipedia, datasets de GitHub/Kaggle) publican los nombres de jugadores, árbitros y cuerpos técnicos ya romanizados en alfabeto latino, y la collation `CI_AI` ya cubre los acentos de español/portugués/francés/alemán/italiano. Se revisó y se descartó `NVARCHAR` incluso para nombres de persona: duplicar el ancho de almacenamiento no aporta nada si ninguna fuente real va a traer escritura no latina (coreano, japonés, árabe). |
 | Huso horario | `CHAR(6)` con offset fijo (`'UTC-03'`) en `pais.huso_horario` y `sede.huso_horario`, en vez de nombres de zona | Ver desarrollo completo más abajo. |
 
-**Consecuencia transversal del idioma `us_english`**: el formato de fecha implícito pasa a ser `mdy`. Para que los
-literales sean inequívocos independientemente del `LANGUAGE`/`DATEFORMAT` de la sesión, se adopta como norma del
-grupo escribir **todas** las fechas en ISO 8601 (`'2026-06-11T18:00:00'`). Conviene enunciarlo en el documento
-junto a la norma de nomenclatura, porque aplica a todos los scripts de las entregas siguientes.
+**Norma de fechas del grupo**: independientemente de la configuración de idioma de la instancia (que queda a
+criterio del DBA y no se fija en el script), se adopta como norma escribir **todas** las fechas en ISO 8601
+(`'2026-06-11T18:00:00'`), porque es el único formato inequívoco sin importar el `LANGUAGE`/`DATEFORMAT` de la
+sesión que ejecute el script. Conviene enunciarlo en el documento junto a la norma de nomenclatura, porque aplica
+a todos los scripts de las entregas siguientes.
 
 **Efecto colateral de AI a dejar asentado**: las restricciones `UNIQUE` sobre nombres propios (`uq_arbitro`,
 `uq_cuerpo_tecnico`) pasan a considerar iguales dos grafías que difieren sólo en acentos. En este dominio es el
@@ -181,10 +180,10 @@ sedes del Mundial 2026, nombres de países).
 | Columna | Antes | Ahora | Motivo |
 |---|---|---|---|
 | `confederacion.nombre` | `VARCHAR(50)` | `VARCHAR(8)` + `CHECK IN (...)` | Sólo existen 6 confederaciones FIFA (AFC, CAF, CONCACAF, CONMEBOL, OFC, UEFA); la más larga tiene 8 caracteres ([Wikipedia](https://en.wikipedia.org/wiki/FIFA)). No tenía `CHECK` antes; se agregó, ya que el dominio es cerrado y conocido. |
-| `pais.nombre` | `VARCHAR(100)` | `VARCHAR(60)` | Nombre común, no el oficial largo. El país con nombre común más largo ronda 33 caracteres (`Saint Vincent and the Grenadines`, `Democratic Republic of the Congo`); 60 deja margen sin ser 100 ([WorldAtlas](https://www.worldatlas.com/geography/what-is-the-longest-country-name-in-the-world-50109.html)). |
-| `sede.nombre` | `VARCHAR(150)` | `VARCHAR(60)` | Estadios del Mundial 2026 confirmados; el nombre más largo entre los 16 (`Lincoln Financial Field`, Philadelphia) tiene 23 caracteres. |
-| `sede.ciudad` | `VARCHAR(100)` | `VARCHAR(60)` | Nombres de ciudad sede, ninguno cerca de 100 caracteres. |
-| `jugador.club_origen` | `VARCHAR(150)` | `VARCHAR(100)` | Nombre de club (no razón social legal), rara vez supera 40-50 caracteres. |
+| `pais.nombre` | `VARCHAR(100)` | `VARCHAR(80)` | Nombre común, no el oficial largo. El país con nombre común más largo ronda 33 caracteres (`Saint Vincent and the Grenadines`, `Democratic Republic of the Congo`); no tiene `CHECK` que lo gobierne (es un catálogo abierto), así que se deja margen real por encima del máximo conocido ([WorldAtlas](https://www.worldatlas.com/geography/what-is-the-longest-country-name-in-the-world-50109.html)). |
+| `sede.nombre` | `VARCHAR(150)` | `VARCHAR(80)` | Estadios del Mundial 2026 confirmados; el nombre más largo entre los 16 (`Lincoln Financial Field`, Philadelphia) tiene 23 caracteres, pero el nombre puede cambiar por naming rights durante el proyecto, así que se deja margen. |
+| `sede.ciudad` | `VARCHAR(100)` | `VARCHAR(80)` | Nombres de ciudad sede, ninguno cerca de 80 caracteres. |
+| `jugador.club_origen` | `VARCHAR(150)` | `VARCHAR(120)` | Nombre de club (no razón social legal), rara vez supera 40-50 caracteres; sin `CHECK` que lo acote, se deja margen. |
 | `partido.fase` / `criterio_suspension.fase_aplicable` | `VARCHAR(20)` | `VARCHAR(13)` | Dominio cerrado; máximo `'dieciseisavos'`/`'tercer_puesto'` = 13. |
 | `partido.estado` | `VARCHAR(20)` | `VARCHAR(10)` | Dominio cerrado; los tres valores miden exactamente 10. |
 | `cuerpo_tecnico.rol` | `VARCHAR(30)` | `VARCHAR(17)` | Dominio cerrado; máximo `'preparador_fisico'` = 17. |
@@ -197,7 +196,7 @@ sedes del Mundial 2026, nombres de países).
 | `tarjeta.tipo_expulsion` | `VARCHAR(20)` | `VARCHAR(14)` | Dominio cerrado; máximo `'doble_amarilla'` = 14. |
 | `arbitro.categoria` | `VARCHAR(30)` | `VARCHAR(13)` | Dominio cerrado; máximo `'confederacion'` = 13. |
 | `designacion_arbitral.rol` | `VARCHAR(20)` | `VARCHAR(11)` | Dominio cerrado; máximo `'asistente_1'`/`'asistente_2'` = 11. |
-| `arbitro_idioma.idioma` / `pieza_publicitaria.idioma` | `VARCHAR(30)` | `VARCHAR(20)` | Nombre de idioma; ninguno de los idiomas oficiales relevantes se acerca a 20 caracteres. |
+| `arbitro_idioma.idioma` / `pieza_publicitaria.idioma` | `VARCHAR(30)` | `VARCHAR(10)` | Nombre de idioma; es un catálogo conocido (no libre), y el más largo entre los idiomas usuales (`'Neerlandés'`) mide exactamente 10. |
 | `convocatoria.motivo_alta/motivo_baja`, `tarjeta.motivo`, `suspension.motivo`, `informe_arbitral.sancion` | `VARCHAR(200)` | `VARCHAR(150)` | Texto libre corto (una justificación de una oración); no tiene dominio cerrado, así que no hay un "exacto", pero 200 era generoso sin razón. |
 | `anunciante.nombre`, `campania.nombre` | `VARCHAR(150)` | `VARCHAR(100)` | Nombre comercial/de campaña, no la razón social legal. |
 | `anunciante.contacto` | `VARCHAR(150)` | `VARCHAR(100)` | Dato de contacto (nombre, email o teléfono en texto libre). |
