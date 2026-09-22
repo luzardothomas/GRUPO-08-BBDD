@@ -1,0 +1,225 @@
+erDiagram
+    pais {
+        int pais_id PK
+        char codigo_iso
+        varchar nombre
+        char huso_horario
+        numeric pbi_per_capita
+    }
+    confederacion {
+        int confederacion_id PK
+        varchar nombre
+    }
+    sede {
+        int sede_id PK
+        varchar nombre
+        varchar ciudad
+        int pais_id FK
+        int capacidad
+        char huso_horario
+    }
+    seleccion {
+        int seleccion_id PK
+        int pais_id FK
+        int confederacion_id FK
+        char grupo
+    }
+    cuerpo_tecnico {
+        int staff_id PK
+        int seleccion_id FK
+        varchar nombre
+        varchar apellido
+        varchar rol
+    }
+    jugador {
+        int jugador_id PK
+        varchar nombre
+        varchar apellido
+        date fecha_nacimiento
+        varchar club_origen
+        varchar posicion_habitual
+    }
+    convocatoria {
+        int convocatoria_id PK
+        int seleccion_id FK
+        int jugador_id FK
+        int dorsal
+        date fecha_alta
+        varchar motivo_alta
+        date fecha_baja
+        varchar motivo_baja
+    }
+    formacion {
+        int formacion_id PK
+        int partido_id FK
+        int seleccion_id FK
+        varchar esquema_tactico
+    }
+    formacion_jugador {
+        int formacion_id PK,FK
+        int jugador_id PK,FK
+        int dorsal
+        varchar posicion
+        bit titular
+    }
+    sustitucion {
+        int sustitucion_id PK
+        int partido_id FK
+        int seleccion_id FK
+        int jugador_sale_id FK
+        int jugador_entra_id FK
+        int minuto
+        varchar periodo
+        int numero_ventana
+        varchar motivo
+    }
+    gol {
+        int gol_id PK
+        int partido_id FK
+        int seleccion_id FK
+        int jugador_id FK
+        int asistencia_jugador_id FK
+        int minuto
+        varchar tipo_gol
+        varchar periodo
+    }
+    tarjeta {
+        int tarjeta_id PK
+        int partido_id FK
+        int seleccion_id FK
+        int jugador_id FK
+        int minuto
+        varchar tipo
+        varchar motivo
+        varchar tipo_expulsion
+    }
+    criterio_suspension {
+        int criterio_id PK
+        varchar fase_aplicable
+        int cantidad_amarillas
+        int partidos_suspension
+        bit activo
+    }
+    suspension {
+        int suspension_id PK
+        int jugador_id FK
+        int criterio_id FK
+        int tarjeta_id FK
+        int partido_afectado_id FK
+        varchar motivo
+        datetimeoffset fecha_generada
+    }
+    arbitro {
+        int arbitro_id PK
+        varchar nombre
+        varchar apellido
+        date fecha_nacimiento
+        int pais_id FK
+        varchar categoria
+    }
+    arbitro_idioma {
+        int arbitro_id PK,FK
+        varchar idioma PK
+    }
+    designacion_arbitral {
+        int designacion_id PK
+        int partido_id FK
+        int arbitro_id FK
+        varchar rol
+    }
+    informe_arbitral {
+        int informe_id PK
+        int designacion_id FK
+        datetimeoffset fecha
+        varchar contenido
+        varchar sancion
+    }
+    anunciante {
+        int anunciante_id PK
+        varchar nombre
+        varchar razon_social
+        varchar contacto
+    }
+    campania {
+        int campania_id PK
+        int anunciante_id FK
+        varchar nombre
+        date fecha_inicio
+        date fecha_fin
+    }
+    campania_pais_interes {
+        int campania_id PK,FK
+        int pais_id PK,FK
+    }
+    pieza_publicitaria {
+        int pieza_id PK
+        int campania_id FK
+        varchar idioma
+        int pais_mercado_id FK
+        numeric costo_tarifa
+    }
+    espacio_publicitario {
+        int espacio_id PK
+        int partido_id FK
+        int numero_espacio
+        int pieza_id FK
+        int orden_prioridad
+        datetimeoffset fecha_exhibicion
+        bit facturado
+        numeric monto_facturado
+    }
+    partido {
+        int partido_id PK
+        int sede_id FK
+        datetimeoffset fecha_hora_local
+        datetimeoffset fecha_hora_utc
+        varchar fase
+        int seleccion_local_id FK
+        int seleccion_visitante_id FK
+        varchar estado
+        int goles_local
+        int goles_visitante
+        int penales_local
+        int penales_visitante
+        int asistencia_publico
+    }
+    pais ||--o{ sede : "pais_id"
+    pais ||--o{ seleccion : "pais_id"
+    confederacion ||--o{ seleccion : "confederacion_id"
+    sede ||--o{ partido : "sede_id"
+    seleccion ||--o{ partido : "seleccion_local_id"
+    seleccion ||--o{ partido : "seleccion_visitante_id"
+    seleccion ||--o{ cuerpo_tecnico : "seleccion_id"
+    seleccion ||--o{ convocatoria : "seleccion_id"
+    jugador ||--o{ convocatoria : "jugador_id"
+    partido ||--o{ formacion : "partido_id"
+    seleccion ||--o{ formacion : "seleccion_id"
+    formacion ||--o{ formacion_jugador : "formacion_id"
+    jugador ||--o{ formacion_jugador : "jugador_id"
+    partido ||--o{ sustitucion : "partido_id"
+    seleccion ||--o{ sustitucion : "seleccion_id"
+    jugador ||--o{ sustitucion : "jugador_sale_id"
+    jugador ||--o{ sustitucion : "jugador_entra_id"
+    partido ||--o{ gol : "partido_id"
+    seleccion ||--o{ gol : "seleccion_id"
+    jugador ||--o{ gol : "jugador_id"
+    jugador ||--o{ gol : "asistencia_jugador_id"
+    partido ||--o{ tarjeta : "partido_id"
+    seleccion ||--o{ tarjeta : "seleccion_id"
+    jugador ||--o{ tarjeta : "jugador_id"
+    jugador ||--o{ suspension : "jugador_id"
+    criterio_suspension ||--o{ suspension : "criterio_id"
+    tarjeta ||--o{ suspension : "tarjeta_id"
+    partido ||--o{ suspension : "partido_afectado_id"
+    pais ||--o{ arbitro : "pais_id"
+    arbitro ||--o{ arbitro_idioma : "arbitro_id"
+    partido ||--o{ designacion_arbitral : "partido_id"
+    arbitro ||--o{ designacion_arbitral : "arbitro_id"
+    designacion_arbitral ||--o{ informe_arbitral : "designacion_id"
+    anunciante ||--o{ campania : "anunciante_id"
+    campania ||--o{ campania_pais_interes : "campania_id"
+    pais ||--o{ campania_pais_interes : "pais_id"
+    campania ||--o{ pieza_publicitaria : "campania_id"
+    pais ||--o{ pieza_publicitaria : "pais_mercado_id"
+    partido ||--o{ espacio_publicitario : "partido_id"
+    pieza_publicitaria ||--o{ espacio_publicitario : "pieza_id"
