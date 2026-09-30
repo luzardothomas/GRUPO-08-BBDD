@@ -2,12 +2,12 @@
 
 **Bases de Datos Aplicadas · Comisión 02-5600 · Grupo 08**
 
-Registro de los cambios aplicados al modelo de datos a partir de las revisiones del cliente.
-Arriba de todo se encuentra la fecha más actual, y en la misma está la observación del cliente y la solución propuesta para adaptar el modelo.
+En este documento se va a documentar todos los cambios realizados al modelo a partir de las revisiones que haga el cliente.
+Al principio siempre va a estar la fecha más actual, y en la misma está la observación del cliente y la solución que se utilizó para resolver el problema.
 
 ---
 
-## [2026-09-30] Sanciones al cuerpo técnico: incorporación de la entidad Persona
+## [25-09-2026] Sanciones al cuerpo técnico
 
 ### Observación del cliente
 
