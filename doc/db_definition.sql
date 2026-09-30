@@ -432,6 +432,7 @@ CREATE TABLE evento.tarjeta (
     seleccion_id   INT NOT NULL,
     persona_id     INT NOT NULL,                       -- jugador o miembro del cuerpo técnico
     minuto         INT NOT NULL,
+    periodo        VARCHAR(19) NOT NULL,               -- tiempo del partido en que se mostró la tarjeta
     tipo           VARCHAR(8) NOT NULL,
     motivo         VARCHAR(150),
     tipo_expulsion VARCHAR(14),
@@ -444,6 +445,9 @@ CREATE TABLE evento.tarjeta (
     CONSTRAINT fk_tarjeta_persona FOREIGN KEY (persona_id)
         REFERENCES plantel.persona (persona_id),
     CONSTRAINT chk_tarjeta_minuto CHECK (minuto >= 0),
+    CONSTRAINT chk_tarjeta_periodo CHECK (periodo IN
+        ('PT', 'adicional_PT', 'ST', 'adicional_ST',
+         'alargue_1', 'adicional_alargue_1', 'alargue_2', 'adicional_alargue_2', 'penales')),
     CONSTRAINT chk_tarjeta_tipo CHECK (tipo IN ('amarilla', 'roja')),
     CONSTRAINT chk_tarjeta_tipo_expulsion CHECK
         ((tipo = 'amarilla' AND tipo_expulsion IS NULL) OR
