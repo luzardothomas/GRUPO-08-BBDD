@@ -100,6 +100,7 @@ IF OBJECT_ID('plantel.formacion', 'U')                IS NOT NULL DROP TABLE pla
 IF OBJECT_ID('plantel.convocatoria', 'U')             IS NOT NULL DROP TABLE plantel.convocatoria;
 IF OBJECT_ID('plantel.cuerpo_tecnico', 'U')           IS NOT NULL DROP TABLE plantel.cuerpo_tecnico;
 IF OBJECT_ID('plantel.jugador', 'U')                  IS NOT NULL DROP TABLE plantel.jugador;
+IF OBJECT_ID('plantel.persona', 'U')                  IS NOT NULL DROP TABLE plantel.persona;
 
 IF OBJECT_ID('torneo.partido', 'U')                   IS NOT NULL DROP TABLE torneo.partido;
 IF OBJECT_ID('torneo.seleccion', 'U')                 IS NOT NULL DROP TABLE torneo.seleccion;
@@ -222,14 +223,28 @@ GO
 -- B. SELECCIONES Y CONVOCATORIA
 -- ============================================================
 
+-- Entidad intermedia entre un jugador y alguien del cuerpo técnico para que estos últimos puedan recibir tarjetas
+
+CREATE TABLE plantel.persona (
+    persona_id   INT IDENTITY(1, 1),
+    tipo_persona VARCHAR(14) NOT NULL,
+
+    CONSTRAINT pk_persona PRIMARY KEY (persona_id),
+    CONSTRAINT chk_persona_tipo CHECK (tipo_persona IN ('jugador', 'cuerpo_tecnico'))
+);
+
 CREATE TABLE plantel.cuerpo_tecnico (
     staff_id     INT IDENTITY(1, 1),
+    persona_id   INT NOT NULL,
     seleccion_id INT NOT NULL,
     nombre       VARCHAR(100) NOT NULL,
     apellido     VARCHAR(100) NOT NULL,
     rol          VARCHAR(17) NOT NULL,
 
     CONSTRAINT pk_cuerpo_tecnico PRIMARY KEY (staff_id),
+    CONSTRAINT uq_cuerpo_tecnico_persona UNIQUE (persona_id),
+    CONSTRAINT fk_cuerpo_tecnico_persona FOREIGN KEY (persona_id)
+        REFERENCES plantel.persona (persona_id),
     CONSTRAINT fk_cuerpo_tecnico_seleccion FOREIGN KEY (seleccion_id)
         REFERENCES torneo.seleccion (seleccion_id),
     CONSTRAINT uq_cuerpo_tecnico UNIQUE (seleccion_id, nombre, apellido, rol),
@@ -239,6 +254,7 @@ CREATE TABLE plantel.cuerpo_tecnico (
 
 CREATE TABLE plantel.jugador (
     jugador_id        INT IDENTITY(1, 1),
+    persona_id        INT NOT NULL,
     nombre            VARCHAR(100) NOT NULL,
     apellido          VARCHAR(100) NOT NULL,
     fecha_nacimiento  DATE NOT NULL,
@@ -246,6 +262,9 @@ CREATE TABLE plantel.jugador (
     posicion_habitual VARCHAR(13) NOT NULL,
 
     CONSTRAINT pk_jugador PRIMARY KEY (jugador_id),
+    CONSTRAINT uq_jugador_persona UNIQUE (persona_id),
+    CONSTRAINT fk_jugador_persona FOREIGN KEY (persona_id)
+        REFERENCES plantel.persona (persona_id),
     CONSTRAINT chk_jugador_posicion CHECK (posicion_habitual IN
         ('arquero', 'defensor', 'mediocampista', 'delantero'))
 );
@@ -411,7 +430,7 @@ CREATE TABLE evento.tarjeta (
     tarjeta_id     INT IDENTITY(1, 1),
     partido_id     INT NOT NULL,
     seleccion_id   INT NOT NULL,
-    jugador_id     INT NOT NULL,
+    persona_id     INT NOT NULL,                       -- jugador o miembro del cuerpo técnico
     minuto         INT NOT NULL,
     tipo           VARCHAR(8) NOT NULL,
     motivo         VARCHAR(150),
@@ -422,8 +441,8 @@ CREATE TABLE evento.tarjeta (
         REFERENCES torneo.partido (partido_id),
     CONSTRAINT fk_tarjeta_seleccion FOREIGN KEY (seleccion_id)
         REFERENCES torneo.seleccion (seleccion_id),
-    CONSTRAINT fk_tarjeta_jugador FOREIGN KEY (jugador_id)
-        REFERENCES plantel.jugador (jugador_id),
+    CONSTRAINT fk_tarjeta_persona FOREIGN KEY (persona_id)
+        REFERENCES plantel.persona (persona_id),
     CONSTRAINT chk_tarjeta_minuto CHECK (minuto >= 0),
     CONSTRAINT chk_tarjeta_tipo CHECK (tipo IN ('amarilla', 'roja')),
     CONSTRAINT chk_tarjeta_tipo_expulsion CHECK
@@ -431,41 +450,43 @@ CREATE TABLE evento.tarjeta (
          (tipo = 'roja' AND tipo_expulsion IN ('doble_amarilla', 'roja_directa')))
 );
 
--- Índice no clusterizado: soporta el cálculo de acumulación de amarillas por jugador.
+-- Índice no clusterizado: soporta el cálculo de acumulación de amarillas por persona.
 
-CREATE INDEX idx_tarjeta_jugador ON evento.tarjeta (jugador_id);
+CREATE INDEX idx_tarjeta_persona ON evento.tarjeta (persona_id);
 
--- Criterios de suspensión parametrizables (ej: 2 amarillas en grupos = 1 partido de sanción).
+-- Criterios de suspensión parametrizables (ej: 2 amarillas en grupos = 1 partido de sanción),
+-- opcionalmente distintos para jugadores y cuerpo técnico.
 
 CREATE TABLE evento.criterio_suspension (
-    criterio_id         INT IDENTITY(1, 1),
-    fase_aplicable      VARCHAR(13),                   -- NULL = aplica a todas las fases
-    cantidad_amarillas  INT NOT NULL,
-    partidos_suspension INT NOT NULL,
-    activo              BIT NOT NULL DEFAULT 1,
+    criterio_id            INT IDENTITY(1, 1),
+    fase_aplicable         VARCHAR(13),                -- NULL = aplica a todas las fases
+    tipo_persona_aplicable VARCHAR(14),                -- NULL = aplica a jugadores y cuerpo técnico
+    cantidad_amarillas     INT NOT NULL,
+    partidos_suspension    INT NOT NULL,
+    activo                 BIT NOT NULL DEFAULT 1,
 
     CONSTRAINT pk_criterio_suspension PRIMARY KEY (criterio_id),
-    CONSTRAINT uq_criterio_suspension UNIQUE (fase_aplicable, cantidad_amarillas),
+    CONSTRAINT uq_criterio_suspension UNIQUE (fase_aplicable, tipo_persona_aplicable, cantidad_amarillas),
     CONSTRAINT chk_criterio_fase CHECK (fase_aplicable IS NULL OR fase_aplicable IN
         ('grupos', 'dieciseisavos', 'octavos', 'cuartos', 'semifinal', 'tercer_puesto', 'final')),
+    CONSTRAINT chk_criterio_tipo_persona CHECK (tipo_persona_aplicable IS NULL OR
+        tipo_persona_aplicable IN ('jugador', 'cuerpo_tecnico')),
     CONSTRAINT chk_criterio_amarillas CHECK (cantidad_amarillas > 0),
     CONSTRAINT chk_criterio_partidos CHECK (partidos_suspension > 0)
 );
 
--- Suspensión efectiva de un jugador, por acumulación o roja directa.
+-- Suspensión efectiva, por acumulación o roja directa. La persona sancionada se obtiene
+-- de la tarjeta que la dispara (tarjeta.persona_id), por eso tarjeta_id es obligatoria.
 
 CREATE TABLE evento.suspension (
     suspension_id       INT IDENTITY(1, 1),
-    jugador_id          INT NOT NULL,
     criterio_id         INT,                            -- NULL si viene de roja directa
-    tarjeta_id          INT,                            -- tarjeta que dispara la sanción
+    tarjeta_id          INT NOT NULL,                   -- tarjeta que dispara la sanción
     partido_afectado_id INT,                            -- próximo partido que se pierde
     motivo              VARCHAR(150) NOT NULL,
     fecha_generada      DATETIMEOFFSET NOT NULL DEFAULT SYSDATETIMEOFFSET(),
 
     CONSTRAINT pk_suspension PRIMARY KEY (suspension_id),
-    CONSTRAINT fk_suspension_jugador FOREIGN KEY (jugador_id)
-        REFERENCES plantel.jugador (jugador_id),
     CONSTRAINT fk_suspension_criterio FOREIGN KEY (criterio_id)
         REFERENCES evento.criterio_suspension (criterio_id),
     CONSTRAINT fk_suspension_tarjeta FOREIGN KEY (tarjeta_id)
