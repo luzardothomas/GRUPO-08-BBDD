@@ -1,7 +1,5 @@
 # Changelog
 
-**Bases de Datos Aplicadas · Comisión 02-5600 · Grupo 08**
-
 En este documento se va a documentar todos los cambios realizados al modelo a partir de las revisiones que haga el cliente.
 Al principio siempre va a estar la fecha más actual, y en la misma está la observación del cliente y la solución que se utilizó para resolver el problema.
 
