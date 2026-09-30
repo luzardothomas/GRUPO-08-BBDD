@@ -117,11 +117,17 @@ el enunciado, no solo el `.mmd` fuente.
 Documento técnico dirigido a un **DBA** (no a un desarrollador ni a un cliente comercial), sin capturas de
 pantalla, que detalle:
 
-- Instalación del motor (en este caso, obligatoriamente **SQL Server**, según lo asignado/confirmado en las
-  Entregas 1–2).
+- Instalación del motor (el enunciado nombra explícitamente "el motor **SQL Server** elegido", y todo el código
+  debe entregarse en una solución de SQL Server Management Studio).
 - Configuración de memoria.
 - Configuración de seguridad.
 - Ubicación de archivos.
+
+Además aplican las pautas generales del TP para los documentos de la Entrega 3 en adelante: formato PDF, y en
+la **carátula deben figurar la fecha de entrega y los miembros del grupo** que participaron. El documento final
+se nombra `ComXXXX_GrupoYY` (en nuestro caso, `Com5600_Grupo08`).
+
+El documento de esta entrega es [`doc/config.pdf`](../doc/config.pdf).
 
 ### Cómo encararlo en términos académicos
 
@@ -130,10 +136,10 @@ general de administración de bases de datos** (aplicable a cualquier RDBMS) y l
 SQL Server que lo materializa. Esto muestra comprensión de fondo, no solo transcripción de un instructivo de
 instalación:
 
-1. **Instalación**: edición elegida (Developer/Express, justificando por qué no una edición paga en este contexto
-   académico), *features* seleccionados (Database Engine, sin necesidad de Analysis/Reporting Services salvo que
-   se use para la Entrega 9), modo de autenticación (mixto vs. Windows — justificar según el escenario de LAN
-   descripto en las Entregas 1–2).
+1. **Instalación**: edición elegida y su justificación frente al escenario (alta disponibilidad, respaldos
+   programados), *features* seleccionados (Database Engine, sin necesidad de Analysis/Reporting Services: la
+   plataforma de BI de la Entrega 9 se conecta como cliente externo), modo de autenticación (mixto vs. Windows —
+   justificar según el escenario de LAN descripto en las Entregas 1–2).
 2. **Memoria**: concepto general de *buffer pool* / caché de páginas en cualquier RDBMS → en SQL Server,
    `max server memory` / `min server memory`, y por qué fijar un techo es una práctica estándar en cualquier motor
    compartiendo el host con otros servicios.
@@ -144,10 +150,31 @@ instalación:
 4. **Ubicación de archivos**: separación física de datos (`.mdf`), log (`.ldf`) y, si corresponde, tempdb, en
    discos/volúmenes distintos — principio general de I/O en cualquier motor, no exclusivo de SQL Server.
 
-### Decisiones ya tomadas y reflejadas en `doc/db_definition.sql`
+### Decisiones de instancia adoptadas en `doc/config.pdf`
 
-La Sección 1 del script implementa la configuración que este documento debe explicarle al DBA. Las decisiones
-concretas adoptadas son:
+Estas decisiones no están en el script: se aplican al instalar y configurar la instancia, antes de crear la base.
+
+| Área | Decisión | Justificación |
+|---|---|---|
+| Edición | Standard en producción, Developer en desarrollo y pruebas | Express se descarta para producción: no incluye el Agente SQL Server, sin el cual no se pueden programar los respaldos de log que exige el recovery model `FULL`, y no ofrece opciones de alta disponibilidad. Standard incluye el Agente y admite clúster de conmutación por error de dos nodos y grupos de disponibilidad básicos. Developer no tiene licencia para producción. |
+| Componentes | Solo Database Engine (incluye el Agente) | Ningún otro servicio es necesario; cada componente extra amplía la superficie de ataque. |
+| Instancia y red | Instancia predeterminada, TCP/IP en puerto fijo 1433, SQL Browser deshabilitado, firewall limitado a la subred de la LAN | Servidor dedicado y uso exclusivo en LAN. |
+| Intercalación del servidor | `Latin1_General_CI_AI`, igual a la de la base | Evita conflictos de collation con tablas temporales (tempdb toma la del servidor). No se puede cambiar después sin reconstruir las bases del sistema. |
+| Memoria | `max server memory` 12 GB y `min server memory` 4 GB, sobre un servidor de referencia de 16 GB | Reserva memoria para el sistema operativo; con ~1 GB de datos toda la base entra en el buffer pool. |
+| Autenticación | Modo mixto, `sa` deshabilitada | Windows para personas; SQL Server solo para la aplicación y la plataforma de BI, que pueden estar fuera del dominio. |
+| Autorización | Roles por función (administrador, cargador de resultados, gestor de publicidad, consulta) con permisos por esquema | Menor privilegio; la implementación corresponde a la Entrega 8. |
+| Superficie expuesta | CLR y `xp_cmdshell` deshabilitados, conexiones cifradas, auditoría de inicios de sesión | El enunciado prohíbe CLR; el resto reduce riesgos en la LAN. |
+| Ubicación de archivos | Volúmenes separados para datos, log, tempdb y backups, configurados como **directorios predeterminados de la instancia** | El script no indica rutas, así que los archivos de `mundial_2026` se crean donde apunten esos directorios predeterminados. |
+| tempdb | Un archivo por núcleo (hasta 8), mismo tamaño y crecimiento fijo | Reparte la contención de objetos temporales en los picos de partido. |
+
+`doc/config.pdf` también incluye la **norma de nomenclatura** que exige el TP, deducida de los nombres que ya usa
+el script (esquemas, tablas, claves, restricciones e índices), más una propuesta para procedimientos, vistas,
+funciones y variables, que todavía no existen en el script.
+
+### Decisiones de base de datos reflejadas en `doc/db_definition.sql`
+
+El bloque "Configuración para el DBA" del script implementa la collation, el tamaño y crecimiento de los archivos
+y el recovery model. Las decisiones concretas adoptadas son:
 
 | Parámetro | Valor | Justificación |
 |---|---|---|
@@ -155,7 +182,7 @@ concretas adoptadas son:
 | Recovery model | `FULL` | Habilita backup de log y restauración a un punto en el tiempo; es el prerrequisito de la política de RPO de la Entrega 8, necesaria por el pico de escritura en días de partido. |
 | Tamaño inicial | 1024 MB datos / 512 MB log | Pre-asignado para evitar autogrowth durante los partidos: el crecimiento de archivo es bloqueante y coincidiría con el pico de escritura. |
 | Autogrowth | MB fijos (256 / 128), no porcentaje | El crecimiento porcentual se encarece progresivamente a medida que el archivo crece. |
-| Ubicación de archivos | `.mdf` y `.ldf` en volúmenes distintos | El archivo de datos tiene acceso aleatorio y el de log secuencial; competir por el mismo cabezal degrada ambos. |
+| Ubicación de archivos | `.mdf` y `.ldf` en volúmenes distintos (no la fija el script: se define con los directorios predeterminados de la instancia, ver tabla anterior) | El archivo de datos tiene acceso aleatorio y el de log secuencial; competir por el mismo cabezal degrada ambos. |
 | Tipos numéricos | `INT` (no `INTEGER`) | `INTEGER` es el sinónimo ANSI de `INT` en T-SQL; se usa la forma nativa del motor por consistencia de estilo en todo el script. |
 | Tipos de texto | `VARCHAR` en todo el script, sin `NVARCHAR` | Las fuentes reales del proyecto (fifa.com, Wikipedia, datasets de GitHub/Kaggle) publican los nombres de jugadores, árbitros y cuerpos técnicos ya romanizados en alfabeto latino, y la collation `CI_AI` ya cubre los acentos de español/portugués/francés/alemán/italiano. Se revisó y se descartó `NVARCHAR` incluso para nombres de persona: duplicar el ancho de almacenamiento no aporta nada si ninguna fuente real va a traer escritura no latina (coreano, japonés, árabe). |
 | Huso horario | `CHAR(6)` con offset fijo (`'UTC-03'`) en `pais.huso_horario` y `sede.huso_horario`, en vez de nombres de zona | Ver desarrollo completo más abajo. |
@@ -163,8 +190,8 @@ concretas adoptadas son:
 **Norma de fechas del grupo**: independientemente de la configuración de idioma de la instancia (que queda a
 criterio del DBA y no se fija en el script), se adopta como norma escribir **todas** las fechas en ISO 8601
 (`'2026-06-11T18:00:00'`), porque es el único formato inequívoco sin importar el `LANGUAGE`/`DATEFORMAT` de la
-sesión que ejecute el script. Conviene enunciarlo en el documento junto a la norma de nomenclatura, porque aplica
-a todos los scripts de las entregas siguientes.
+sesión que ejecute el script. Se enuncia en `doc/config.pdf` junto a la norma de nomenclatura, porque aplica a
+todos los scripts de las entregas siguientes.
 
 **Efecto colateral de AI a dejar asentado**: las restricciones `UNIQUE` sobre nombres propios (`uq_arbitro`,
 `uq_cuerpo_tecnico`) pasan a considerar iguales dos grafías que difieren sólo en acentos. En este dominio es el
@@ -210,8 +237,8 @@ Las columnas con `IDENTITY`/`INT`, las `NUMERIC(12,2)` (montos, PBI per cápita)
 `pais.huso_horario` y `sede.huso_horario` se modelaron primero con el nombre de zona (IANA + el nombre de
 `sys.time_zone_info` que exige `AT TIME ZONE` en SQL Server, duplicado en dos columnas) para poder resolver el
 prime time del módulo H con la hora oficial de cada mercado en cualquier fecha del año. Se revisó esa decisión
-por sobre-ingeniería: el sistema **no necesita ese caso general**, porque los 64 partidos del torneo transcurren
-en una única ventana de cinco semanas (junio–julio de 2026). Dentro de esa ventana el estado de horario de verano
+por sobre-ingeniería: el sistema **no necesita ese caso general**, porque los 104 partidos del torneo (48
+selecciones) transcurren en una única ventana, del 11 de junio al 19 de julio de 2026. Dentro de esa ventana el estado de horario de verano
 de cada país no cambia, así que alcanza con un **offset fijo respecto de UTC**, calculado una sola vez para la
 fecha del torneo.
 
@@ -234,6 +261,6 @@ las decisiones de memoria y almacenamiento con números concretos, en lugar de v
 
 ### Formato
 
-Documento técnico puro (sin diapositivas, sin video — a diferencia de las Entregas 1 y 2), sin capturas de
-pantalla según exigencia explícita del enunciado; se recomienda usar diagramas o tablas de configuración en su
-lugar.
+Documento técnico puro en PDF (sin diapositivas, sin video — a diferencia de las Entregas 1 y 2), sin capturas de
+pantalla según exigencia explícita del enunciado; se usan tablas de configuración en su lugar. La carátula lleva
+la fecha de entrega y los integrantes del grupo, según las pautas generales del TP.
