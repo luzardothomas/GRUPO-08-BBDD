@@ -1,3 +1,8 @@
+---
+config:
+    theme: "redux-dark-color"
+---
+
 erDiagram
     pais {
         int pais_id PK
@@ -24,8 +29,13 @@ erDiagram
         int confederacion_id FK
         char grupo
     }
+    persona {
+        int persona_id PK
+        varchar tipo_persona
+    }
     cuerpo_tecnico {
         int staff_id PK
+        int persona_id FK
         int seleccion_id FK
         varchar nombre
         varchar apellido
@@ -33,6 +43,7 @@ erDiagram
     }
     jugador {
         int jugador_id PK
+        int persona_id FK
         varchar nombre
         varchar apellido
         date fecha_nacimiento
@@ -87,7 +98,7 @@ erDiagram
         int tarjeta_id PK
         int partido_id FK
         int seleccion_id FK
-        int jugador_id FK
+        int persona_id FK
         int minuto
         varchar tipo
         varchar motivo
@@ -96,13 +107,13 @@ erDiagram
     criterio_suspension {
         int criterio_id PK
         varchar fase_aplicable
+        varchar tipo_persona_aplicable
         int cantidad_amarillas
         int partidos_suspension
         bit activo
     }
     suspension {
         int suspension_id PK
-        int jugador_id FK
         int criterio_id FK
         int tarjeta_id FK
         int partido_afectado_id FK
@@ -186,11 +197,13 @@ erDiagram
 
     pais ||--o{ sede : "tiene"
     pais ||--|| seleccion : "representado por"
-    confederacion ||--|| seleccion : "pertenece a"
+    confederacion o{--|| seleccion : "pertenece a"
     sede ||--o{ partido : "hospeda"
     seleccion ||--o{ partido : "juega de local"
     seleccion ||--o{ partido : "juega de visitante"
     seleccion ||--o{ cuerpo_tecnico : "tiene"
+    persona ||--o| jugador : "pertenece"
+    persona ||--o| cuerpo_tecnico : "pertenece"
     seleccion ||--o{ convocatoria : "tiene"
     jugador ||--o{ convocatoria : "pertenece"
     partido ||--o{ formacion : "tiene"
@@ -207,8 +220,7 @@ erDiagram
     jugador ||--o{ gol : "asiste"
     partido ||--o{ tarjeta : "tiene"
     seleccion ||--o{ tarjeta : "sancionada"
-    jugador ||--o{ tarjeta : "sancionado"
-    jugador ||--o{ suspension : "sufre"
+    persona ||--o{ tarjeta : "recibe"
     criterio_suspension ||--o{ suspension : "da criterio a"
     tarjeta ||--o{ suspension : "causa"
     partido ||--o{ suspension : "tiene"
