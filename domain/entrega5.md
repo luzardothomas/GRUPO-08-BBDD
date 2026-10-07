@@ -1,127 +1,180 @@
 # Análisis — Entrega 5 (Base de Datos)
 
-## ⚠️ Nota sobre una instrucción anómala del enunciado
+Estado: **implementada** en `doc/entrega5.sql` (creación) y `doc/entrega5_test.sql` (pruebas). Este documento
+resume qué pide el enunciado, cómo se resolvió cada punto y las decisiones de diseño que hay que poder defender
+en el coloquio.
 
-El texto del TP incluye, dentro de la introducción a esta entrega, la frase suelta *"Usa cursores de SQL en muchos
-lugares"*, intercalada de forma discordante entre "Deberán entregar en una solución de SSMS scripts bajo esta
-pauta:" y la lista de puntos que sigue. No vuelve a mencionarse en ningún otro lugar del documento, contradice
-buenas prácticas estándar de programación relacional (el resto del enunciado insiste en lógica de negocio,
-transacciones y validaciones set-based) y tiene la forma de una instrucción fuera de contexto. Se recomienda al
-grupo **confirmar con el docente** si es un requisito real antes de diseñar los SP alrededor de cursores; este
-análisis asume que la pauta real es la que se explicita en los puntos siguientes (SP, validaciones, transacciones),
-y que el uso de cursores debe limitarse a los casos donde sea genuinamente necesario (ninguno de los identificados
-en la sección "Reglas de negocio no triviales" de `analisis_modelo_negocio.md` requiere iteración fila a fila —
-todos son resolubles con SQL orientado a conjuntos).
+## Qué pide el enunciado y dónde está resuelto
 
-## Qué pide el enunciado
-
-1. Script de generación de base de datos y esquemas.
-2. Script(s) de generación de tablas y restricciones (mínimo un archivo para todas las tablas).
-3. SP de ABM para **cada** tabla — ninguna alta/baja/modificación puede hacerse por acceso directo. Mínimo un
-   archivo de SP de ABM.
-4. Validaciones: mínimo **10 condiciones** entre todas las tablas, informadas con un **único mensaje agrupado**
-   por SP/operación cuando fallan varias a la vez.
-5. Sin SQL dinámico salvo necesidad estricta; todo en T-SQL puro, sin CLR ni herramientas externas.
-6. SP de **lógica de negocio** que afecten varias tablas dentro de una misma transacción (en scripts separados de
-   los de ABM).
-7. Cada script de SP acompañado 1:1 de script de testing exitoso (con evidencia de datos) y de testing de
-   validaciones fallidas.
-8. Encabezado de comentarios en cada script (fecha, integrantes, descripción).
-9. Numeración de dos dígitos en el nombre de archivo para indicar orden de ejecución.
-
-Esta es la primera entrega puramente de **implementación obligada en SQL Server/T-SQL**; a diferencia de la
-Entrega 3, aquí no hay margen de motor. Aun así, el diseño de la lógica (qué valida cada SP, qué transacciones
-existen) debe pensarse primero en términos relacionales estándar y después traducirse a T-SQL, para que el
-razonamiento sea reutilizable si el docente pidiera portarlo a otro motor.
-
-## Organización de scripts sugerida (según la norma "01_", "02_"...)
-
-| # | Archivo | Contenido |
+| # | Requisito | Dónde |
 |---|---|---|
-| 01 | `01_crear_base_y_esquemas.sql` | `CREATE DATABASE`, `CREATE SCHEMA` si se decide separar por módulo |
-| 02 | `02_crear_tablas.sql` | Todas las tablas + constraints (`PK`, `FK`, `CHECK`, `UNIQUE`) |
-| 03 | `03_sp_abm_<modulo>.sql` | Uno o varios archivos, un conjunto de SP `_insertar/_actualizar/_eliminar` por tabla |
-| 04 | `04_sp_negocio_<caso>.sql` | SP transaccionales multi-tabla (uno por regla de negocio, ver abajo) |
-| 05 | `05_test_abm_ok.sql` | Casos exitosos de cada SP de ABM, con `SELECT` de verificación y comentario del resultado esperado |
-| 06 | `06_test_abm_validaciones.sql` | Casos que deben fallar, mostrando el mensaje agrupado esperado |
-| 07 | `07_test_negocio.sql` | Testing de los SP de negocio (éxito y rollback ante violación) |
+| 1 | Generación de la base de datos y esquemas | `entrega5.sql`, secciones iniciales (contenido de `db_definition.sql`) |
+| 2 | Generación de tablas y restricciones | `entrega5.sql`, secciones 0 a H (ídem) + sección I (`torneo.parametro`) |
+| 3 | SP de ABM para **cada** tabla; ninguna alta, baja o modificación por acceso directo | `entrega5.sql`, sección II: `_insertar`, `_modificar` y `_eliminar` de las 26 tablas |
+| 4 | Mínimo 10 validaciones, informadas en un único mensaje agrupado por SP y operación | Sección II: más de 300 condiciones entre todas las tablas; ver "Validaciones" |
+| 5 | Sin SQL dinámico, sin CLR, todo en T-SQL | Única excepción: `EXEC('CREATE SCHEMA ...')`, heredada de `db_definition.sql` (`CREATE SCHEMA` debe ser la primera sentencia de su lote) |
+| 6 | SP de lógica de negocio, multi-tabla y transaccionales, separados de los de ABM | `entrega5.sql`, sección III (9 procedimientos) |
+| 7 | Testing 1:1, con casos exitosos (con evidencia) y de validaciones fallidas | `entrega5_test.sql`: Parte 1 (ABM) y Parte 2 (negocio) |
+| 8 | Encabezado con fecha, integrantes y descripción | Al inicio de ambos archivos |
+| 9 | Dos dígitos numéricos en el nombre del archivo; solución de SSMS | **Pendiente**, ver "Pendientes para la entrega formal" |
 
-## Diseño de las 10+ validaciones exigidas
+## Organización de los scripts
 
-Conviene repartirlas entre distintas tablas para demostrar cobertura, y documentarlas explícitamente en el informe.
-Candidatas naturales según el modelo ya existente:
+Por decisión del grupo todo el código de creación está en un único archivo, dividido en secciones:
 
-1. `convocatoria`: dorsal en rango 1–99 y no duplicado dentro de la convocatoria vigente de la selección.
-2. `convocatoria`: cantidad de convocados dentro de mínimo/máximo reglamentario al momento del alta.
-3. `partido`: selección local distinta de visitante.
-4. `partido`: fecha/hora UTC coherente con fecha/hora local según el huso de la sede (no se acepta una diferencia
-   inconsistente).
-5. `sustitucion`: jugador que sale distinto del que entra.
-6. `sustitucion`: cantidad de ventanas/cambios por partido y selección dentro del máximo reglamentario (incluyendo
-   el cambio extra en alargue).
-7. `gol` / `tarjeta`: minuto no negativo y coherente con el período informado.
-8. `tarjeta`: `tipo_expulsion` solo puede completarse si `tipo = 'roja'`.
-9. `designacion_arbitral`: rechazo si el país del árbitro coincide con alguna de las selecciones del partido.
-10. `espacio_publicitario`: número de espacio entre 1 y 4, sin duplicar espacio para el mismo partido.
-11. `campania`: fecha de fin no anterior a fecha de inicio.
+| Archivo | Sección | Contenido |
+|---|---|---|
+| `doc/entrega5.sql` | 0 a H | Base, esquemas, tablas y restricciones: el contenido de `db_definition.sql`, sin cambios |
+| | I | `torneo.parametro`, tipo tabla `plantel.tt_formacion_jugador`, vistas `plantel.vw_formacion` y `plantel.vw_persona_partido` |
+| | II | SP de ABM, agrupados por módulo |
+| | III | SP de lógica de negocio |
+| | IV | Carga de los parámetros iniciales (mediante su SP de ABM) |
+| `doc/entrega5_test.sql` | Parte 1 | Pruebas de los SP de ABM |
+| | Parte 2 | Pruebas de los SP de negocio, incluidos los casos obligatorios de la sección IV del TP |
 
-Con 11 puntos ya se cubre el mínimo de 10 pedido, repartidos en 6 tablas distintas.
+`db_definition.sql` se conserva como referencia del modelo (Entrega 3); `entrega5.sql` lo contiene completo.
 
-### Patrón para el mensaje único agrupado
+### Cómo ejecutarlos
 
-Cada SP de ABM debe acumular los errores detectados (no cortar en el primer `RAISERROR`/`THROW`) y devolver un
-solo mensaje. El patrón estándar en T-SQL es acumular las condiciones incumplidas en una variable de texto y
-lanzar una única excepción al final:
+1. Ejecutar `entrega5.sql`. Elimina la base `mundial_2026` si existe y la recrea desde cero (lo que se pide hacer
+   en vivo en el coloquio). Tarda unos segundos.
+2. Ejecutar `entrega5_test.sql` completo, de una vez y en la misma ventana de consulta (usa tablas temporales para
+   pasar los id generados entre lotes). Termina con un resumen: todas las pruebas deben figurar en `OK`.
+
+El script de pruebas exige la base recién creada: si ya tiene datos avisa y no ejecuta nada.
+
+## Norma de nombres de los procedimientos
+
+- ABM: `<esquema>.<tabla>_insertar`, `_modificar`, `_eliminar`.
+- `<esquema>.<tabla>_validar`: SP **interno** con las condiciones comunes al alta y a la modificación. Devuelve los
+  errores acumulados en un parámetro `OUTPUT`; no se invoca desde afuera.
+- Negocio: `<esquema>.<verbo>_<objeto>` (`registrar_tarjeta`, `cargar_formacion`, `designar_arbitros`...).
+- Sin prefijo `sp_` (reservado a los procedimientos de sistema).
+- Variables y parámetros en `snake_case`, con el mismo nombre que la columna que representan.
+
+## Validaciones y mensaje único agrupado
+
+Cada SP acumula las condiciones incumplidas y lanza una única excepción al final, sin cortar en la primera:
 
 ```sql
-DECLARE @errores NVARCHAR(MAX) = N'';
+DECLARE @errores VARCHAR(2000) = '', @nl CHAR(2) = CHAR(13) + CHAR(10);
 
-IF @dorsal NOT BETWEEN 1 AND 99
-    SET @errores = @errores + N'- Dorsal fuera de rango (1-99).' + CHAR(10);
+IF @dorsal IS NULL OR @dorsal NOT BETWEEN 1 AND 99
+    SET @errores += '- El dorsal debe estar entre 1 y 99.' + @nl;
 
-IF EXISTS (SELECT 1 FROM convocatoria
-           WHERE seleccion_id = @seleccion_id AND dorsal = @dorsal AND activo = 1)
-    SET @errores = @errores + N'- Dorsal ya utilizado en la convocatoria vigente.' + CHAR(10);
+IF EXISTS (SELECT 1 FROM plantel.convocatoria
+           WHERE seleccion_id = @seleccion_id AND dorsal = @dorsal AND fecha_baja IS NULL)
+    SET @errores += '- El dorsal ya está en uso en la convocatoria vigente de la selección.' + @nl;
 
 -- ... más condiciones ...
 
-IF @errores <> N''
+IF @errores <> ''
+BEGIN
+    SET @errores = 'plantel.convocatoria_insertar - alta rechazada:' + @nl + @errores;
     THROW 50001, @errores, 1;
+END;
 ```
 
-Este patrón es el que debe repetirse en cada SP que tenga más de una condición a validar, para cumplir el
-requisito de "único mensaje que agrupe todas las condiciones no cumplidas por SP y operación".
+- Error **50001**: validación de un SP de ABM. Error **50002**: validación de un SP de negocio.
+- Cuidado al agregar condiciones: concatenar una variable `NULL` anula todo el mensaje; por eso los valores que
+  pueden venir nulos se envuelven en `ISNULL(...)`.
+- Las bajas son físicas y se rechazan si hay filas dependientes, indicando cuáles (no se llega al error de FK).
 
-## SP de lógica de negocio (transaccionales, multi-tabla)
+Reglas destacadas, además de las de formato, dominio, existencia y unicidad de cada tabla:
 
-El enunciado (sección "Se espera lógica de negocio para...") delimita exactamente qué SP transaccionales se
-esperan. Mapeo directo:
+| Tabla | Regla |
+|---|---|
+| `partido` | Hora local en el huso de la sede y mismo instante que la UTC; en fase de grupos ambas selecciones del mismo grupo; cruce no repetido; sede libre ese día; ninguna selección con otro partido a menos de 24 horas |
+| `convocatoria` | Dorsal 1–99 no repetido entre los vigentes; un jugador no puede estar vigente en dos selecciones; cupo máximo de convocados |
+| `formacion` | Esquema de 3 a 5 líneas que suman 10 jugadores de campo |
+| `formacion_jugador` | Convocado vigente a la fecha del partido; no suspendido para ese partido; máximo de titulares y de suplentes |
+| `sustitucion` | El que sale está en cancha y no fue expulsado; el que entra está en el banco y no participó; máximo de cambios y ventanas, con el adicional del alargue; ventanas en orden; minuto coherente con el período |
+| `gol` | Autor y asistente ingresaron al campo; gol en contra y gol de tanda sin asistencia; minuto coherente con el período |
+| `tarjeta` | La persona participa del partido; no estaba ya expulsada; la doble amarilla exige una amarilla previa |
+| `suspension` | La selección del sancionado juega el partido afectado, que es posterior al de la tarjeta |
+| `designacion_arbitral` | Conflicto de nacionalidad; rol y árbitro no repetidos en el partido; no dirige dos partidos en 24 horas |
+| `pieza_publicitaria` | El mercado debe ser un país de interés de la campaña |
+| `espacio_publicitario` | Espacio 1–4 no repetido; campaña vigente en la fecha del partido; un espacio facturado no se modifica ni elimina |
 
-| Caso de negocio | Tablas afectadas | Punto crítico transaccional |
+## SP de lógica de negocio
+
+Todos validan primero (un único mensaje agrupado) y después abren la transacción con `SET XACT_ABORT ON` y
+`TRY...CATCH` + `ROLLBACK` + `THROW`. Si son invocados dentro de una transacción ya abierta no abren otra ni hacen
+`ROLLBACK` por su cuenta: esa decisión queda para quien la abrió.
+
+| Caso del enunciado | Procedimiento | Tablas que modifica |
 |---|---|---|
-| Registrar partido y su resultado | `partido`, (`gol` agregada si se mantiene redundancia) | atomicidad entre detalle de goles y resumen del partido |
-| Alta/baja de convocatoria de último momento | `convocatoria` (baja del saliente + alta del entrante) | dos operaciones que deben o completarse juntas o no ejecutarse |
-| Carga de alineación/formación de un partido | `formacion`, `formacion_jugador` (N filas) | todos los jugadores de la formación se insertan o ninguno |
-| Registrar sustitución | `sustitucion`, `formacion_jugador` (actualizar quién está en cancha) | consistencia entre el evento y el estado derivado |
-| Registrar gol | `gol` (+ actualización de `partido.goles_*` si se mantiene) | ver nota de desnormalización de `entrega3_4.md` |
-| Registrar tarjeta + cálculo de suspensión | `tarjeta`, `criterio_suspension` (lectura), `suspension` (alta condicional) | la suspensión debe insertarse en la misma transacción que la tarjeta que la origina |
-| Designar árbitros de un partido | `designacion_arbitral` (hasta 5 filas: principal, 2 asistentes, cuarto, VAR) | validación de conflicto de nacionalidad antes del commit; todo el equipo arbitral o ninguno |
-| Asignar las 4 piezas publicitarias de un partido | `espacio_publicitario` (4 filas) | debe resolverse el algoritmo de priorización (sección H) completo antes de persistir; o las 4 quedan asignadas o ninguna |
-| Importación de datos externos | (ver `entrega6.md`) | upsert transaccional por lote |
+| Partidos y resultados | `torneo.registrar_resultado` | `partido` (resultado y estado) y `espacio_publicitario` (fecha de exhibición) |
+| Altas y bajas de último momento | `plantel.reemplazar_convocado` | `convocatoria` (baja del saliente + alta del entrante) |
+| Alineaciones y formaciones | `plantel.cargar_formacion` | `formacion` y `formacion_jugador` (titulares y banco) |
+| Cambios durante el partido | `evento.registrar_sustitucion` | `sustitucion` (calcula la ventana) |
+| Goles | `evento.registrar_gol` | `gol` y `partido` (marcador) |
+| Amonestaciones, expulsiones y suspensión | `evento.registrar_tarjeta` | `tarjeta` y `suspension` |
+| Designación de árbitros | `arbitraje.designar_arbitros` | `designacion_arbitral` (los cinco roles) |
+| Las cuatro piezas publicitarias | `publicidad.asignar_espacios_partido` | `espacio_publicitario` (los cuatro espacios) |
+| Historial para facturar | `publicidad.facturar_espacios_partido` | `espacio_publicitario` |
+| Importación de datos externos | — | Corresponde a la Entrega 6 (ver `entrega6.md`), que reutiliza estos SP |
 
-Cada uno de estos SP debe envolver sus sentencias en `BEGIN TRANSACTION` / `COMMIT` / `ROLLBACK` con manejo de
-errores vía `TRY...CATCH` + `THROW`, de forma que ante cualquier violación de regla se revierta la operación
-completa. Este es el mecanismo estándar (equivalente conceptual a una transacción ACID en cualquier motor ANSI-SQL,
-con sintaxis específica de T-SQL) para garantizar la integridad exigida por el enunciado.
+## Decisiones de diseño a documentar y defender
 
-## Testing 1:1
+1. **Parámetros del reglamento en una tabla** (`torneo.parametro`): cupo mínimo y máximo de convocados, titulares
+   y suplentes, cambios y ventanas (más los adicionales del alargue), partidos de suspensión por roja y franja de
+   prime time. Es la única tabla agregada al modelo; conviene sumarla al DER.
+2. **Marcador desnormalizado.** `partido.goles_*` y `penales_*` son un resumen de `evento.gol`. Los SP de gol lo
+   recalculan en su misma transacción (`torneo.partido_actualizar_marcador`), por lo que no puede quedar
+   desincronizado. El gol en contra suma al rival; los goles de la tanda van a `penales_*`.
+3. **Cierre del partido.** `torneo.registrar_resultado` es la única forma de pasar a `finalizado`. Si el partido
+   tiene formaciones, el resultado sale del detalle y lo informado debe coincidir; si no las tiene (resultado
+   importado), se usa lo informado. Un partido finalizado no admite más eventos.
+4. **Doble amarilla.** La primera amarilla es una fila `amarilla`; la segunda en el mismo partido se registra como
+   una única fila `roja` / `doble_amarilla` (`registrar_tarjeta` hace la conversión).
+5. **Acumulación de amarillas.** Se cuentan las amarillas en partidos distintos posteriores a la última suspensión
+   por acumulación de la persona, sin contar las de partidos donde terminó expulsada por doble amarilla. Se aplica
+   el criterio activo más específico para la fase y el tipo de persona. La suspensión recae en el próximo partido
+   programado de su selección; si aún no existe queda con partido `NULL` hasta completarla.
+6. **Advertencia arbitral desde dieciseisavos.** Se interpreta "país que puede cruzarse" como: el país del árbitro
+   tiene una selección que todavía no perdió un partido de eliminación directa. No bloquea: se devuelve en un
+   parámetro `OUTPUT` y por `PRINT`.
+7. **Criterio de priorización publicitaria** (el enunciado lo deja a definir por el grupo). Son candidatas las
+   piezas de campañas vigentes en la fecha del partido, ordenadas por:
+   1. el mercado de la pieza es el país de una de las dos selecciones;
+   2. el mercado es el de mayor PBI per cápita entre los países de interés de su campaña;
+   3. el horario del partido cae en prime time en el huso del mercado;
+   4. desempate: mayor PBI per cápita, mayor tarifa.
 
-Por cada script de creación de SP debe existir un script de testing correspondiente, con:
-- Un bloque de **caso exitoso**, mostrando `SELECT` antes/después y comentario `-- Resultado esperado: ...`.
-- Un bloque de **caso de validación fallida**, mostrando que se lanza el mensaje agrupado esperado y que no quedan
-  datos parciales (rollback correcto).
+   Entra a lo sumo una pieza por campaña. `orden_prioridad` guarda el criterio que ubicó a la pieza (1 a 4).
+8. **Ventanas de cambio.** Las calcula `registrar_sustitucion`: los cambios del mismo equipo en el mismo minuto y
+   período comparten ventana. No se modela la excepción reglamentaria del entretiempo.
 
-Se recomienda derivar varios de estos casos directamente de los "Casos obligatorios" de la sección IV del TP
-(doble amarilla, roja directa, suspensión efectiva, cambio por lesión en los primeros 20 minutos, conflicto de
-nacionalidad arbitral), ya que son, en la práctica, el conjunto de test que el docente va a pedir ver ejecutado en
-el coloquio.
+## Testing
+
+`entrega5_test.sql` carga todos sus datos a través de los SP (ningún `INSERT` directo a tablas de la base) y
+registra cada comprobación en una tabla temporal; el resumen final debe mostrar 115 comprobaciones en `OK`.
+Los rechazos verifican el número de error y, cuando corresponde, la cantidad exacta de condiciones agrupadas.
+
+Casos obligatorios de la sección IV del TP cubiertos:
+
+| Caso obligatorio | Prueba |
+|---|---|
+| Cambio por lesión dentro de los primeros 20 minutos | 2.3.a |
+| Partido con roja directa | 2.5.b |
+| Partido con expulsión por doble amonestación | 2.8.b |
+| Suspendido por acumulación de amarillas, fuera de la formación del siguiente partido | 2.8.a y 2.8.d |
+| Prime time simultáneo en más de cuatro mercados, con priorización | 2.6.a |
+| Designación arbitral descartada por conflicto de nacionalidad | 2.9.a |
+| Importación con errores parciales | Entrega 6 |
+
+Las pruebas 2.11.a y 2.11.b muestran la atomicidad: una operación que afecta dos tablas se deshace completa, y
+un error a mitad de una transacción revierte también lo ya hecho.
+
+## Pendientes para la entrega formal
+
+- **Dividir en archivos numerados.** El enunciado pide que cada archivo empiece con dos dígitos según el orden de
+  ejecución, y scripts separados para tablas, SP de ABM, SP de negocio, vistas/funciones y testing. Las secciones
+  de `entrega5.sql` están delimitadas para poder cortarlo sin reescribir nada, por ejemplo:
+  `01_base_y_esquemas.sql`, `02_tablas.sql`, `03_vistas_y_tipos.sql`, `04_sp_abm.sql`, `05_sp_negocio.sql`,
+  `06_parametros_iniciales.sql`, `07_test_abm.sql`, `08_test_negocio.sql`.
+- **Solución de SSMS** que agrupe esos archivos.
+- **Juego de datos completo** de la sección IV (8 sedes, 16 selecciones con 23 convocados, 24 partidos, 15
+  árbitros): el script de pruebas carga un subconjunto mínimo; el volumen final llega con la Entrega 6.
+- Sumar `torneo.parametro` al DER y al documento de la Entrega 3.
