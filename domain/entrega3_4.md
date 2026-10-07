@@ -23,13 +23,16 @@ Usando la grilla de `analisis_modelo_negocio.md`, cada módulo del TP debería r
 - **B. Selecciones/Convocatoria**: `pais` 1—1 `seleccion` (un país participa una sola vez), `seleccion` 1—N
   `cuerpo_tecnico`, `seleccion` N—M `jugador` resuelta con entidad asociativa `convocatoria` que además historiza
   altas/bajas (atributos `fecha_alta`, `motivo_alta`, `fecha_baja`, `motivo_baja`).
-- **C. Formaciones**: `partido` × `seleccion` → `formacion` (entidad con atributo `esquema_tactico`); `formacion`
-  1—N `formacion_jugador` (con flag titular/suplente).
-- **D. Cambios**: `sustitucion` como entidad de evento, con dos FK a `jugador` (sale/entra) y FK a `partido` y
-  `seleccion`.
-- **E. Goles**: `gol` como entidad de evento, FK a `jugador` (autor) y FK opcional a `jugador` (asistencia).
-- **F. Amonestaciones**: `tarjeta` (evento) → dispara `suspension` (derivada), parametrizada por
-  `criterio_suspension`.
+- **C. Formaciones**: `partido` 1—N `formacion` (entidad con atributos `esquema_tactico` y `condicion`, que
+  indica si es la del equipo local o la del visitante; la selección se obtiene del partido, sin FK propia);
+  `formacion` 1—N `formacion_jugador` (con flag titular/suplente).
+- **D. Cambios**: `sustitucion` como entidad de evento, con dos FK compuestas a `formacion_jugador` (sale/entra)
+  que comparten `formacion_id`; partido y selección se obtienen de la formación.
+- **E. Goles**: `gol` como entidad de evento, con FK compuesta a `formacion_jugador` (autor) y FK compuesta
+  opcional a `formacion_jugador` (asistencia), ambas sobre el mismo `formacion_id`. El gol cuenta para la selección
+  de esa formación, salvo `tipo_gol = 'en_contra'`, que cuenta para la rival.
+- **F. Amonestaciones**: `tarjeta` (evento, con FK a `partido` y a `persona`, sin FK a `seleccion`) → dispara
+  `suspension` (derivada), parametrizada por `criterio_suspension`.
 - **G. Árbitros**: `arbitro` 1—N `arbitro_idioma` (multivaluado → tabla aparte, resuelve 1FN), `partido` N—M
   `arbitro` resuelta por `designacion_arbitral` (con atributo `rol`), y `designacion_arbitral` 1—N
   `informe_arbitral`.
@@ -72,9 +75,32 @@ pide aplicar las tres primeras formas normales y fundamentar los casos donde no 
    alternativa normalizada —una tabla `indicador_economico(pais_id, anio, indicador, valor)`— se difiere a la
    Entrega 6, cuando se importe efectivamente el indicador `NY.GDP.PCAP.CD` del Banco Mundial.
 
-**Restricción que no se puede declarar y se valida por SP** (conviene tenerla explicada para el coloquio): las FK
-de `formacion_jugador`, `gol`, `tarjeta` y `sustitucion` apuntan directamente a `jugador`, de modo que a nivel
-declarativo nada impide registrar un evento de un jugador no convocado por esa selección. No es resoluble con una
+**Eliminación de bucles de relaciones** (revisión del 02-10-2026, ver `doc/changelog.md`): en la versión
+anterior `formacion`, `sustitucion`, `gol` y `tarjeta` tenían FK directa a `seleccion` además de la FK a `partido`
+(y, en los eventos, a `jugador`). Como `partido` ya referencia a sus dos selecciones, a la selección de un evento
+se llegaba por dos caminos, y nada obligaba a que coincidieran: se podía cargar la formación de una selección
+que no juega ese partido, o un gol cuyo jugador no pertenece a la selección indicada. Se dejó un único camino:
+
+- `formacion` pierde `seleccion_id` y gana `condicion` (`'local'` / `'visitante'`), con `UNIQUE (partido_id,
+  condicion)`; la selección es `partido.seleccion_local_id` o `seleccion_visitante_id` según ese valor.
+- `sustitucion` y `gol` pierden `partido_id` y `seleccion_id` y referencian a `formacion_jugador` por su PK
+  compuesta `(formacion_id, jugador_id)`. Así queda garantizado de forma declarativa que quien convierte, asiste,
+  entra o sale figura en la formación de ese partido, y que los dos jugadores de un cambio (o autor y asistente)
+  son del mismo equipo.
+- `tarjeta` pierde `seleccion_id`: la selección se obtiene de la persona (`cuerpo_tecnico.seleccion_id`, o la
+  formación del jugador en ese partido). Conserva `partido_id` en lugar de colgar de la formación porque el cuerpo
+  técnico no integra `formacion_jugador`.
+
+Los ciclos que quedan en el DER no son redundantes, porque cada camino guarda un hecho distinto: los dos roles
+de `seleccion` en `partido` (local/visitante); el partido de la tarjeta frente al partido afectado por la
+`suspension`; el país de la `sede` frente al de la `seleccion`; el país del `arbitro` frente al de las selecciones
+del partido (justamente la regla de conflicto de nacionalidad); y el país de interés de la `campania` frente al
+país mercado de la `pieza_publicitaria`.
+
+**Restricción que no se puede declarar y se valida por SP** (conviene tenerla explicada para el coloquio): la FK
+de `formacion_jugador` apunta directamente a `jugador`, de modo que a nivel declarativo nada impide incluir en
+una formación a un jugador no convocado por esa selección (y, por extensión, registrarle goles o cambios). Tampoco
+se declara que la persona de una `tarjeta` pertenezca a una de las selecciones del partido. No es resoluble con una
 FK compuesta hacia `convocatoria` porque esa tabla está historizada: el par `(seleccion_id, jugador_id)` puede
 tener varias filas por sucesivas altas y bajas, y por lo tanto no es una clave candidata estable a la que
 referenciar. La validación se hace en los SP de la Entrega 5.
@@ -87,9 +113,10 @@ referenciar. La validación se hace en los SP de la Entrega 5.
 | pais — seleccion | 1 — 1 (un país participa una vez) |
 | seleccion — partido (local/visitante) | 1 — N (dos roles) |
 | seleccion — jugador (vía convocatoria) | N — M |
-| partido — formacion | 1 — N (una por selección) |
+| partido — formacion | 1 — N (una por condición: local y visitante) |
 | formacion — jugador (vía formacion_jugador) | N — M |
-| partido — gol / tarjeta / sustitucion | 1 — N |
+| formacion_jugador — gol / sustitucion | 1 — N (dos roles cada una: autor/asistencia, sale/entra) |
+| partido — tarjeta | 1 — N |
 | jugador — suspension | 1 — N |
 | arbitro — partido (vía designacion_arbitral) | N — M |
 | partido — espacio_publicitario | 1 — 4 (cardinalidad acotada, a marcar explícitamente) |

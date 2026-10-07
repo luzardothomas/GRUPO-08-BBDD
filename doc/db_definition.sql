@@ -313,18 +313,20 @@ GO
 -- C. FORMACIONES Y ALINEACIONES
 -- ============================================================
 
+-- Sin FK a selección: se obtiene del partido (seleccion_local_id o seleccion_visitante_id)
+-- según condicion, evitando una formación de una selección que no juega ese partido.
+
 CREATE TABLE plantel.formacion (
     formacion_id    INT IDENTITY(1, 1),
     partido_id      INT NOT NULL,
-    seleccion_id    INT NOT NULL,
+    condicion       VARCHAR(9) NOT NULL,               -- equipo del partido al que corresponde
     esquema_tactico VARCHAR(9) NOT NULL,               -- ej: '4-3-3'; máximo '4-1-2-1-2' = 9
 
     CONSTRAINT pk_formacion PRIMARY KEY (formacion_id),
-    CONSTRAINT uq_formacion UNIQUE (partido_id, seleccion_id),
+    CONSTRAINT uq_formacion UNIQUE (partido_id, condicion),
     CONSTRAINT fk_formacion_partido FOREIGN KEY (partido_id)
         REFERENCES torneo.partido (partido_id),
-    CONSTRAINT fk_formacion_seleccion FOREIGN KEY (seleccion_id)
-        REFERENCES torneo.seleccion (seleccion_id)
+    CONSTRAINT chk_formacion_condicion CHECK (condicion IN ('local', 'visitante'))
 );
 
 -- Titulares y banco de suplentes de esa formación.
@@ -349,10 +351,12 @@ GO
 -- D. CAMBIOS (SUSTITUCIONES)
 -- ============================================================
 
+-- Partido y selección se obtienen de la formación. Las FK compuestas a formacion_jugador
+-- garantizan que ambos jugadores integran esa formación (mismo partido y mismo equipo).
+
 CREATE TABLE evento.sustitucion (
     sustitucion_id   INT IDENTITY(1, 1),
-    partido_id       INT NOT NULL,
-    seleccion_id     INT NOT NULL,
+    formacion_id     INT NOT NULL,
     jugador_sale_id  INT NOT NULL,
     jugador_entra_id INT NOT NULL,
     minuto           INT NOT NULL,                     -- sin cota superior: el descuento puede extenderlo
@@ -361,14 +365,10 @@ CREATE TABLE evento.sustitucion (
     motivo           VARCHAR(10) NOT NULL,
 
     CONSTRAINT pk_sustitucion PRIMARY KEY (sustitucion_id),
-    CONSTRAINT fk_sustitucion_partido FOREIGN KEY (partido_id)
-        REFERENCES torneo.partido (partido_id),
-    CONSTRAINT fk_sustitucion_seleccion FOREIGN KEY (seleccion_id)
-        REFERENCES torneo.seleccion (seleccion_id),
-    CONSTRAINT fk_sustitucion_jugador_sale FOREIGN KEY (jugador_sale_id)
-        REFERENCES plantel.jugador (jugador_id),
-    CONSTRAINT fk_sustitucion_jugador_entra FOREIGN KEY (jugador_entra_id)
-        REFERENCES plantel.jugador (jugador_id),
+    CONSTRAINT fk_sustitucion_jugador_sale FOREIGN KEY (formacion_id, jugador_sale_id)
+        REFERENCES plantel.formacion_jugador (formacion_id, jugador_id),
+    CONSTRAINT fk_sustitucion_jugador_entra FOREIGN KEY (formacion_id, jugador_entra_id)
+        REFERENCES plantel.formacion_jugador (formacion_id, jugador_id),
     CONSTRAINT chk_sustitucion_jugadores CHECK (jugador_sale_id <> jugador_entra_id),
     CONSTRAINT chk_sustitucion_minuto CHECK (minuto >= 0),
     CONSTRAINT chk_sustitucion_ventana CHECK (numero_ventana > 0),
@@ -376,35 +376,33 @@ CREATE TABLE evento.sustitucion (
     CONSTRAINT chk_sustitucion_motivo CHECK (motivo IN ('tactico', 'lesion', 'precaucion'))
 );
 
--- Índice no clusterizado compuesto: soporta tanto reconstruir el XI en cancha en un
--- minuto dado como contar cambios/ventanas usados por partido y selección.
+-- Índice no clusterizado: soporta tanto reconstruir el XI en cancha en un minuto dado
+-- como contar cambios/ventanas usados por formación (partido y selección).
 
-CREATE INDEX idx_sustitucion_partido ON evento.sustitucion (partido_id, seleccion_id);
+CREATE INDEX idx_sustitucion_formacion ON evento.sustitucion (formacion_id);
 GO
 
 -- ============================================================
 -- E. GOLES Y EVENTOS DE PARTIDO
 -- ============================================================
 
+-- Partido y selección se obtienen de la formación del autor. El gol cuenta para esa
+-- selección, salvo tipo_gol = 'en_contra', que cuenta para la rival.
+
 CREATE TABLE evento.gol (
     gol_id                INT IDENTITY(1, 1),
-    partido_id            INT NOT NULL,
-    seleccion_id          INT NOT NULL,  -- a favor de qué selección cuenta
-    jugador_id            INT NOT NULL,      -- autor (si es en contra, va el autor real)
+    formacion_id          INT NOT NULL,                 -- formación del autor
+    jugador_id            INT NOT NULL,                 -- autor (si es en contra, va el autor real)
     asistencia_jugador_id INT,
     minuto                INT NOT NULL,
     tipo_gol              VARCHAR(10) NOT NULL,
     periodo               VARCHAR(17) NOT NULL,         -- incluye 'penales'; se excluye del ranking de goleadores
 
     CONSTRAINT pk_gol PRIMARY KEY (gol_id),
-    CONSTRAINT fk_gol_partido FOREIGN KEY (partido_id)
-        REFERENCES torneo.partido (partido_id),
-    CONSTRAINT fk_gol_seleccion FOREIGN KEY (seleccion_id)
-        REFERENCES torneo.seleccion (seleccion_id),
-    CONSTRAINT fk_gol_jugador FOREIGN KEY (jugador_id)
-        REFERENCES plantel.jugador (jugador_id),
-    CONSTRAINT fk_gol_asistencia FOREIGN KEY (asistencia_jugador_id)
-        REFERENCES plantel.jugador (jugador_id),
+    CONSTRAINT fk_gol_jugador FOREIGN KEY (formacion_id, jugador_id)
+        REFERENCES plantel.formacion_jugador (formacion_id, jugador_id),
+    CONSTRAINT fk_gol_asistencia FOREIGN KEY (formacion_id, asistencia_jugador_id)
+        REFERENCES plantel.formacion_jugador (formacion_id, jugador_id),
     CONSTRAINT chk_gol_minuto CHECK (minuto >= 0),
     CONSTRAINT chk_gol_asistencia CHECK
         (asistencia_jugador_id IS NULL OR asistencia_jugador_id <> jugador_id),
@@ -416,9 +414,9 @@ CREATE TABLE evento.gol (
 );
 
 -- Índices no clusterizados de un solo campo: base de los reportes de goleadores,
--- por partido (resultado/detalle) y por jugador (ranking del torneo).
+-- por formación (resultado/detalle del partido) y por jugador (ranking del torneo).
 
-CREATE INDEX idx_gol_partido ON evento.gol (partido_id);
+CREATE INDEX idx_gol_formacion ON evento.gol (formacion_id);
 CREATE INDEX idx_gol_jugador ON evento.gol (jugador_id);
 GO
 
@@ -426,10 +424,13 @@ GO
 -- F. AMONESTACIONES Y EXPULSIONES
 -- ============================================================
 
+-- Sin FK a selección: se obtiene de la persona (cuerpo_tecnico.seleccion_id, o la formación
+-- del jugador en ese partido). Cuelga del partido y no de la formación porque el cuerpo
+-- técnico no integra formacion_jugador.
+
 CREATE TABLE evento.tarjeta (
     tarjeta_id     INT IDENTITY(1, 1),
     partido_id     INT NOT NULL,
-    seleccion_id   INT NOT NULL,
     persona_id     INT NOT NULL,                       -- jugador o miembro del cuerpo técnico
     minuto         INT NOT NULL,
     periodo        VARCHAR(19) NOT NULL,               -- tiempo del partido en que se mostró la tarjeta
@@ -440,8 +441,6 @@ CREATE TABLE evento.tarjeta (
     CONSTRAINT pk_tarjeta PRIMARY KEY (tarjeta_id),
     CONSTRAINT fk_tarjeta_partido FOREIGN KEY (partido_id)
         REFERENCES torneo.partido (partido_id),
-    CONSTRAINT fk_tarjeta_seleccion FOREIGN KEY (seleccion_id)
-        REFERENCES torneo.seleccion (seleccion_id),
     CONSTRAINT fk_tarjeta_persona FOREIGN KEY (persona_id)
         REFERENCES plantel.persona (persona_id),
     CONSTRAINT chk_tarjeta_minuto CHECK (minuto >= 0),
