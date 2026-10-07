@@ -118,9 +118,6 @@ proyecto. El esquema actual ya sigue una convención razonable y motor-agnóstic
   efectiva, cambio por lesión temprano, empate de prime time en más de 4 mercados, conflicto arbitral, importación
   con errores parciales). Conviene derivar de esta lista los *casos de test* de cada SP desde la Entrega 5, no dejarlo
   para el final.
-- Cualquier fragmento del enunciado que parezca fuera de estilo o contradiga buenas prácticas (como la mención a
-  "usar cursores en muchos lugares" en la Entrega 5) debería confirmarse con el docente antes de aplicarse
-  literalmente, en lugar de darse por válido sin más.
 
 ## 8. Relación con el resto de los documentos de análisis
 
