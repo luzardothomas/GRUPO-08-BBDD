@@ -63,7 +63,7 @@ erDiagram
     formacion {
         int formacion_id PK
         int partido_id FK
-        int seleccion_id FK
+        varchar condicion
         varchar esquema_tactico
     }
     formacion_jugador {
@@ -75,8 +75,7 @@ erDiagram
     }
     sustitucion {
         int sustitucion_id PK
-        int partido_id FK
-        int seleccion_id FK
+        int formacion_id FK
         int jugador_sale_id FK
         int jugador_entra_id FK
         int minuto
@@ -86,8 +85,7 @@ erDiagram
     }
     gol {
         int gol_id PK
-        int partido_id FK
-        int seleccion_id FK
+        int formacion_id FK
         int jugador_id FK
         int asistencia_jugador_id FK
         int minuto
@@ -97,7 +95,6 @@ erDiagram
     tarjeta {
         int tarjeta_id PK
         int partido_id FK
-        int seleccion_id FK
         int persona_id FK
         int minuto
         varchar periodo
@@ -208,19 +205,13 @@ erDiagram
     seleccion ||--o{ convocatoria : "tiene"
     jugador ||--o{ convocatoria : "pertenece"
     partido ||--o{ formacion : "tiene"
-    seleccion ||--o{ formacion : "arma"
     formacion ||--o{ formacion_jugador : "posiciona"
     jugador ||--o{ formacion_jugador : "tiene"
-    partido ||--o{ sustitucion : "tiene"
-    seleccion ||--o{ sustitucion : "hace"
-    jugador ||--o{ sustitucion : "sustituido"
-    jugador ||--o{ sustitucion : "sustituye"
-    partido ||--o{ gol : "tiene"
-    seleccion ||--o{ gol : "hace"
-    jugador ||--o{ gol : "convierte"
-    jugador ||--o{ gol : "asiste"
+    formacion_jugador ||--o{ sustitucion : "sale"
+    formacion_jugador ||--o{ sustitucion : "entra"
+    formacion_jugador ||--o{ gol : "convierte"
+    formacion_jugador |o--o{ gol : "asiste"
     partido ||--o{ tarjeta : "tiene"
-    seleccion ||--o{ tarjeta : "sancionada"
     persona ||--o{ tarjeta : "recibe"
     criterio_suspension ||--o{ suspension : "da criterio a"
     tarjeta ||--o{ suspension : "causa"

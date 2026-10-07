@@ -5,6 +5,28 @@ Al principio siempre va a estar la fecha más actual, y en la misma está la obs
 
 ---
 
+## [02-10-2026]
+
+### 1. Bucles de relaciones entre entidades
+
+#### Observación del cliente
+
+El cliente indicó que el modelo tenía relaciones que formaban bucles: una selección juega un partido (de local o de visitante) y ese partido tiene formaciones, pero la selección también estaba relacionada directamente con la formación. Al poder llegar al mismo dato por dos caminos distintos, el modelo permitía registrar información contradictoria, como una formación de una selección que no juega ese partido. Lo mismo ocurría con los goles, las sustituciones y las tarjetas, que se relacionaban a la vez con el partido, con la selección y con el jugador.
+
+#### Solución adoptada
+
+Se eliminaron las relaciones redundantes, dejando un único camino para llegar a cada dato:
+
+- **Formación**: ya no se relaciona con la selección. Se agregó el atributo **condicion**, que indica si corresponde al equipo `local` o al `visitante` del partido; la selección se obtiene a partir del partido.
+- **Sustitución** y **Gol**: ya no se relacionan directamente con el partido, la selección ni el jugador. Pasan a relacionarse con el jugador dentro de la formación de ese partido (**Formación Jugador**), de donde se obtienen el partido y la selección. Un gol en contra se registra en la formación de su autor y cuenta para la selección rival.
+- **Tarjeta**: ya no se relaciona con la selección, que se obtiene a partir de la persona que la recibe. Mantiene su relación con el partido porque el cuerpo técnico no forma parte de la formación.
+
+Se eligió esta alternativa, en lugar de conservar ambas relaciones y validar su coincidencia en cada carga, para que la inconsistencia no pueda existir en el modelo. Además, queda garantizado que quien convierte, asiste, entra o sale en un partido figura en la formación de ese partido.
+
+Los bucles restantes se conservaron porque cada camino representa un dato distinto: por ejemplo, el partido en el que se muestra una tarjeta y el partido que se pierde por la suspensión, o el país de la sede y el país de la selección.
+
+---
+
 ## [25-09-2026]
 
 ### 1. Sanciones al cuerpo técnico
