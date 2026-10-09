@@ -11,7 +11,7 @@
 --   LARAN, JEAN PIERRE
 --
 -- DESCRIPCIÓN:
---   Pruebas de los procedimientos de entrega5.sql.
+--   Pruebas de los procedimientos de entrega5_sp.sql.
 --     PARTE 1: SP de ABM de cada tabla  (casos exitosos con evidencia + rechazos).
 --     PARTE 2: SP de lógica de negocio  (casos exitosos con evidencia + rechazos).
 --   Cada prueba indica en un comentario "Resultado esperado". Los rechazos muestran el
@@ -19,7 +19,7 @@
 --   resumen: todas las pruebas deben figurar con resultado OK.
 --
 -- CÓMO EJECUTARLO:
---   1) Ejecutar entrega5.sql (recrea la base vacía).
+--   1) Ejecutar entrega5_definition.sql (recrea la base vacía) y luego entrega5_sp.sql.
 --   2) Ejecutar este script completo, de una sola vez y en la misma ventana de consulta
 --      (usa tablas temporales para pasar datos entre lotes).
 --   Todos los datos se cargan a través de los SP: no hay INSERT/UPDATE/DELETE directos
@@ -36,7 +36,7 @@ GO
 
 IF EXISTS (SELECT 1 FROM torneo.pais)
 BEGIN
-    RAISERROR('La base ya tiene datos: ejecutar primero entrega5.sql para recrearla. No se ejecuta ninguna prueba.', 16, 1);
+    RAISERROR('La base ya tiene datos: ejecutar primero entrega5_definition.sql y entrega5_sp.sql para recrearla. No se ejecuta ninguna prueba.', 16, 1);
     SET NOEXEC ON;
 END;
 GO
