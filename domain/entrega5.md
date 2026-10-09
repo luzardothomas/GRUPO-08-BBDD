@@ -1,6 +1,6 @@
 # Análisis — Entrega 5 (Base de Datos)
 
-Estado: **implementada** en `doc/entrega5.sql` (creación) y `doc/entrega5_test.sql` (pruebas). Este documento
+Estado: **implementada** en `doc/entrega5_definition.sql` y `doc/entrega5_sp.sql` (creación) y `doc/entrega5_test.sql` (pruebas). Este documento
 resume qué pide el enunciado, cómo se resolvió cada punto y las decisiones de diseño que hay que poder defender
 en el coloquio.
 
@@ -8,12 +8,12 @@ en el coloquio.
 
 | # | Requisito | Dónde |
 |---|---|---|
-| 1 | Generación de la base de datos y esquemas | `entrega5.sql`, secciones iniciales (contenido de `db_definition.sql`) |
-| 2 | Generación de tablas y restricciones | `entrega5.sql`, secciones 0 a H (ídem) + sección I (`torneo.parametro`) |
-| 3 | SP de ABM para **cada** tabla; ninguna alta, baja o modificación por acceso directo | `entrega5.sql`, sección II: `_insertar`, `_modificar` y `_eliminar` de las 26 tablas |
+| 1 | Generación de la base de datos y esquemas | `entrega5_definition.sql`, secciones iniciales (contenido de `db_definition.sql`) |
+| 2 | Generación de tablas y restricciones | `entrega5_definition.sql`, secciones 0 a H (ídem) + sección I (`torneo.parametro`) |
+| 3 | SP de ABM para **cada** tabla; ninguna alta, baja o modificación por acceso directo | `entrega5_sp.sql`, sección II: `_insertar`, `_modificar` y `_eliminar` de las 26 tablas |
 | 4 | Mínimo 10 validaciones, informadas en un único mensaje agrupado por SP y operación | Sección II: más de 300 condiciones entre todas las tablas; ver "Validaciones" |
 | 5 | Sin SQL dinámico, sin CLR, todo en T-SQL | Única excepción: `EXEC('CREATE SCHEMA ...')`, heredada de `db_definition.sql` (`CREATE SCHEMA` debe ser la primera sentencia de su lote) |
-| 6 | SP de lógica de negocio, multi-tabla y transaccionales, separados de los de ABM | `entrega5.sql`, sección III (9 procedimientos) |
+| 6 | SP de lógica de negocio, multi-tabla y transaccionales, separados de los de ABM | `entrega5_sp.sql`, sección III (9 procedimientos) |
 | 7 | Testing 1:1, con casos exitosos (con evidencia) y de validaciones fallidas | `entrega5_test.sql`: Parte 1 (ABM) y Parte 2 (negocio) |
 | 8 | Encabezado con fecha, integrantes y descripción | Al inicio de ambos archivos |
 | 9 | Dos dígitos numéricos en el nombre del archivo; solución de SSMS | **Pendiente**, ver "Pendientes para la entrega formal" |
@@ -24,7 +24,7 @@ Por decisión del grupo todo el código de creación está en un único archivo,
 
 | Archivo | Sección | Contenido |
 |---|---|---|
-| `doc/entrega5.sql` | 0 a H | Base, esquemas, tablas y restricciones: el contenido de `db_definition.sql`, sin cambios |
+| `doc/entrega5_definition.sql` y `doc/entrega5_sp.sql` | 0 a H | Base, esquemas, tablas y restricciones: el contenido de `db_definition.sql`, sin cambios |
 | | I | `torneo.parametro`, tipo tabla `plantel.tt_formacion_jugador`, vistas `plantel.vw_formacion` y `plantel.vw_persona_partido` |
 | | II | SP de ABM, agrupados por módulo |
 | | III | SP de lógica de negocio |
@@ -32,11 +32,11 @@ Por decisión del grupo todo el código de creación está en un único archivo,
 | `doc/entrega5_test.sql` | Parte 1 | Pruebas de los SP de ABM |
 | | Parte 2 | Pruebas de los SP de negocio, incluidos los casos obligatorios de la sección IV del TP |
 
-`db_definition.sql` se conserva como referencia del modelo (Entrega 3); `entrega5.sql` lo contiene completo.
+`db_definition.sql` se conserva como referencia del modelo (Entrega 3); `entrega5_definition.sql` lo contiene completo.
 
 ### Cómo ejecutarlos
 
-1. Ejecutar `entrega5.sql`. Elimina la base `mundial_2026` si existe y la recrea desde cero (lo que se pide hacer
+1. Ejecutar `entrega5_definition.sql` y luego `entrega5_sp.sql`. Elimina la base `mundial_2026` si existe y la recrea desde cero (lo que se pide hacer
    en vivo en el coloquio). Tarda unos segundos.
 2. Ejecutar `entrega5_test.sql` completo, de una vez y en la misma ventana de consulta (usa tablas temporales para
    pasar los id generados entre lotes). Termina con un resumen: todas las pruebas deben figurar en `OK`.
@@ -171,7 +171,7 @@ un error a mitad de una transacción revierte también lo ya hecho.
 
 - **Dividir en archivos numerados.** El enunciado pide que cada archivo empiece con dos dígitos según el orden de
   ejecución, y scripts separados para tablas, SP de ABM, SP de negocio, vistas/funciones y testing. Las secciones
-  de `entrega5.sql` están delimitadas para poder cortarlo sin reescribir nada, por ejemplo:
+  de `entrega5_sp.sql` están delimitadas para poder cortarlo sin reescribir nada, por ejemplo:
   `01_base_y_esquemas.sql`, `02_tablas.sql`, `03_vistas_y_tipos.sql`, `04_sp_abm.sql`, `05_sp_negocio.sql`,
   `06_parametros_iniciales.sql`, `07_test_abm.sql`, `08_test_negocio.sql`.
 - **Solución de SSMS** que agrupe esos archivos.
