@@ -5209,29 +5209,29 @@ GO
 -- sólo si faltan, así el script puede reejecutarse sin pisar valores ya ajustados.
 -- La "Importación de datos externos" que lista el enunciado corresponde a la Entrega 6.
 
-IF NOT EXISTS (SELECT 1 FROM torneo.parametro WHERE clave = 'convocatoria_min_jugadores')
-    EXEC torneo.parametro_insertar 'convocatoria_min_jugadores', 23, 'Mínimo de convocados vigentes exigido para presentar una formación';
-IF NOT EXISTS (SELECT 1 FROM torneo.parametro WHERE clave = 'convocatoria_max_jugadores')
-    EXEC torneo.parametro_insertar 'convocatoria_max_jugadores', 26, 'Máximo de convocados vigentes por selección';
-IF NOT EXISTS (SELECT 1 FROM torneo.parametro WHERE clave = 'formacion_titulares')
-    EXEC torneo.parametro_insertar 'formacion_titulares', 11, 'Cantidad de titulares de una formación';
-IF NOT EXISTS (SELECT 1 FROM torneo.parametro WHERE clave = 'formacion_max_suplentes')
-    EXEC torneo.parametro_insertar 'formacion_max_suplentes', 15, 'Máximo de suplentes en el banco';
-IF NOT EXISTS (SELECT 1 FROM torneo.parametro WHERE clave = 'cambios_max_reglamentarios')
-    EXEC torneo.parametro_insertar 'cambios_max_reglamentarios', 5, 'Máximo de cambios por equipo en tiempo reglamentario';
-IF NOT EXISTS (SELECT 1 FROM torneo.parametro WHERE clave = 'ventanas_max_reglamentarias')
-    EXEC torneo.parametro_insertar 'ventanas_max_reglamentarias', 3, 'Máximo de ventanas de cambio por equipo en tiempo reglamentario';
-IF NOT EXISTS (SELECT 1 FROM torneo.parametro WHERE clave = 'cambios_extra_alargue')
-    EXEC torneo.parametro_insertar 'cambios_extra_alargue', 1, 'Cambios adicionales habilitados en tiempo suplementario';
-IF NOT EXISTS (SELECT 1 FROM torneo.parametro WHERE clave = 'ventanas_extra_alargue')
-    EXEC torneo.parametro_insertar 'ventanas_extra_alargue', 1, 'Ventanas adicionales habilitadas en tiempo suplementario';
-IF NOT EXISTS (SELECT 1 FROM torneo.parametro WHERE clave = 'suspension_partidos_roja')
-    EXEC torneo.parametro_insertar 'suspension_partidos_roja', 1, 'Partidos de suspensión por expulsión (roja directa o doble amarilla)';
-IF NOT EXISTS (SELECT 1 FROM torneo.parametro WHERE clave = 'prime_time_hora_desde')
-    EXEC torneo.parametro_insertar 'prime_time_hora_desde', 19, 'Hora local de inicio del prime time (incluida)';
-IF NOT EXISTS (SELECT 1 FROM torneo.parametro WHERE clave = 'prime_time_hora_hasta')
-    EXEC torneo.parametro_insertar 'prime_time_hora_hasta', 23, 'Hora local de fin del prime time (excluida)';
+CREATE OR ALTER PROCEDURE torneo.parametro_cargar_defaults
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO torneo.parametro (clave, valor, descripcion)
+    SELECT d.clave, d.valor, d.descripcion
+    FROM (VALUES
+        ('convocatoria_min_jugadores', 23, N'Mínimo de convocados vigentes exigido para presentar una formación'),
+        ('convocatoria_max_jugadores', 26, N'Máximo de convocados vigentes por selección'),
+        ('formacion_titulares',        11, N'Cantidad de titulares de una formación'),
+        ('formacion_max_suplentes',    15, N'Máximo de suplentes en el banco'),
+        ('cambios_max_reglamentarios',  5, N'Máximo de cambios por equipo en tiempo reglamentario'),
+        ('ventanas_max_reglamentarias', 3, N'Máximo de ventanas de cambio por equipo en tiempo reglamentario'),
+        ('cambios_extra_alargue',       1, N'Cambios adicionales habilitados en tiempo suplementario'),
+        ('ventanas_extra_alargue',      1, N'Ventanas adicionales habilitadas en tiempo suplementario'),
+        ('suspension_partidos_roja',    1, N'Partidos de suspensión por expulsión (roja directa o doble amarilla)'),
+        ('prime_time_hora_desde',      19, N'Hora local de inicio del prime time (incluida)'),
+        ('prime_time_hora_hasta',      23, N'Hora local de fin del prime time (excluida)')
+    ) AS d (clave, valor, descripcion)
+    WHERE NOT EXISTS (SELECT 1 FROM torneo.parametro p WHERE p.clave = d.clave);
+END
 GO
 
-PRINT 'entrega5.sql: base mundial_2026 creada con sus tablas, SP de ABM, SP de negocio y parámetros.';
+EXEC torneo.parametro_cargar_defaults;
 GO
