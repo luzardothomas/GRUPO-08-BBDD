@@ -1,43 +1,42 @@
 # Análisis — Entrega 5 (Base de Datos)
 
-Estado: **implementada** en `doc/entrega5_definition.sql` y `doc/entrega5_sp.sql` (creación) y `doc/entrega5_test.sql` (pruebas). Este documento
-resume qué pide el enunciado, cómo se resolvió cada punto y las decisiones de diseño que hay que poder defender
-en el coloquio.
+Estado: **implementada** en la carpeta `src/entrega5/`: `entrega5_db_definition.sql`, `entrega5_sp_ABM.sql` y
+`entrega5_sp_logica_negocio.sql` (creación) y `entrega5_test.sql` (pruebas). Este documento resume qué pide el
+enunciado, cómo se resolvió cada punto y las decisiones de diseño que hay que poder defender en el coloquio.
 
 ## Qué pide el enunciado y dónde está resuelto
 
 | # | Requisito | Dónde |
 |---|---|---|
-| 1 | Generación de la base de datos y esquemas | `entrega5_definition.sql`, secciones iniciales (contenido de `db_definition.sql`) |
-| 2 | Generación de tablas y restricciones | `entrega5_definition.sql`, secciones 0 a H (ídem) + sección I (`torneo.parametro`) |
-| 3 | SP de ABM para **cada** tabla; ninguna alta, baja o modificación por acceso directo | `entrega5_sp.sql`, sección II: `_insertar`, `_modificar` y `_eliminar` de las 26 tablas |
-| 4 | Mínimo 10 validaciones, informadas en un único mensaje agrupado por SP y operación | Sección II: más de 300 condiciones entre todas las tablas; ver "Validaciones" |
-| 5 | Sin SQL dinámico, sin CLR, todo en T-SQL | Única excepción: `EXEC('CREATE SCHEMA ...')`, heredada de `db_definition.sql` (`CREATE SCHEMA` debe ser la primera sentencia de su lote) |
-| 6 | SP de lógica de negocio, multi-tabla y transaccionales, separados de los de ABM | `entrega5_sp.sql`, sección III (9 procedimientos) |
+| 1 | Generación de la base de datos y esquemas | `entrega5_db_definition.sql`, secciones iniciales |
+| 2 | Generación de tablas y restricciones | `entrega5_db_definition.sql`, secciones 0 a H + sección I (`torneo.parametro`) |
+| 3 | SP de ABM para **cada** tabla; ninguna alta, baja o modificación por acceso directo | `entrega5_sp_ABM.sql`, sección II: `_insertar`, `_modificar` y `_eliminar` de las 26 tablas |
+| 4 | Mínimo 10 validaciones, informadas en un único mensaje agrupado por SP y operación | `entrega5_sp_ABM.sql`: 317 condiciones entre todas las tablas (y 62 más en los SP de negocio); ver "Validaciones" |
+| 5 | Sin SQL dinámico, sin CLR, todo en T-SQL | Única excepción: `EXEC('CREATE SCHEMA ...')` (`CREATE SCHEMA` debe ser la primera sentencia de su lote) |
+| 6 | SP de lógica de negocio, multi-tabla y transaccionales, separados de los de ABM | `entrega5_sp_logica_negocio.sql`, sección III (9 procedimientos) |
 | 7 | Testing 1:1, con casos exitosos (con evidencia) y de validaciones fallidas | `entrega5_test.sql`: Parte 1 (ABM) y Parte 2 (negocio) |
-| 8 | Encabezado con fecha, integrantes y descripción | Al inicio de ambos archivos |
+| 8 | Encabezado con fecha, integrantes y descripción | Al inicio de cada archivo |
 | 9 | Dos dígitos numéricos en el nombre del archivo; solución de SSMS | **Pendiente**, ver "Pendientes para la entrega formal" |
 
 ## Organización de los scripts
 
-Por decisión del grupo todo el código de creación está en un único archivo, dividido en secciones:
+Los scripts están en `src/entrega5/`, divididos en secciones:
 
 | Archivo | Sección | Contenido |
 |---|---|---|
-| `doc/entrega5_definition.sql` y `doc/entrega5_sp.sql` | 0 a H | Base, esquemas, tablas y restricciones: el contenido de `db_definition.sql`, sin cambios |
+| `entrega5_db_definition.sql` | 0 a H | Base, esquemas, tablas y restricciones del modelo de la Entrega 3 |
 | | I | `torneo.parametro`, tipo tabla `plantel.tt_formacion_jugador`, vistas `plantel.vw_formacion` y `plantel.vw_persona_partido` |
-| | II | SP de ABM, agrupados por módulo |
-| | III | SP de lógica de negocio |
-| | IV | Carga de los parámetros iniciales (mediante su SP de ABM) |
-| `doc/entrega5_test.sql` | Parte 1 | Pruebas de los SP de ABM |
+| `entrega5_sp_ABM.sql` | II | SP de ABM, agrupados por módulo |
+| `entrega5_sp_logica_negocio.sql` | III | SP de lógica de negocio |
+| | IV | Carga de los parámetros iniciales con `torneo.parametro_cargar_defaults`, que inserta sólo las claves que faltan (no pisa valores ya ajustados) |
+| `entrega5_test.sql` | Parte 1 | Pruebas de los SP de ABM |
 | | Parte 2 | Pruebas de los SP de negocio, incluidos los casos obligatorios de la sección IV del TP |
-
-`db_definition.sql` se conserva como referencia del modelo (Entrega 3); `entrega5_definition.sql` lo contiene completo.
 
 ### Cómo ejecutarlos
 
-1. Ejecutar `entrega5_definition.sql` y luego `entrega5_sp.sql`. Elimina la base `mundial_2026` si existe y la recrea desde cero (lo que se pide hacer
-   en vivo en el coloquio). Tarda unos segundos.
+1. Ejecutar, en este orden, `entrega5_db_definition.sql`, `entrega5_sp_ABM.sql` y `entrega5_sp_logica_negocio.sql`.
+   El primero elimina la base `mundial_2026` si existe y la recrea desde cero (lo que se pide hacer en vivo en el
+   coloquio). Tarda unos segundos.
 2. Ejecutar `entrega5_test.sql` completo, de una vez y en la misma ventana de consulta (usa tablas temporales para
    pasar los id generados entre lotes). Termina con un resumen: todas las pruebas deben figurar en `OK`.
 
@@ -149,7 +148,8 @@ Todos validan primero (un único mensaje agrupado) y después abren la transacci
 ## Testing
 
 `entrega5_test.sql` carga todos sus datos a través de los SP (ningún `INSERT` directo a tablas de la base) y
-registra cada comprobación en una tabla temporal; el resumen final debe mostrar 115 comprobaciones en `OK`.
+registra cada comprobación en una tabla temporal; el resumen final debe mostrar 115 comprobaciones en `OK`
+(verificado el 23/10/2026 sobre SQL Server 2025 Express).
 Los rechazos verifican el número de error y, cuando corresponde, la cantidad exacta de condiciones agrupadas.
 
 Casos obligatorios de la sección IV del TP cubiertos:
@@ -162,19 +162,20 @@ Casos obligatorios de la sección IV del TP cubiertos:
 | Suspendido por acumulación de amarillas, fuera de la formación del siguiente partido | 2.8.a y 2.8.d |
 | Prime time simultáneo en más de cuatro mercados, con priorización | 2.6.a |
 | Designación arbitral descartada por conflicto de nacionalidad | 2.9.a |
-| Importación con errores parciales | Entrega 6 |
+| Importación con errores parciales | Entrega 6 (`entrega6_test.sql`, pruebas 5.1 y 5.2) |
 
 Las pruebas 2.11.a y 2.11.b muestran la atomicidad: una operación que afecta dos tablas se deshace completa, y
 un error a mitad de una transacción revierte también lo ya hecho.
 
 ## Pendientes para la entrega formal
 
-- **Dividir en archivos numerados.** El enunciado pide que cada archivo empiece con dos dígitos según el orden de
-  ejecución, y scripts separados para tablas, SP de ABM, SP de negocio, vistas/funciones y testing. Las secciones
-  de `entrega5_sp.sql` están delimitadas para poder cortarlo sin reescribir nada, por ejemplo:
-  `01_base_y_esquemas.sql`, `02_tablas.sql`, `03_vistas_y_tipos.sql`, `04_sp_abm.sql`, `05_sp_negocio.sql`,
-  `06_parametros_iniciales.sql`, `07_test_abm.sql`, `08_test_negocio.sql`.
+- **Numerar los archivos.** El enunciado pide que cada archivo empiece con dos dígitos según el orden de
+  ejecución (por ejemplo `01_entrega5_db_definition.sql`, `02_entrega5_sp_ABM.sql`, ...). Vale también para la
+  Entrega 6. Las vistas y el tipo tabla podrían ir a un script propio de vistas y funciones: hoy están en la
+  sección I de `entrega5_db_definition.sql`.
 - **Solución de SSMS** que agrupe esos archivos.
-- **Juego de datos completo** de la sección IV (8 sedes, 16 selecciones con 23 convocados, 24 partidos, 15
-  árbitros): el script de pruebas carga un subconjunto mínimo; el volumen final llega con la Entrega 6.
+- **Juego de datos de la sección IV.** La Entrega 6 ya importa 16 sedes, 48 selecciones con su tabla final y los
+  26 convocados más el DT de cada una (además de las estadísticas individuales de Kaggle). Faltan los partidos,
+  las formaciones de cada partido, los árbitros con sus designaciones y la asignación de espacios publicitarios,
+  que se cargan con los SP de negocio (seed de la Entrega 7).
 - Sumar `torneo.parametro` al DER y al documento de la Entrega 3.
