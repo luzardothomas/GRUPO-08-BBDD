@@ -1,508 +1,286 @@
-/*
- * Universidad: UNLaM
- * Materia: Bases de Datos Aplicada
- * Trabajo práctico: Sistema de registro y gestión del Mundial de Fútbol
- * Entrega: 6 - Importación de datos desde APIs
- *
- * Fuentes:
- * - Banco Mundial, indicador NY.GDP.PCAP.CD:
- *   https://api.worldbank.org/v2/country/all/indicator/NY.GDP.PCAP.CD?format=json&date=2020:2025&per_page=20000
- * - Frankfurter, tipos de cambio:
- *   https://api.frankfurter.dev/v1/latest?base=EUR&symbols=USD,CAD,MXN
- *
- * Las consultas HTTP y la importación se ejecutan desde los procedimientos de este archivo.
- * Requiere SQL Server 2025 (17.x) y nivel de compatibilidad de base 130 o superior.
- * Antes de ejecutar, habilitar 'external rest endpoint enabled' y conceder
- * EXECUTE ANY EXTERNAL ENDPOINT al usuario que invoque los procedimientos.
- * Configuración del servidor (ejecutar como administrador):
- *   EXEC sp_configure 'external rest endpoint enabled', 1;
- *   RECONFIGURE WITH OVERRIDE;
- *   GRANT EXECUTE ANY EXTERNAL ENDPOINT TO [usuario];
- * Ejecutar después de la definición de tablas y SP ABM de la Entrega 5.
- */
+-- =======================================================================================
+-- UNIVERSIDAD NACIONAL DE LA MATANZA
+-- MATERIA: 3641 - Bases de Datos Aplicada (Comisión 02-5600)
+-- TRABAJO PRÁCTICO: Sistema de registro y gestión del mundial de fútbol
+-- ENTREGA 6: Procesos de importación - Consumo de APIs
+--
+-- INTEGRANTES:
+--   LUZARDO, THOMAS GASTON
+--   EKSZTEIN ROLON, JEREMIAS OCTAVIO
+--   REPRESAS PANOZZO, GERÓNIMO
+--   LARAN, JEAN PIERRE
+--
+-- DESCRIPCIÓN:
+--   Consumo de APIs desde T-SQL (sp_invoke_external_rest_endpoint, habilitado en
+--   entrega6_importacion.sql):
+--     torneo.consultar_api_banco_mundial -> torneo.indicador_economico y torneo.pais.pbi_per_capita
+--     publicidad.consultar_api_frankfurter -> publicidad.tipo_cambio
+--   Se ejecuta después de entrega6_importacion.sql y sigue su misma norma.
+--
+-- FUENTES (APIs) Y LÍMITES DE USO:
+--   * API de Indicadores del Banco Mundial (indicador NY.GDP.PCAP.CD - PBI per cápita en USD corrientes):
+--     - Endpoint: https://api.worldbank.org/v2/country/all/indicator/NY.GDP.PCAP.CD?format=json&per_page=20000&date=2020:2025
+--     - Límites de uso: API pública y gratuita, no requiere API key ni autenticación. No tiene
+--       rate limit estricto publicado para consultas estándar; las respuestas son paginadas (50 por
+--       defecto, admite per_page=20000 para traer toda la serie en una sola llamada HTTP). Publica
+--       por Estado soberano (Reino Unido unificado, sin separar Inglaterra y Escocia).
+--   * API Frankfurter (tipos de cambio publicados por el Banco Central Europeo):
+--     - Endpoint vigente:   https://api.frankfurter.dev/v1/latest?base=USD
+--     - Endpoint histórico: https://api.frankfurter.dev/v1/{aaaa-mm-dd}?base=USD
+--     - Límites de uso: API pública y gratuita, sin API key ni límite de peticiones (rate limit)
+--       publicado. Actualiza una vez por día hábil alrededor de las 16:00 CET y cubre ~30 monedas
+--       de referencia del BCE (incluye USD, EUR, MXN, BRL, GBP, CAD, JPY, KRW, AUD, CHF; no cotiza ARS).
+-- =======================================================================================
 
 USE mundial_2026;
 GO
 
-IF SCHEMA_ID('apis') IS NULL
-    EXEC('CREATE SCHEMA apis');
+SET QUOTED_IDENTIFIER ON;
 GO
 
--- Tablas de destino y registro de errores de las importaciones.
+/* Se consumen desde T-SQL con sp_invoke_external_rest_endpoint:
+   * Banco Mundial, indicador NY.GDP.PCAP.CD (PBI per cápita, USD corrientes). Sin clave
+     ni límite publicado; respuestas paginadas (per_page hasta 20000).
+   * Frankfurter (cotizaciones del Banco Central Europeo). Sin clave ni límite publicado;
+     sólo días hábiles y unas 30 monedas (no cotiza ARS). */
 
-IF OBJECT_ID('apis.indicador_economico', 'U') IS NULL
-BEGIN
-    CREATE TABLE apis.indicador_economico (
-        pais_id           INT NOT NULL,
-        codigo_indicador  VARCHAR(30) NOT NULL,
-        anio              SMALLINT NOT NULL,
-        valor             NUMERIC(12, 2) NOT NULL,
-        fuente            VARCHAR(30) NOT NULL,
-        importado_en      DATETIMEOFFSET NOT NULL
-            CONSTRAINT df_indicador_economico_importado_en DEFAULT SYSDATETIMEOFFSET(),
+-- ==================================================================
+-- 1. Banco Mundial: PBI per cápita
+-- ==================================================================
 
-        CONSTRAINT pk_indicador_economico
-            PRIMARY KEY (pais_id, codigo_indicador, anio),
-        CONSTRAINT fk_indicador_economico_pais
-            FOREIGN KEY (pais_id) REFERENCES torneo.pais (pais_id),
-        CONSTRAINT chk_indicador_economico_valor CHECK (valor >= 0)
-    );
-END;
-GO
+/* La respuesta es [ {metadatos}, [ {country, countryiso3code, date, value}, ... ] ].
+ Se importan sólo los países registrados en el modelo (el resto se omite, no es un error).
+ Clave natural: país + indicador + año. Si el año es el más reciente con valor que tiene
+ registrado el país, actualiza además torneo.pais.pbi_per_capita (torneo.pais_modificar);
+ importar después un año anterior no pisa el valor vigente. */
 
-IF OBJECT_ID('apis.tipo_cambio', 'U') IS NULL
-BEGIN
-    CREATE TABLE apis.tipo_cambio (
-        fecha             DATE NOT NULL,
-        moneda_base       CHAR(3) NOT NULL,
-        moneda_cotizada   CHAR(3) NOT NULL,
-        tipo_cambio       NUMERIC(18, 8) NOT NULL,
-        fuente            VARCHAR(30) NOT NULL,
-        importado_en      DATETIMEOFFSET NOT NULL
-            CONSTRAINT df_tipo_cambio_importado_en DEFAULT SYSDATETIMEOFFSET(),
-
-        CONSTRAINT pk_tipo_cambio
-            PRIMARY KEY (fecha, moneda_base, moneda_cotizada),
-        CONSTRAINT chk_tipo_cambio_moneda_distinta
-            CHECK (moneda_base <> moneda_cotizada),
-        CONSTRAINT chk_tipo_cambio_positivo CHECK (tipo_cambio > 0)
-    );
-END;
-GO
-
-IF OBJECT_ID('apis.error_importacion', 'U') IS NULL
-BEGIN
-    CREATE TABLE apis.error_importacion (
-        error_id       INT IDENTITY(1, 1) PRIMARY KEY,
-        fuente         VARCHAR(30) NOT NULL,
-        registro       VARCHAR(1000) NOT NULL,
-        motivo         VARCHAR(1000) NOT NULL,
-        fecha_error    DATETIMEOFFSET NOT NULL DEFAULT SYSDATETIMEOFFSET()
-    );
-END;
-GO
-
--- 1. Importación del PBI per cápita desde el Banco Mundial
-
-CREATE OR ALTER PROCEDURE apis.importar_pbi_banco_mundial
-    @respuesta_json VARCHAR(MAX)
+CREATE OR ALTER PROCEDURE torneo.consultar_api_banco_mundial
+    @anio_desde SMALLINT = 2020,
+    @anio_hasta SMALLINT = 2025
 AS
 BEGIN
     SET NOCOUNT ON;
+    DECLARE @url NVARCHAR(4000), @respuesta_json NVARCHAR(MAX), @lote_id INT,
+            @mensaje VARCHAR(2100), @numero INT, @nl CHAR(2) = CHAR(13) + CHAR(10),
+            @errores VARCHAR(2000), @leidos INT = 0, @insertados INT = 0, @actualizados INT = 0,
+            @sin_cambios INT = 0, @rechazados INT = 0, @omitidos INT, @i INT = 1, @registro VARCHAR(1000),
+            @pais_id INT, @codigo_iso CHAR(3), @nombre VARCHAR(80), @huso CHAR(6), @pbi_actual NUMERIC(12,2),
+            @anio_txt VARCHAR(10), @valor_txt VARCHAR(50), @anio SMALLINT, @valor NUMERIC(14,2),
+            @valor_actual NUMERIC(14,2), @es_ultimo BIT, @resultado VARCHAR(12);
 
-    DECLARE @id_actual INT = 1;
-    DECLARE @id_maximo INT;
-    DECLARE @pais_id INT;
-    DECLARE @codigo_iso VARCHAR(10);
-    DECLARE @nombre VARCHAR(80);
-    DECLARE @huso_horario VARCHAR(10);
-    DECLARE @anio SMALLINT;
-    DECLARE @valor_texto VARCHAR(50);
-    DECLARE @valor NUMERIC(12, 2);
-    DECLARE @registro VARCHAR(1000);
-    DECLARE @mensaje_error VARCHAR(1000);
-    DECLARE @es_actualizacion BIT;
-    DECLARE @actualiza_pais BIT;
-    DECLARE @insertados INT = 0;
-    DECLARE @actualizados INT = 0;
-    DECLARE @rechazados INT = 0;
-    DECLARE @pbi_actualizados INT = 0;
+    SET @url = N'https://api.worldbank.org/v2/country/all/indicator/NY.GDP.PCAP.CD?format=json&per_page=20000&date='
+             + CAST(@anio_desde AS NVARCHAR(4)) + N':' + CAST(@anio_hasta AS NVARCHAR(4));
 
-    IF @respuesta_json IS NULL OR ISJSON(@respuesta_json) <> 1
-        THROW 50020, 'La respuesta del Banco Mundial no contiene JSON válido.', 1;
+    EXEC importacion.lote_abrir 'torneo.consultar_api_banco_mundial', @url, @lote_id OUTPUT;
+    BEGIN TRY
+        EXEC importacion.invocar_api @url, @respuesta_json OUTPUT;
+        IF ISJSON(@respuesta_json) <> 1 OR JSON_QUERY(@respuesta_json, '$[1]') IS NULL
+            THROW 50003, 'La respuesta del Banco Mundial no tiene el formato [metadatos, [datos]].', 1;
+    END TRY
+    BEGIN CATCH
+        SELECT @numero = ERROR_NUMBER(), @mensaje = ERROR_MESSAGE();
+        EXEC importacion.lote_rechazar @lote_id, @numero, @mensaje;
+        THROW;
+    END CATCH;
 
-    IF JSON_QUERY(@respuesta_json, '$[1]') IS NULL
-        THROW 50021, 'La respuesta del Banco Mundial no contiene el arreglo de datos esperado.', 1;
+    CREATE TABLE #respuesta (codigo_iso VARCHAR(3) COLLATE DATABASE_DEFAULT, anio_txt VARCHAR(10),
+                             valor_txt VARCHAR(50), pais_id INT);
+    INSERT INTO #respuesta (codigo_iso, anio_txt, valor_txt, pais_id)
+    SELECT d.codigo_iso, d.anio_txt, d.valor_txt, p.pais_id
+    FROM OPENJSON(@respuesta_json, '$[1]') WITH (
+        codigo_iso VARCHAR(3)  '$.countryiso3code',
+        anio_txt   VARCHAR(10) '$.date',
+        valor_txt  VARCHAR(50) '$.value'
+    ) d
+    LEFT JOIN torneo.pais p ON p.codigo_iso = d.codigo_iso COLLATE DATABASE_DEFAULT;
 
-    DROP TABLE IF EXISTS #RespuestaBancoMundial;
+    SET @omitidos = (SELECT COUNT(*) FROM #respuesta WHERE pais_id IS NULL OR valor_txt IS NULL);
 
-    CREATE TABLE #RespuestaBancoMundial (
-        fila_api INT IDENTITY(1, 1) PRIMARY KEY,
-        codigo_iso VARCHAR(3) NULL,
-        anio_texto VARCHAR(10) NULL,
-        valor_texto VARCHAR(50) NULL
-    );
+    -- Se marca el año más reciente con valor de cada país.
+    CREATE TABLE #datos (fila INT PRIMARY KEY, codigo_iso VARCHAR(3), anio_txt VARCHAR(10), valor_txt VARCHAR(50),
+                         pais_id INT, es_ultimo BIT);
+    INSERT INTO #datos (fila, codigo_iso, anio_txt, valor_txt, pais_id, es_ultimo)
+    SELECT ROW_NUMBER() OVER (ORDER BY codigo_iso, anio_txt), codigo_iso, anio_txt, valor_txt, pais_id,
+           IIF(ROW_NUMBER() OVER (PARTITION BY pais_id ORDER BY TRY_CONVERT(SMALLINT, anio_txt) DESC) = 1, 1, 0)
+    FROM #respuesta
+    WHERE pais_id IS NOT NULL AND valor_txt IS NOT NULL;
 
-    INSERT INTO #RespuestaBancoMundial (codigo_iso, anio_texto, valor_texto)
-    SELECT codigo_iso, anio_texto, valor_texto
-    FROM OPENJSON(@respuesta_json, '$[1]')
-    WITH (
-        codigo_iso VARCHAR(3) '$.countryiso3code',
-        anio_texto VARCHAR(10) '$.date',
-        valor_texto VARCHAR(50) '$.value'
-    );
+    SELECT @leidos = COUNT(*) FROM #datos;
 
-    IF NOT EXISTS (SELECT 1 FROM #RespuestaBancoMundial)
-        THROW 50022, 'La respuesta del Banco Mundial no contiene registros.', 1;
-
-    -- Se conservan todos los años recibidos para los países del torneo.
-    -- La fila con el año más reciente se marca para actualizar el valor vigente de pais.
-    DROP TABLE IF EXISTS #DatosBancoMundial;
-
-    ;WITH datos_ordenados AS (
-        SELECT
-            r.codigo_iso,
-            r.anio_texto,
-            r.valor_texto,
-            ROW_NUMBER() OVER (
-                PARTITION BY r.codigo_iso
-                ORDER BY TRY_CONVERT(SMALLINT, r.anio_texto) DESC, r.fila_api DESC
-            ) AS orden_anio
-        FROM #RespuestaBancoMundial r
-        WHERE r.valor_texto IS NOT NULL
-          AND EXISTS (
-              SELECT 1
-              FROM torneo.pais p
-              WHERE p.codigo_iso = r.codigo_iso
-          )
-    )
-    SELECT
-        IDENTITY(INT, 1, 1) AS fila_importacion,
-        codigo_iso,
-        TRY_CONVERT(SMALLINT, anio_texto) AS anio,
-        anio_texto,
-        valor_texto,
-        CAST(CASE WHEN orden_anio = 1 THEN 1 ELSE 0 END AS BIT) AS es_ultimo_anio
-    INTO #DatosBancoMundial
-    FROM datos_ordenados;
-
-    IF NOT EXISTS (SELECT 1 FROM #DatosBancoMundial)
-        THROW 50023, 'No hay indicadores con valor para los países registrados en el torneo.', 1;
-
-    SELECT @id_maximo = MAX(fila_importacion)
-    FROM #DatosBancoMundial;
-
-    WHILE @id_actual <= @id_maximo
+    WHILE @i <= @leidos
     BEGIN
-        SELECT
-            @codigo_iso = codigo_iso,
-            @anio = anio,
-            @valor_texto = valor_texto,
-            @registro = 'codigo_iso=' + ISNULL(codigo_iso, '') +
-                        '; anio=' + ISNULL(anio_texto, '') +
-                        '; valor=' + ISNULL(valor_texto, '')
-        FROM #DatosBancoMundial d
-        WHERE d.fila_importacion = @id_actual;
-
-        SET @es_actualizacion = 0;
-        SET @actualiza_pais = 0;
+        SELECT @pais_id = pais_id, @anio_txt = anio_txt, @valor_txt = valor_txt, @es_ultimo = es_ultimo,
+               @registro = CONCAT(codigo_iso, ' | ', anio_txt, ' | ', valor_txt)
+        FROM #datos WHERE fila = @i;
+        SELECT @errores = '', @valor_actual = NULL, @resultado = 'sin_cambios';
 
         BEGIN TRY
+            SET @anio = TRY_CONVERT(SMALLINT, @anio_txt);
+            SET @valor = TRY_CONVERT(NUMERIC(14,2), TRY_CONVERT(FLOAT, @valor_txt));
             IF @anio IS NULL
-                THROW 50024, 'El año del indicador no es válido.', 1;
-
-            SET @valor = TRY_CONVERT(NUMERIC(12, 2), @valor_texto);
-
+                SET @errores += '- El año ''' + ISNULL(@anio_txt, '') + ''' no es válido.' + @nl;
             IF @valor IS NULL OR @valor < 0
-                THROW 50025, 'El valor del PBI per cápita no es numérico o es negativo.', 1;
-
-            SELECT
-                @pais_id = pais_id,
-                @codigo_iso = codigo_iso,
-                @nombre = nombre,
-                @huso_horario = huso_horario
-            FROM torneo.pais
-            WHERE codigo_iso = @codigo_iso;
+                SET @errores += '- El valor ''' + ISNULL(@valor_txt, '') + ''' no es un número positivo.' + @nl;
+            IF @errores <> ''
+            BEGIN
+                SET @errores = 'Registro rechazado:' + @nl + @errores;
+                THROW 50004, @errores, 1;
+            END;
 
             BEGIN TRANSACTION;
 
-            IF EXISTS (
-                SELECT 1
-                FROM apis.indicador_economico
-                WHERE pais_id = @pais_id
-                  AND codigo_indicador = 'NY.GDP.PCAP.CD'
-                  AND anio = @anio
-            )
-            BEGIN
-                UPDATE apis.indicador_economico
-                SET valor = @valor,
-                    fuente = 'Banco Mundial',
-                    importado_en = SYSDATETIMEOFFSET()
-                WHERE pais_id = @pais_id
-                  AND codigo_indicador = 'NY.GDP.PCAP.CD'
-                  AND anio = @anio;
+            SELECT @valor_actual = valor FROM torneo.indicador_economico
+            WHERE pais_id = @pais_id AND codigo_indicador = 'NY.GDP.PCAP.CD' AND anio = @anio;
 
-                SET @es_actualizacion = 1;
-            END
-            ELSE
+            IF @valor_actual IS NULL
             BEGIN
-                INSERT INTO apis.indicador_economico
-                    (pais_id, codigo_indicador, anio, valor, fuente)
-                VALUES
-                    (@pais_id, 'NY.GDP.PCAP.CD', @anio, @valor, 'Banco Mundial');
+                INSERT INTO torneo.indicador_economico (pais_id, codigo_indicador, anio, valor, fuente)
+                VALUES (@pais_id, 'NY.GDP.PCAP.CD', @anio, @valor, 'Banco Mundial');
+                SET @resultado = 'insertado';
+            END
+            ELSE IF @valor_actual <> @valor
+            BEGIN
+                UPDATE torneo.indicador_economico
+                SET valor = @valor, importado_en = SYSDATETIMEOFFSET()
+                WHERE pais_id = @pais_id AND codigo_indicador = 'NY.GDP.PCAP.CD' AND anio = @anio;
+                SET @resultado = 'actualizado';
             END;
 
-            IF EXISTS (
-                SELECT 1
-                FROM #DatosBancoMundial
-                WHERE fila_importacion = @id_actual
-                  AND es_ultimo_anio = 1
-            )
+            -- Sólo el año más reciente registrado del país pasa a ser su PBI vigente.
+            IF @es_ultimo = 1
+               AND NOT EXISTS (SELECT 1 FROM torneo.indicador_economico
+                               WHERE pais_id = @pais_id AND codigo_indicador = 'NY.GDP.PCAP.CD' AND anio > @anio)
             BEGIN
-                EXEC torneo.pais_modificar
-                    @pais_id = @pais_id,
-                    @codigo_iso = @codigo_iso,
-                    @nombre = @nombre,
-                    @huso_horario = @huso_horario,
-                    @pbi_per_capita = @valor;
-
-                SET @actualiza_pais = 1;
+                SELECT @codigo_iso = codigo_iso, @nombre = nombre, @huso = huso_horario, @pbi_actual = pbi_per_capita
+                FROM torneo.pais WHERE pais_id = @pais_id;
+                IF ISNULL(@pbi_actual, -1) <> @valor
+                BEGIN
+                    EXEC torneo.pais_modificar @pais_id, @codigo_iso, @nombre, @huso, @valor;
+                    IF @resultado = 'sin_cambios' SET @resultado = 'actualizado';
+                END;
             END;
 
             COMMIT TRANSACTION;
 
-            IF @es_actualizacion = 1
-                SET @actualizados += 1;
-            ELSE
-                SET @insertados += 1;
-
-            IF @actualiza_pais = 1
-                SET @pbi_actualizados += 1;
+            IF @resultado = 'insertado' SET @insertados += 1;
+            ELSE IF @resultado = 'actualizado' SET @actualizados += 1;
+            ELSE SET @sin_cambios += 1;
         END TRY
         BEGIN CATCH
-            IF XACT_STATE() <> 0
-                ROLLBACK TRANSACTION;
-
-            SET @mensaje_error = ERROR_MESSAGE();
-
-            INSERT INTO apis.error_importacion (fuente, registro, motivo)
-            VALUES ('Banco Mundial', ISNULL(@registro, ''), @mensaje_error);
-
+            SELECT @numero = ERROR_NUMBER(), @mensaje = ERROR_MESSAGE();
+            IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+            EXEC importacion.error_registrar @lote_id, @i, @registro, @numero, @mensaje;
             SET @rechazados += 1;
         END CATCH;
 
-        SET @id_actual += 1;
+        SET @i += 1;
     END;
 
-    SELECT
-        'Banco Mundial' AS fuente,
-        @insertados AS registros_insertados,
-        @actualizados AS registros_actualizados,
-        @pbi_actualizados AS paises_actualizados,
-        @rechazados AS registros_rechazados;
+    PRINT CONCAT('torneo.consultar_api_banco_mundial: ', @omitidos,
+                 ' registros omitidos (países que el modelo no registra o años sin dato).');
+    EXEC importacion.lote_cerrar @lote_id, @leidos, @insertados, @actualizados, @sin_cambios, @rechazados;
 END;
 GO
 
--- 2. Importación de cotizaciones desde Frankfurter
+-- ==================================================================
+-- 2. Frankfurter: tipos de cambio
+-- ==================================================================
 
-CREATE OR ALTER PROCEDURE apis.importar_tipos_cambio_frankfurter
-    @respuesta_json VARCHAR(MAX)
+/* La respuesta es { "amount": 1, "base": "USD", "date": "aaaa-mm-dd", "rates": { "EUR": 0.89, ... } }.
+ Clave natural: fecha + moneda base + moneda cotizada (se conserva la historia de cada día).
+ @fecha NULL = cotización más reciente. Para un día no hábil la API devuelve el anterior. */
+
+CREATE OR ALTER PROCEDURE publicidad.consultar_api_frankfurter
+    @fecha DATE = NULL,
+    @base  CHAR(3) = 'USD'
 AS
 BEGIN
     SET NOCOUNT ON;
+    DECLARE @url NVARCHAR(4000), @respuesta_json NVARCHAR(MAX), @lote_id INT,
+            @mensaje VARCHAR(2100), @numero INT, @nl CHAR(2) = CHAR(13) + CHAR(10),
+            @errores VARCHAR(2000), @leidos INT = 0, @insertados INT = 0, @actualizados INT = 0,
+            @sin_cambios INT = 0, @rechazados INT = 0, @i INT = 1, @registro VARCHAR(1000),
+            @fecha_resp DATE, @base_resp VARCHAR(10), @moneda VARCHAR(10), @tasa_txt VARCHAR(50),
+            @tasa NUMERIC(18,8), @tasa_actual NUMERIC(18,8);
 
-    DECLARE @fecha DATE;
-    DECLARE @moneda_base VARCHAR(10);
-    DECLARE @moneda_cotizada VARCHAR(10);
-    DECLARE @tipo_cambio_texto VARCHAR(50);
-    DECLARE @tipo_cambio NUMERIC(18, 8);
-    DECLARE @id_actual INT = 1;
-    DECLARE @id_maximo INT;
-    DECLARE @registro VARCHAR(1000);
-    DECLARE @mensaje_error VARCHAR(1000);
-    DECLARE @insertados INT = 0;
-    DECLARE @actualizados INT = 0;
-    DECLARE @rechazados INT = 0;
-    DECLARE @es_actualizacion BIT;
+    SET @url = N'https://api.frankfurter.dev/v1/' + ISNULL(CONVERT(NVARCHAR(10), @fecha, 23), N'latest')
+             + N'?base=' + UPPER(@base);
 
-    IF @respuesta_json IS NULL OR ISJSON(@respuesta_json) <> 1
-        THROW 50030, 'La respuesta de Frankfurter no contiene JSON válido.', 1;
+    EXEC importacion.lote_abrir 'publicidad.consultar_api_frankfurter', @url, @lote_id OUTPUT;
+    BEGIN TRY
+        EXEC importacion.invocar_api @url, @respuesta_json OUTPUT;
+        IF ISJSON(@respuesta_json) <> 1
+            THROW 50003, 'La respuesta de Frankfurter no es un JSON válido.', 1;
+        SET @base_resp = UPPER(JSON_VALUE(@respuesta_json, '$.base'));
+        SET @fecha_resp = TRY_CONVERT(DATE, JSON_VALUE(@respuesta_json, '$.date'), 23);
+        IF @base_resp IS NULL OR LEN(@base_resp) <> 3 OR @base_resp LIKE '%[^A-Z]%'
+            THROW 50003, 'La respuesta de Frankfurter no trae una moneda base válida.', 1;
+        IF @fecha_resp IS NULL
+            THROW 50003, 'La respuesta de Frankfurter no trae una fecha válida.', 1;
+        IF JSON_QUERY(@respuesta_json, '$.rates') IS NULL
+            THROW 50003, 'La respuesta de Frankfurter no trae el objeto "rates".', 1;
+    END TRY
+    BEGIN CATCH
+        SELECT @numero = ERROR_NUMBER(), @mensaje = ERROR_MESSAGE();
+        EXEC importacion.lote_rechazar @lote_id, @numero, @mensaje;
+        THROW;
+    END CATCH;
 
-    SET @moneda_base = JSON_VALUE(@respuesta_json, '$.base');
-    SET @fecha = TRY_CONVERT(DATE, JSON_VALUE(@respuesta_json, '$.date'), 23);
-
-    IF @moneda_base IS NULL
-       OR LEN(@moneda_base) <> 3
-       OR @moneda_base LIKE '%[^A-Za-z]%'
-        THROW 50031, 'La respuesta de Frankfurter no contiene una moneda base válida.', 1;
-
-    IF @fecha IS NULL
-        THROW 50032, 'La respuesta de Frankfurter no contiene una fecha válida.', 1;
-
-    IF JSON_QUERY(@respuesta_json, '$.rates') IS NULL
-        THROW 50033, 'La respuesta de Frankfurter no contiene el objeto de cotizaciones esperado.', 1;
-
-    DROP TABLE IF EXISTS #DatosFrankfurter;
-
-    CREATE TABLE #DatosFrankfurter (
-        fila_importacion INT IDENTITY(1, 1) PRIMARY KEY,
-        moneda_cotizada VARCHAR(10) NOT NULL,
-        tipo_cambio_texto VARCHAR(50) NULL
-    );
-
-    INSERT INTO #DatosFrankfurter (moneda_cotizada, tipo_cambio_texto)
-    SELECT [key], [value]
+    -- [key] y [value] de OPENJSON vienen con collation BIN2: se pasan a la de la base.
+    SELECT IDENTITY(INT, 1, 1) AS fila, CAST([key] AS VARCHAR(10)) COLLATE DATABASE_DEFAULT AS moneda,
+           CAST([value] AS VARCHAR(50)) COLLATE DATABASE_DEFAULT AS tasa
+    INTO #cotizaciones
     FROM OPENJSON(@respuesta_json, '$.rates');
+    SELECT @leidos = COUNT(*) FROM #cotizaciones;
 
-    IF NOT EXISTS (SELECT 1 FROM #DatosFrankfurter)
-        THROW 50034, 'La respuesta de Frankfurter no contiene cotizaciones.', 1;
-
-    SELECT @id_maximo = MAX(fila_importacion)
-    FROM #DatosFrankfurter;
-
-    WHILE @id_actual <= @id_maximo
+    WHILE @i <= @leidos
     BEGIN
-        SELECT
-            @moneda_cotizada = moneda_cotizada,
-            @tipo_cambio_texto = tipo_cambio_texto
-        FROM #DatosFrankfurter
-        WHERE fila_importacion = @id_actual;
-
-        SET @registro = 'fecha=' + CONVERT(VARCHAR(10), @fecha, 23) +
-                        '; base=' + ISNULL(@moneda_base, '') +
-                        '; cotizada=' + ISNULL(@moneda_cotizada, '') +
-                        '; tipo_cambio=' + ISNULL(@tipo_cambio_texto, '');
-        SET @es_actualizacion = 0;
+        SELECT @moneda = UPPER(moneda), @tasa_txt = tasa,
+               @registro = CONCAT(CONVERT(VARCHAR(10), @fecha_resp, 23), ' | 1 ', @base_resp, ' = ', tasa, ' ', moneda)
+        FROM #cotizaciones WHERE fila = @i;
+        SELECT @errores = '', @tasa_actual = NULL;
 
         BEGIN TRY
-            IF @moneda_cotizada IS NULL
-               OR LEN(@moneda_cotizada) <> 3
-               OR @moneda_cotizada LIKE '%[^A-Za-z]%'
-                THROW 50035, 'El código de moneda cotizada debe tener tres letras.', 1;
-
-            IF UPPER(@moneda_cotizada) = UPPER(@moneda_base)
-                THROW 50037, 'La moneda base no puede ser igual a la moneda cotizada.', 1;
-
-            SET @tipo_cambio = TRY_CONVERT(NUMERIC(18, 8), @tipo_cambio_texto);
-
-            IF @tipo_cambio IS NULL OR @tipo_cambio <= 0
-                THROW 50038, 'La cotización no es numérica o no es positiva.', 1;
-
-            BEGIN TRANSACTION;
-
-            IF EXISTS (
-                SELECT 1
-                FROM apis.tipo_cambio
-                WHERE fecha = @fecha
-                  AND moneda_base = UPPER(@moneda_base)
-                  AND moneda_cotizada = UPPER(@moneda_cotizada)
-            )
+            SET @tasa = TRY_CONVERT(NUMERIC(18,8), TRY_CONVERT(FLOAT, @tasa_txt));
+            IF @moneda IS NULL OR LEN(@moneda) <> 3 OR @moneda LIKE '%[^A-Z]%'
+                SET @errores += '- El código de moneda ''' + ISNULL(@moneda, '') + ''' debe tener tres letras.' + @nl;
+            ELSE IF @moneda = @base_resp
+                SET @errores += '- La moneda cotizada no puede ser la moneda base.' + @nl;
+            IF @tasa IS NULL OR @tasa <= 0
+                SET @errores += '- La cotización ''' + ISNULL(@tasa_txt, '') + ''' no es un número positivo.' + @nl;
+            IF @errores <> ''
             BEGIN
-                UPDATE apis.tipo_cambio
-                SET tipo_cambio = @tipo_cambio,
-                    fuente = 'Frankfurter',
-                    importado_en = SYSDATETIMEOFFSET()
-                WHERE fecha = @fecha
-                  AND moneda_base = UPPER(@moneda_base)
-                  AND moneda_cotizada = UPPER(@moneda_cotizada);
-
-                SET @es_actualizacion = 1;
-            END
-            ELSE
-            BEGIN
-                INSERT INTO apis.tipo_cambio
-                    (fecha, moneda_base, moneda_cotizada, tipo_cambio, fuente)
-                VALUES
-                    (@fecha, UPPER(@moneda_base), UPPER(@moneda_cotizada),
-                     @tipo_cambio, 'Frankfurter');
+                SET @errores = 'Registro rechazado:' + @nl + @errores;
+                THROW 50004, @errores, 1;
             END;
 
-            COMMIT TRANSACTION;
+            SELECT @tasa_actual = tipo_cambio FROM publicidad.tipo_cambio
+            WHERE fecha = @fecha_resp AND moneda_base = @base_resp AND moneda_cotizada = @moneda;
 
-            IF @es_actualizacion = 1
-                SET @actualizados += 1;
-            ELSE
+            IF @tasa_actual IS NULL
+            BEGIN
+                INSERT INTO publicidad.tipo_cambio (fecha, moneda_base, moneda_cotizada, tipo_cambio, fuente)
+                VALUES (@fecha_resp, @base_resp, @moneda, @tasa, 'Frankfurter');
                 SET @insertados += 1;
+            END
+            ELSE IF @tasa_actual <> @tasa
+            BEGIN
+                UPDATE publicidad.tipo_cambio SET tipo_cambio = @tasa, importado_en = SYSDATETIMEOFFSET()
+                WHERE fecha = @fecha_resp AND moneda_base = @base_resp AND moneda_cotizada = @moneda;
+                SET @actualizados += 1;
+            END
+            ELSE
+                SET @sin_cambios += 1;
         END TRY
         BEGIN CATCH
-            IF XACT_STATE() <> 0
-                ROLLBACK TRANSACTION;
-
-            SET @mensaje_error = ERROR_MESSAGE();
-
-            INSERT INTO apis.error_importacion (fuente, registro, motivo)
-            VALUES ('Frankfurter', ISNULL(@registro, ''), @mensaje_error);
-
+            SELECT @numero = ERROR_NUMBER(), @mensaje = ERROR_MESSAGE();
+            EXEC importacion.error_registrar @lote_id, @i, @registro, @numero, @mensaje;
             SET @rechazados += 1;
         END CATCH;
 
-        SET @id_actual += 1;
+        SET @i += 1;
     END;
 
-    SELECT
-        'Frankfurter' AS fuente,
-        @insertados AS registros_insertados,
-        @actualizados AS registros_actualizados,
-        @rechazados AS registros_rechazados;
-END;
-GO
-
--- 3. Consulta e importación del Banco Mundial
--- Ejecución: EXEC apis.consultar_api_banco_mundial;
-
-CREATE OR ALTER PROCEDURE apis.consultar_api_banco_mundial
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    DECLARE @respuesta_http NVARCHAR(MAX);
-    DECLARE @respuesta_api NVARCHAR(MAX);
-    DECLARE @respuesta_importacion VARCHAR(MAX);
-    DECLARE @estado_http INT;
-    DECLARE @mensaje_error NVARCHAR(2048);
-
-    EXEC @estado_http = sys.sp_invoke_external_rest_endpoint
-        @url = N'https://api.worldbank.org/v2/country/all/indicator/NY.GDP.PCAP.CD?format=json&date=2020:2025&per_page=20000',
-        @method = N'GET',
-        @timeout = 60,
-        @response = @respuesta_http OUTPUT;
-
-    IF @estado_http <> 0
-    BEGIN
-        SET @mensaje_error =
-            N'La API del Banco Mundial respondió con código HTTP ' +
-            CONVERT(NVARCHAR(10), @estado_http) + N'.';
-        THROW 50040, @mensaje_error, 1;
-    END;
-
-    SET @respuesta_api = JSON_QUERY(@respuesta_http, '$.result');
-
-    IF @respuesta_api IS NULL
-        THROW 50041, 'La respuesta HTTP del Banco Mundial no contiene el resultado JSON esperado.', 1;
-
-    SET @respuesta_importacion = CONVERT(VARCHAR(MAX), @respuesta_api);
-
-    EXEC apis.importar_pbi_banco_mundial
-        @respuesta_json = @respuesta_importacion;
-END;
-GO
-
--- 4. Consulta e importación de tipos de cambio desde Frankfurter
--- Ejecución: EXEC apis.consultar_api_frankfurter;
-
-CREATE OR ALTER PROCEDURE apis.consultar_api_frankfurter
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    DECLARE @respuesta_http NVARCHAR(MAX);
-    DECLARE @respuesta_api NVARCHAR(MAX);
-    DECLARE @respuesta_importacion VARCHAR(MAX);
-    DECLARE @estado_http INT;
-    DECLARE @mensaje_error NVARCHAR(2048);
-
-    EXEC @estado_http = sys.sp_invoke_external_rest_endpoint
-        @url = N'https://api.frankfurter.dev/v1/latest?base=EUR&symbols=USD,CAD,MXN',
-        @method = N'GET',
-        @timeout = 60,
-        @response = @respuesta_http OUTPUT;
-
-    IF @estado_http <> 0
-    BEGIN
-        SET @mensaje_error =
-            N'La API de Frankfurter respondió con código HTTP ' +
-            CONVERT(NVARCHAR(10), @estado_http) + N'.';
-        THROW 50042, @mensaje_error, 1;
-    END;
-
-    SET @respuesta_api = JSON_QUERY(@respuesta_http, '$.result');
-
-    IF @respuesta_api IS NULL
-        THROW 50043, 'La respuesta HTTP de Frankfurter no contiene el resultado JSON esperado.', 1;
-
-    SET @respuesta_importacion = CONVERT(VARCHAR(MAX), @respuesta_api);
-
-    EXEC apis.importar_tipos_cambio_frankfurter
-        @respuesta_json = @respuesta_importacion;
+    EXEC importacion.lote_cerrar @lote_id, @leidos, @insertados, @actualizados, @sin_cambios, @rechazados;
 END;
 GO

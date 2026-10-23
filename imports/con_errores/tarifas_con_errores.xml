@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Archivo de prueba: 5 piezas, 4 con errores (importación parcial). -->
+<tarifario fecha="2026-06-01">
+  <anunciante nombre="Quilmes">
+    <campania nombre="Mesa de astros" inicio="2026-06-11" fin="2026-07-19">
+      <pais_interes codigo="ARG"/>
+      <!-- ARS: Frankfurter no la cotiza, no se puede convertir -->
+      <pieza idioma="espanol" mercado="ARG" moneda="ARS" tarifa="15000000"/>
+      <!-- tarifa no numérica -->
+      <pieza idioma="ingles" mercado="ARG" moneda="USD" tarifa="abc"/>
+      <!-- mercado inexistente -->
+      <pieza idioma="espanol" mercado="XXX" moneda="USD" tarifa="1000"/>
+      <!-- Brasil no es país de interés de la campaña: lo rechaza publicidad.pieza_publicitaria_insertar -->
+      <pieza idioma="portugues" mercado="BRA" moneda="BRL" tarifa="50000"/>
+      <!-- válida: se convierte de EUR a USD -->
+      <pieza idioma="ingles" mercado="URY" moneda="EUR" tarifa="5000"/>
+    </campania>
+  </anunciante>
+</tarifario>
