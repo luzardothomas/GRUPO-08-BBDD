@@ -340,6 +340,9 @@ BEGIN
     DECLARE @nl CHAR(2) = CHAR(13) + CHAR(10);
     SET @errores = ISNULL(@errores, '');
 
+    SET @nombre = LTRIM(RTRIM(@nombre));
+    SET @ciudad = LTRIM(RTRIM(@ciudad));
+
     IF @sede_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM torneo.sede WHERE sede_id = @sede_id)
         SET @errores += '- No existe la sede con id ' + CAST(@sede_id AS VARCHAR(12)) + '.' + @nl;
     IF NULLIF(LTRIM(RTRIM(@nombre)), '') IS NULL
@@ -350,12 +353,19 @@ BEGIN
         SET @errores += '- No existe el país con id ' + ISNULL(CAST(@pais_id AS VARCHAR(12)), '(nulo)') + '.' + @nl;
     IF @capacidad IS NULL OR @capacidad <= 0
         SET @errores += '- La capacidad debe ser mayor a cero.' + @nl;
-    IF @huso_horario IS NULL OR LEN(@huso_horario) <> 6 OR @huso_horario NOT LIKE 'UTC[-+][0-9][0-9]'
+    IF @huso_horario IS NULL
+       OR DATALENGTH(@huso_horario) <> 6
+       OR @huso_horario NOT LIKE 'UTC[-+][0-9][0-9]'
         SET @errores += '- El huso horario debe tener el formato UTC+hh o UTC-hh (ej: UTC-04).' + @nl;
     ELSE IF CAST(SUBSTRING(@huso_horario, 4, 3) AS INT) NOT BETWEEN -12 AND 14
         SET @errores += '- El huso horario debe estar entre UTC-12 y UTC+14.' + @nl;
-    IF EXISTS (SELECT 1 FROM torneo.sede
-               WHERE nombre = @nombre AND ciudad = @ciudad AND (@sede_id IS NULL OR sede_id <> @sede_id))
+    IF EXISTS (
+        SELECT 1
+        FROM torneo.sede
+        WHERE LTRIM(RTRIM(nombre)) = @nombre
+          AND LTRIM(RTRIM(ciudad)) = @ciudad
+          AND (@sede_id IS NULL OR sede_id <> @sede_id)
+    )
         SET @errores += '- Ya existe una sede con ese nombre en esa ciudad.' + @nl;
 END;
 GO
@@ -470,7 +480,7 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM torneo.confederacion WHERE confederacion_id = @confederacion_id)
         SET @errores += '- No existe la confederación con id '
                       + ISNULL(CAST(@confederacion_id AS VARCHAR(12)), '(nulo)') + '.' + @nl;
-    IF @grupo IS NULL OR LEN(@grupo) <> 1 OR @grupo NOT LIKE '[A-L]'
+    IF @grupo IS NULL OR DATALENGTH(@grupo) <> 1 OR @grupo NOT LIKE '[A-L]'
         SET @errores += '- El grupo debe ser una letra entre A y L.' + @nl;
 END;
 GO
@@ -629,6 +639,7 @@ BEGIN
                  AND ABS(DATEDIFF(MINUTE, fecha_hora_utc, @fecha_hora_utc)) < 24 * 60
                  AND (@partido_id IS NULL OR partido_id <> @partido_id))
         SET @errores += '- Alguna de las selecciones ya juega otro partido a menos de 24 horas.' + @nl;
+
 END;
 GO
 
@@ -800,7 +811,7 @@ BEGIN
 
     IF @errores <> ''
     BEGIN
-        SET @errores = 'plantel.persona_modificar - modificación rechazada:' + @nl + @errores;
+        SET @errores = 'plantel.persona_modificar - modificacion rechazada:' + @nl + @errores;
         THROW 50001, @errores, 1;
     END;
 
@@ -2984,9 +2995,19 @@ BEGIN
     IF NULLIF(LTRIM(RTRIM(@nombre)), '') IS NULL
         SET @errores += '- El nombre del anunciante es obligatorio.' + @nl;
     IF EXISTS (SELECT 1 FROM publicidad.anunciante WHERE nombre = @nombre)
-        SET @errores += '- Ya existe un anunciante con ese nombre.' + @nl;
-    IF @contacto IS NOT NULL AND @contacto LIKE '%@%' AND @contacto NOT LIKE '_%@_%._%'
-        SET @errores += '- El contacto parece un correo electrónico pero su formato no es válido.' + @nl;
+    SET @errores += '- Ya existe un anunciante con ese nombre.' + @nl;
+    
+    IF @contacto IS NOT NULL AND NULLIF(LTRIM(RTRIM(@contacto)), '') IS NOT NULL
+    BEGIN
+        SET @contacto = LTRIM(RTRIM(@contacto));
+        IF LEN(@contacto) > 100
+            OR LEN(@contacto) - LEN(REPLACE(@contacto, '@', '')) <> 1
+            OR @contacto NOT LIKE '_%@_%._%'
+            OR @contacto LIKE '% %'
+            OR @contacto LIKE '%[^a-zA-Z0-9@._%+-]%'
+            OR @contacto LIKE '%..%'
+        SET @errores += '- El contacto debe ser un correo electrónico válido.' + @nl;
+    END;
 
     IF @errores <> ''
     BEGIN
@@ -3014,12 +3035,30 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM publicidad.anunciante WHERE anunciante_id = @anunciante_id)
         SET @errores += '- No existe el anunciante con id '
                       + ISNULL(CAST(@anunciante_id AS VARCHAR(12)), '(nulo)') + '.' + @nl;
+
     IF NULLIF(LTRIM(RTRIM(@nombre)), '') IS NULL
         SET @errores += '- El nombre del anunciante es obligatorio.' + @nl;
-    IF EXISTS (SELECT 1 FROM publicidad.anunciante WHERE nombre = @nombre AND anunciante_id <> @anunciante_id)
+
+    IF EXISTS (
+        SELECT 1
+        FROM publicidad.anunciante
+        WHERE nombre = LTRIM(RTRIM(@nombre))
+          AND anunciante_id <> @anunciante_id
+    )
         SET @errores += '- Ya existe otro anunciante con ese nombre.' + @nl;
-    IF @contacto IS NOT NULL AND @contacto LIKE '%@%' AND @contacto NOT LIKE '_%@_%._%'
-        SET @errores += '- El contacto parece un correo electrónico pero su formato no es válido.' + @nl;
+
+    IF @contacto IS NOT NULL
+       AND NULLIF(LTRIM(RTRIM(@contacto)), '') IS NOT NULL
+    BEGIN
+        SET @contacto = LTRIM(RTRIM(@contacto));
+
+        IF LEN(@contacto) - LEN(REPLACE(@contacto, '@', '')) <> 1
+            OR @contacto NOT LIKE '_%@_%._%'
+            OR @contacto LIKE '% %'
+            OR @contacto LIKE '%[^a-zA-Z0-9@._%+-]%'
+            OR @contacto LIKE '%..%'
+            SET @errores += '- El contacto debe ser un correo electrónico válido.' + @nl;
+    END;
 
     IF @errores <> ''
     BEGIN
