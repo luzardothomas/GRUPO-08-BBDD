@@ -858,14 +858,17 @@ BEGIN
     DECLARE @nl CHAR(2) = CHAR(13) + CHAR(10);
     SET @errores = ISNULL(@errores, '');
 
+    SET @nombre   = LTRIM(RTRIM(@nombre));     
+    SET @apellido = LTRIM(RTRIM(@apellido));   
+
     IF @staff_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM plantel.cuerpo_tecnico WHERE staff_id = @staff_id)
         SET @errores += '- No existe el integrante de cuerpo técnico con id ' + CAST(@staff_id AS VARCHAR(12)) + '.' + @nl;
     IF NOT EXISTS (SELECT 1 FROM torneo.seleccion WHERE seleccion_id = @seleccion_id)
         SET @errores += '- No existe la selección con id '
                       + ISNULL(CAST(@seleccion_id AS VARCHAR(12)), '(nulo)') + '.' + @nl;
-    IF NULLIF(LTRIM(RTRIM(@nombre)), '') IS NULL
+    IF NULLIF(@nombre, '') IS NULL
         SET @errores += '- El nombre es obligatorio.' + @nl;
-    IF NULLIF(LTRIM(RTRIM(@apellido)), '') IS NULL
+    IF NULLIF(@apellido, '') IS NULL
         SET @errores += '- El apellido es obligatorio.' + @nl;
     IF @rol IS NULL OR @rol NOT IN ('director_tecnico', 'ayudante_tecnico', 'preparador_fisico', 'otro')
         SET @errores += '- El rol debe ser director_tecnico, ayudante_tecnico, preparador_fisico u otro.' + @nl;
@@ -1005,6 +1008,9 @@ BEGIN
     SET NOCOUNT ON;
     DECLARE @nl CHAR(2) = CHAR(13) + CHAR(10), @hoy DATE = CAST(SYSDATETIME() AS DATE);
     SET @errores = ISNULL(@errores, '');
+
+    SET @nombre   = LTRIM(RTRIM(@nombre));     
+    SET @apellido = LTRIM(RTRIM(@apellido));   
 
     IF @jugador_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM plantel.jugador WHERE jugador_id = @jugador_id)
         SET @errores += '- No existe el jugador con id ' + CAST(@jugador_id AS VARCHAR(12)) + '.' + @nl;
