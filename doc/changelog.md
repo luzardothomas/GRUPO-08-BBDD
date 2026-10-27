@@ -5,6 +5,16 @@ Al principio siempre va a estar la fecha más actual, y en la misma está la obs
 
 ---
 
+## [23-10-2026]
+
+### ABM Fallidos y validaciones en sus SPs
+
+El cliente señaló que los SPs tienen que corregirse sus validaciones, además hay que utilizar caminos incorrectos para mostrar el correcto funcionamiento de los SPs.
+
+#### Solución adoptada
+
+Se procedió a revisar todos y cada uno de los SPs para corregir las validaciones y se eligió dividir en dos archivos .sql las pruebas, uno para mostrar el camino correcto y otro que muestre los fallos según el error que proporcione el input que se haya insertado.
+
 ## [02-10-2026]
 
 ### 1. Bucles de relaciones entre entidades

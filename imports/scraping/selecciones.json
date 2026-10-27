@@ -1,0 +1,707 @@
+{
+  "fuentes": [
+    "https://en.wikipedia.org/wiki/2026_FIFA_World_Cup",
+    "https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_squads"
+  ],
+  "obtenido_en": "2026-10-27T23:07:34+00:00",
+  "selecciones": [
+    {
+      "codigo": "AUS",
+      "confederacion": "AFC",
+      "posicion": 22,
+      "ganados": "1",
+      "empatados": "2",
+      "perdidos": "1",
+      "goles_a_favor": "3",
+      "goles_en_contra": "3"
+    },
+    {
+      "codigo": "IRN",
+      "confederacion": "AFC",
+      "posicion": 33,
+      "ganados": "0",
+      "empatados": "3",
+      "perdidos": "0",
+      "goles_a_favor": "3",
+      "goles_en_contra": "3"
+    },
+    {
+      "codigo": "IRQ",
+      "confederacion": "AFC",
+      "posicion": 48,
+      "ganados": "0",
+      "empatados": "0",
+      "perdidos": "3",
+      "goles_a_favor": "1",
+      "goles_en_contra": "12"
+    },
+    {
+      "codigo": "JPN",
+      "confederacion": "AFC",
+      "posicion": 21,
+      "ganados": "1",
+      "empatados": "2",
+      "perdidos": "1",
+      "goles_a_favor": "8",
+      "goles_en_contra": "5"
+    },
+    {
+      "codigo": "JOR",
+      "confederacion": "AFC",
+      "posicion": 44,
+      "ganados": "0",
+      "empatados": "0",
+      "perdidos": "3",
+      "goles_a_favor": "3",
+      "goles_en_contra": "8"
+    },
+    {
+      "codigo": "QAT",
+      "confederacion": "AFC",
+      "posicion": 41,
+      "ganados": "0",
+      "empatados": "1",
+      "perdidos": "2",
+      "goles_a_favor": "2",
+      "goles_en_contra": "10"
+    },
+    {
+      "codigo": "KSA",
+      "confederacion": "AFC",
+      "posicion": 38,
+      "ganados": "0",
+      "empatados": "2",
+      "perdidos": "1",
+      "goles_a_favor": "1",
+      "goles_en_contra": "5"
+    },
+    {
+      "codigo": "KOR",
+      "confederacion": "AFC",
+      "posicion": 34,
+      "ganados": "1",
+      "empatados": "0",
+      "perdidos": "2",
+      "goles_a_favor": "2",
+      "goles_en_contra": "3"
+    },
+    {
+      "codigo": "UZB",
+      "confederacion": "AFC",
+      "posicion": 46,
+      "ganados": "0",
+      "empatados": "0",
+      "perdidos": "3",
+      "goles_a_favor": "2",
+      "goles_en_contra": "11"
+    },
+    {
+      "codigo": "ALG",
+      "confederacion": "CAF",
+      "posicion": 30,
+      "ganados": "1",
+      "empatados": "1",
+      "perdidos": "2",
+      "goles_a_favor": "5",
+      "goles_en_contra": "9"
+    },
+    {
+      "codigo": "CPV",
+      "confederacion": "CAF",
+      "posicion": 32,
+      "ganados": "0",
+      "empatados": "3",
+      "perdidos": "1",
+      "goles_a_favor": "4",
+      "goles_en_contra": "5"
+    },
+    {
+      "codigo": "COD",
+      "confederacion": "CAF",
+      "posicion": 23,
+      "ganados": "1",
+      "empatados": "1",
+      "perdidos": "2",
+      "goles_a_favor": "5",
+      "goles_en_contra": "5"
+    },
+    {
+      "codigo": "EGY",
+      "confederacion": "CAF",
+      "posicion": 15,
+      "ganados": "1",
+      "empatados": "3",
+      "perdidos": "1",
+      "goles_a_favor": "8",
+      "goles_en_contra": "7"
+    },
+    {
+      "codigo": "GHA",
+      "confederacion": "CAF",
+      "posicion": 24,
+      "ganados": "1",
+      "empatados": "1",
+      "perdidos": "2",
+      "goles_a_favor": "2",
+      "goles_en_contra": "3"
+    },
+    {
+      "codigo": "CIV",
+      "confederacion": "CAF",
+      "posicion": 19,
+      "ganados": "2",
+      "empatados": "0",
+      "perdidos": "2",
+      "goles_a_favor": "5",
+      "goles_en_contra": "4"
+    },
+    {
+      "codigo": "MAR",
+      "confederacion": "CAF",
+      "posicion": 7,
+      "ganados": "3",
+      "empatados": "2",
+      "perdidos": "1",
+      "goles_a_favor": "10",
+      "goles_en_contra": "6"
+    },
+    {
+      "codigo": "SEN",
+      "confederacion": "CAF",
+      "posicion": 31,
+      "ganados": "1",
+      "empatados": "0",
+      "perdidos": "3",
+      "goles_a_favor": "10",
+      "goles_en_contra": "9"
+    },
+    {
+      "codigo": "RSA",
+      "confederacion": "CAF",
+      "posicion": 25,
+      "ganados": "1",
+      "empatados": "1",
+      "perdidos": "2",
+      "goles_a_favor": "2",
+      "goles_en_contra": "4"
+    },
+    {
+      "codigo": "TUN",
+      "confederacion": "CAF",
+      "posicion": 47,
+      "ganados": "0",
+      "empatados": "0",
+      "perdidos": "3",
+      "goles_a_favor": "2",
+      "goles_en_contra": "12"
+    },
+    {
+      "codigo": "CAN",
+      "confederacion": "CONCACAF",
+      "posicion": 14,
+      "ganados": "2",
+      "empatados": "1",
+      "perdidos": "2",
+      "goles_a_favor": "9",
+      "goles_en_contra": "6"
+    },
+    {
+      "codigo": "CUW",
+      "confederacion": "CONCACAF",
+      "posicion": 42,
+      "ganados": "0",
+      "empatados": "1",
+      "perdidos": "2",
+      "goles_a_favor": "1",
+      "goles_en_contra": "9"
+    },
+    {
+      "codigo": "HAI",
+      "confederacion": "CONCACAF",
+      "posicion": 45,
+      "ganados": "0",
+      "empatados": "0",
+      "perdidos": "3",
+      "goles_a_favor": "2",
+      "goles_en_contra": "8"
+    },
+    {
+      "codigo": "MEX",
+      "confederacion": "CONCACAF",
+      "posicion": 9,
+      "ganados": "4",
+      "empatados": "0",
+      "perdidos": "1",
+      "goles_a_favor": "10",
+      "goles_en_contra": "3"
+    },
+    {
+      "codigo": "PAN",
+      "confederacion": "CONCACAF",
+      "posicion": 43,
+      "ganados": "0",
+      "empatados": "0",
+      "perdidos": "3",
+      "goles_a_favor": "0",
+      "goles_en_contra": "4"
+    },
+    {
+      "codigo": "USA",
+      "confederacion": "CONCACAF",
+      "posicion": 12,
+      "ganados": "3",
+      "empatados": "0",
+      "perdidos": "2",
+      "goles_a_favor": "11",
+      "goles_en_contra": "8"
+    },
+    {
+      "codigo": "ARG",
+      "confederacion": "CONMEBOL",
+      "posicion": 2,
+      "ganados": "7",
+      "empatados": "0",
+      "perdidos": "1",
+      "goles_a_favor": "19",
+      "goles_en_contra": "8"
+    },
+    {
+      "codigo": "BRA",
+      "confederacion": "CONMEBOL",
+      "posicion": 11,
+      "ganados": "3",
+      "empatados": "1",
+      "perdidos": "1",
+      "goles_a_favor": "10",
+      "goles_en_contra": "4"
+    },
+    {
+      "codigo": "COL",
+      "confederacion": "CONMEBOL",
+      "posicion": 10,
+      "ganados": "3",
+      "empatados": "2",
+      "perdidos": "0",
+      "goles_a_favor": "5",
+      "goles_en_contra": "1"
+    },
+    {
+      "codigo": "ECU",
+      "confederacion": "CONMEBOL",
+      "posicion": 25,
+      "ganados": "1",
+      "empatados": "1",
+      "perdidos": "2",
+      "goles_a_favor": "2",
+      "goles_en_contra": "4"
+    },
+    {
+      "codigo": "PAR",
+      "confederacion": "CONMEBOL",
+      "posicion": 16,
+      "ganados": "1",
+      "empatados": "2",
+      "perdidos": "2",
+      "goles_a_favor": "3",
+      "goles_en_contra": "6"
+    },
+    {
+      "codigo": "URU",
+      "confederacion": "CONMEBOL",
+      "posicion": 37,
+      "ganados": "0",
+      "empatados": "2",
+      "perdidos": "1",
+      "goles_a_favor": "3",
+      "goles_en_contra": "4"
+    },
+    {
+      "codigo": "NZL",
+      "confederacion": "OFC",
+      "posicion": 40,
+      "ganados": "0",
+      "empatados": "1",
+      "perdidos": "2",
+      "goles_a_favor": "4",
+      "goles_en_contra": "10"
+    },
+    {
+      "codigo": "AUT",
+      "confederacion": "UEFA",
+      "posicion": 28,
+      "ganados": "1",
+      "empatados": "1",
+      "perdidos": "2",
+      "goles_a_favor": "6",
+      "goles_en_contra": "9"
+    },
+    {
+      "codigo": "BEL",
+      "confederacion": "UEFA",
+      "posicion": 6,
+      "ganados": "3",
+      "empatados": "2",
+      "perdidos": "1",
+      "goles_a_favor": "14",
+      "goles_en_contra": "7"
+    },
+    {
+      "codigo": "BIH",
+      "confederacion": "UEFA",
+      "posicion": 29,
+      "ganados": "1",
+      "empatados": "1",
+      "perdidos": "2",
+      "goles_a_favor": "5",
+      "goles_en_contra": "8"
+    },
+    {
+      "codigo": "CRO",
+      "confederacion": "UEFA",
+      "posicion": 20,
+      "ganados": "2",
+      "empatados": "0",
+      "perdidos": "2",
+      "goles_a_favor": "6",
+      "goles_en_contra": "7"
+    },
+    {
+      "codigo": "CZE",
+      "confederacion": "UEFA",
+      "posicion": 39,
+      "ganados": "0",
+      "empatados": "1",
+      "perdidos": "2",
+      "goles_a_favor": "2",
+      "goles_en_contra": "6"
+    },
+    {
+      "codigo": "ENG",
+      "confederacion": "UEFA",
+      "posicion": 3,
+      "ganados": "6",
+      "empatados": "1",
+      "perdidos": "1",
+      "goles_a_favor": "20",
+      "goles_en_contra": "12"
+    },
+    {
+      "codigo": "FRA",
+      "confederacion": "UEFA",
+      "posicion": 4,
+      "ganados": "6",
+      "empatados": "0",
+      "perdidos": "2",
+      "goles_a_favor": "20",
+      "goles_en_contra": "10"
+    },
+    {
+      "codigo": "GER",
+      "confederacion": "UEFA",
+      "posicion": 18,
+      "ganados": "2",
+      "empatados": "1",
+      "perdidos": "1",
+      "goles_a_favor": "11",
+      "goles_en_contra": "5"
+    },
+    {
+      "codigo": "NED",
+      "confederacion": "UEFA",
+      "posicion": 17,
+      "ganados": "2",
+      "empatados": "2",
+      "perdidos": "0",
+      "goles_a_favor": "11",
+      "goles_en_contra": "5"
+    },
+    {
+      "codigo": "NOR",
+      "confederacion": "UEFA",
+      "posicion": 5,
+      "ganados": "4",
+      "empatados": "0",
+      "perdidos": "2",
+      "goles_a_favor": "13",
+      "goles_en_contra": "11"
+    },
+    {
+      "codigo": "POR",
+      "confederacion": "UEFA",
+      "posicion": 13,
+      "ganados": "2",
+      "empatados": "2",
+      "perdidos": "1",
+      "goles_a_favor": "8",
+      "goles_en_contra": "3"
+    },
+    {
+      "codigo": "SCO",
+      "confederacion": "UEFA",
+      "posicion": 36,
+      "ganados": "1",
+      "empatados": "0",
+      "perdidos": "2",
+      "goles_a_favor": "1",
+      "goles_en_contra": "4"
+    },
+    {
+      "codigo": "ESP",
+      "confederacion": "UEFA",
+      "posicion": 1,
+      "ganados": "7",
+      "empatados": "1",
+      "perdidos": "0",
+      "goles_a_favor": "14",
+      "goles_en_contra": "1"
+    },
+    {
+      "codigo": "SWE",
+      "confederacion": "UEFA",
+      "posicion": 27,
+      "ganados": "1",
+      "empatados": "1",
+      "perdidos": "2",
+      "goles_a_favor": "7",
+      "goles_en_contra": "10"
+    },
+    {
+      "codigo": "SUI",
+      "confederacion": "UEFA",
+      "posicion": 7,
+      "ganados": "3",
+      "empatados": "2",
+      "perdidos": "1",
+      "goles_a_favor": "10",
+      "goles_en_contra": "6"
+    },
+    {
+      "codigo": "TUR",
+      "confederacion": "UEFA",
+      "posicion": 35,
+      "ganados": "1",
+      "empatados": "0",
+      "perdidos": "2",
+      "goles_a_favor": "3",
+      "goles_en_contra": "5"
+    }
+  ],
+  "grupos": [
+    {
+      "equipo": "Czech Republic",
+      "grupo": "A"
+    },
+    {
+      "equipo": "Mexico",
+      "grupo": "A"
+    },
+    {
+      "equipo": "South Africa",
+      "grupo": "A"
+    },
+    {
+      "equipo": "South Korea",
+      "grupo": "A"
+    },
+    {
+      "equipo": "Bosnia and Herzegovina",
+      "grupo": "B"
+    },
+    {
+      "equipo": "Canada",
+      "grupo": "B"
+    },
+    {
+      "equipo": "Qatar",
+      "grupo": "B"
+    },
+    {
+      "equipo": "Switzerland",
+      "grupo": "B"
+    },
+    {
+      "equipo": "Brazil",
+      "grupo": "C"
+    },
+    {
+      "equipo": "Haiti",
+      "grupo": "C"
+    },
+    {
+      "equipo": "Morocco",
+      "grupo": "C"
+    },
+    {
+      "equipo": "Scotland",
+      "grupo": "C"
+    },
+    {
+      "equipo": "Australia",
+      "grupo": "D"
+    },
+    {
+      "equipo": "Paraguay",
+      "grupo": "D"
+    },
+    {
+      "equipo": "Turkey",
+      "grupo": "D"
+    },
+    {
+      "equipo": "United States",
+      "grupo": "D"
+    },
+    {
+      "equipo": "Curaçao",
+      "grupo": "E"
+    },
+    {
+      "equipo": "Ecuador",
+      "grupo": "E"
+    },
+    {
+      "equipo": "Germany",
+      "grupo": "E"
+    },
+    {
+      "equipo": "Ivory Coast",
+      "grupo": "E"
+    },
+    {
+      "equipo": "Japan",
+      "grupo": "F"
+    },
+    {
+      "equipo": "Netherlands",
+      "grupo": "F"
+    },
+    {
+      "equipo": "Sweden",
+      "grupo": "F"
+    },
+    {
+      "equipo": "Tunisia",
+      "grupo": "F"
+    },
+    {
+      "equipo": "Belgium",
+      "grupo": "G"
+    },
+    {
+      "equipo": "Egypt",
+      "grupo": "G"
+    },
+    {
+      "equipo": "Iran",
+      "grupo": "G"
+    },
+    {
+      "equipo": "New Zealand",
+      "grupo": "G"
+    },
+    {
+      "equipo": "Cape Verde",
+      "grupo": "H"
+    },
+    {
+      "equipo": "Saudi Arabia",
+      "grupo": "H"
+    },
+    {
+      "equipo": "Spain",
+      "grupo": "H"
+    },
+    {
+      "equipo": "Uruguay",
+      "grupo": "H"
+    },
+    {
+      "equipo": "France",
+      "grupo": "I"
+    },
+    {
+      "equipo": "Iraq",
+      "grupo": "I"
+    },
+    {
+      "equipo": "Norway",
+      "grupo": "I"
+    },
+    {
+      "equipo": "Senegal",
+      "grupo": "I"
+    },
+    {
+      "equipo": "Algeria",
+      "grupo": "J"
+    },
+    {
+      "equipo": "Argentina",
+      "grupo": "J"
+    },
+    {
+      "equipo": "Austria",
+      "grupo": "J"
+    },
+    {
+      "equipo": "Jordan",
+      "grupo": "J"
+    },
+    {
+      "equipo": "Colombia",
+      "grupo": "K"
+    },
+    {
+      "equipo": "DR Congo",
+      "grupo": "K"
+    },
+    {
+      "equipo": "Portugal",
+      "grupo": "K"
+    },
+    {
+      "equipo": "Uzbekistan",
+      "grupo": "K"
+    },
+    {
+      "equipo": "Croatia",
+      "grupo": "L"
+    },
+    {
+      "equipo": "England",
+      "grupo": "L"
+    },
+    {
+      "equipo": "Ghana",
+      "grupo": "L"
+    },
+    {
+      "equipo": "Panama",
+      "grupo": "L"
+    },
+    {
+      "equipo": "Age",
+      "grupo": "L"
+    },
+    {
+      "equipo": "Player representation by club",
+      "grupo": "L"
+    },
+    {
+      "equipo": "Player representation by league system",
+      "grupo": "L"
+    },
+    {
+      "equipo": "Player representation by club confederation",
+      "grupo": "L"
+    },
+    {
+      "equipo": "Average age of squads",
+      "grupo": "L"
+    },
+    {
+      "equipo": "Coach representation by country",
+      "grupo": "L"
+    }
+  ]
+}

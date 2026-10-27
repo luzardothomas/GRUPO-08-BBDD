@@ -17,7 +17,8 @@
 --            único mensaje de error agrupado por SP y operación.
 --     III.   Procedimientos de lógica de negocio, transaccionales y multi-tabla.
 --     IV.    Carga de los parámetros iniciales.
---   Las pruebas están en entrega5_test.sql, que se ejecuta después de este script.
+--   Las pruebas están en entrega5_test_exitosos.sql y entrega5_test_fallidos.sql, que se ejecutan
+--   después de este script.
 -- =======================================================================================
 
 USE mundial_2026;
@@ -277,7 +278,7 @@ BEGIN
         SET @errores += '- La condición debe ser local o visitante.' + @nl;
     IF EXISTS (SELECT 1 FROM plantel.formacion WHERE partido_id = @partido_id AND condicion = @condicion)
         SET @errores += '- El equipo ' + @condicion + ' ya tiene formación cargada en ese partido.' + @nl;
-    IF @esquema_tactico IS NULL OR LEN(@esquema_tactico) > 9
+    IF @esquema_tactico IS NULL OR @esquema_tactico LIKE '%[^0-9-]%'
        OR (SELECT COUNT(*) FROM STRING_SPLIT(@esquema_tactico, '-')) NOT BETWEEN 3 AND 5
        OR EXISTS (SELECT 1 FROM STRING_SPLIT(@esquema_tactico, '-') WHERE value NOT LIKE '[1-9]')
        OR (SELECT SUM(TRY_CAST(value AS INT)) FROM STRING_SPLIT(@esquema_tactico, '-')) <> 10
@@ -408,6 +409,10 @@ BEGIN
 
     IF @errores <> ''
     BEGIN
+        -- Además de lo que impidió identificar el cambio, se informan los errores del resto de los datos
+        -- (la ventana la calcula este SP: se valida con 1).
+        EXEC evento.sustitucion_validar NULL, NULL, NULL, NULL, @minuto, @periodo, 1, @motivo, @errores OUTPUT,
+             @solo_datos = 1;
         SET @errores = 'evento.registrar_sustitucion - operación rechazada:' + @nl + @errores;
         THROW 50002, @errores, 1;
     END;
@@ -485,6 +490,9 @@ BEGIN
 
     IF @errores <> ''
     BEGIN
+        -- Además de lo que impidió identificar al autor, se informan los errores del resto de los datos.
+        EXEC evento.gol_validar NULL, NULL, NULL, NULL, @minuto, @tipo_gol, @periodo, @errores OUTPUT,
+             @solo_datos = 1;
         SET @errores = 'evento.registrar_gol - operación rechazada:' + @nl + @errores;
         THROW 50002, @errores, 1;
     END;
@@ -540,10 +548,16 @@ BEGIN
         JOIN plantel.jugador j            ON j.jugador_id = fj.jugador_id
         WHERE f.partido_id = @partido_id AND f.condicion = @condicion AND fj.dorsal = @dorsal;
 
+    IF @tipo = 'roja' AND @tipo_expulsion IS NULL
+        SET @tipo_expulsion = 'roja_directa';
+
     IF @persona_id IS NULL
     BEGIN
-        SET @errores = 'evento.registrar_tarjeta - operación rechazada:' + @nl
-                     + '- No se pudo identificar a la persona: informar @persona_id, o equipo (local/visitante) y un dorsal de su formación.' + @nl;
+        -- Además de la persona no identificada, se informan los errores del resto de los datos de la tarjeta.
+        SET @errores = '- No se pudo identificar a la persona: informar @persona_id, o equipo (local/visitante) y un dorsal de su formación.' + @nl;
+        EXEC evento.tarjeta_validar NULL, @partido_id, NULL, @minuto, @periodo, @tipo, @tipo_expulsion, @errores OUTPUT,
+             @solo_datos = 1;
+        SET @errores = 'evento.registrar_tarjeta - operación rechazada:' + @nl + @errores;
         THROW 50002, @errores, 1;
     END;
 
@@ -552,8 +566,6 @@ BEGIN
        AND EXISTS (SELECT 1 FROM evento.tarjeta
                    WHERE partido_id = @partido_id AND persona_id = @persona_id AND tipo = 'amarilla')
         SELECT @tipo = 'roja', @tipo_expulsion = 'doble_amarilla';
-    IF @tipo = 'roja' AND @tipo_expulsion IS NULL
-        SET @tipo_expulsion = 'roja_directa';
 
     BEGIN TRY
         IF @tran_propia = 1 BEGIN TRANSACTION;

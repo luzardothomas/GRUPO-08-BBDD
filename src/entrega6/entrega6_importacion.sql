@@ -13,7 +13,7 @@
 -- DESCRIPCIÓN:
 --   Objetos comunes de importación e importación de archivos en tres formatos (CSV, JSON y XML).
 --   Se ejecuta después de los scripts de creación de la Entrega 5 (usa sus SP de ABM) y antes de
---   entrega6_scraping.sql y entrega6_apis.sql:
+--   entrega6_apis.sql:
 --     0. Configuración del servidor para consumir APIs.
 --     1. Tablas: lotes, errores, equivalencias de país, PBI por año, tipos de cambio y
 --        estadísticas de selecciones y jugadores.
@@ -25,6 +25,8 @@
 --          plantel.importar_estadisticas_jugadores_kaggle_2026 CSV  (players.csv de Kaggle)
 --          torneo.importar_fixture                             JSON (worldcup.json de openfootball)
 --          publicidad.importar_tarifas                         XML  (tarifas_publicidad.xml, convirtiendo a USD)
+--     6. Importación de los datos obtenidos por scraping de Wikipedia (JSON que genera entrega6_scraping.py):
+--          torneo.importar_sedes, torneo.importar_selecciones y plantel.importar_planteles
 --   Es reejecutable: crea sólo lo que falta y la carga de referencia es un upsert.
 --   Requiere SQL Server 2025 (17.x): sp_invoke_external_rest_endpoint y STRING_SPLIT
 --   con ordinal.
@@ -47,6 +49,14 @@
 --     Límites de uso: archivo XML local procesado con OPENROWSET(BULK ..., SINGLE_BLOB) y XQuery;
 --     la conversión de las 9 monedas a USD utiliza las cotizaciones descargadas en
 --     publicidad.tipo_cambio desde la API de Frankfurter.
+--   * Wikipedia (scraping con entrega6_scraping.py, que documenta las páginas y los límites de uso):
+--     - imports/scraping/sedes.json, selecciones.json y planteles.json (formato JSON)
+--
+-- DEFENSA EN VIVO (scraping):
+--   python3 src/entrega6/entrega6_scraping.py                    (scrapea y genera los tres JSON)
+--   EXEC torneo.importar_sedes        'C:\mundial2026\imports\scraping\sedes.json';
+--   EXEC torneo.importar_selecciones  'C:\mundial2026\imports\scraping\selecciones.json';
+--   EXEC plantel.importar_planteles   'C:\mundial2026\imports\scraping\planteles.json';
 --
 -- NORMA COMÚN DE LOS IMPORTADORES:
 --   * El nombre del archivo es un parámetro (@ruta_archivo, ruta vista por el servidor).
@@ -189,7 +199,7 @@ IF OBJECT_ID('publicidad.tipo_cambio', 'U') IS NULL
     );
 GO
 
--- Tabla final del torneo por selección (scraping de Wikipedia, entrega6_scraping.sql): datos que el modelo no
+-- Tabla final del torneo por selección (scraping de Wikipedia, sección 6): datos que el modelo no
 -- tiene como columnas. Una fila por selección, se reemplaza en cada importación.
 
 IF OBJECT_ID('torneo.seleccion_estadistica', 'U') IS NULL
@@ -508,9 +518,12 @@ BEGIN
 END;
 GO
 
-/* Carga un CSV (UTF-8, LF, con encabezado) en una tabla temporal creada por quien llama,
- visible desde acá porque la crea un ámbito superior. Con @formato_csv = 1 respeta los
- campos entre comillas; con 0 lee cada línea completa en una única columna. */
+/* Carga un CSV (UTF-8, LF, con encabezado) en una tabla temporal de columnas VARCHAR creada
+ por quien llama, visible desde acá porque la crea un ámbito superior. Con @formato_csv = 1
+ respeta los campos entre comillas; con 0 lee cada línea completa en una única columna.
+ SQL Server para Linux no admite CODEPAGE = '65001' (sólo 'RAW', que copia los bytes sin
+ convertirlos): ahí el archivo se carga en una copia de la tabla destino con columnas UTF-8
+ y de ésa se pasa a la tabla destino, que convierte el texto a la intercalación de la base. */
 
 CREATE OR ALTER PROCEDURE importacion.archivo_cargar_csv
     @ruta_archivo  VARCHAR(500),
@@ -519,17 +532,28 @@ CREATE OR ALTER PROCEDURE importacion.archivo_cargar_csv
 AS
 BEGIN
     SET NOCOUNT ON;
-    DECLARE @sql NVARCHAR(MAX), @mensaje VARCHAR(2100);
+    DECLARE @sql NVARCHAR(MAX), @mensaje VARCHAR(2100), @columnas NVARCHAR(MAX),
+            @linux BIT = IIF(@@VERSION LIKE '%Linux%', 1, 0);
 
     IF NULLIF(LTRIM(RTRIM(@ruta_archivo)), '') IS NULL
         THROW 50003, 'Debe indicarse la ruta del archivo a importar.', 1;
     IF @tabla_destino NOT LIKE '#[A-Za-z]%' OR @tabla_destino LIKE '%[^A-Za-z0-9_#]%'
         THROW 50003, 'La tabla destino debe ser una tabla temporal.', 1;
 
-    SET @sql = N'BULK INSERT ' + @tabla_destino + N' FROM ''' + REPLACE(@ruta_archivo, '''', '''''') + N''' WITH ('
+    SET @sql = N'BULK INSERT ' + IIF(@linux = 1, N'#archivo_utf8', @tabla_destino)
+             + N' FROM ''' + REPLACE(@ruta_archivo, '''', '''''') + N''' WITH ('
              + IIF(@formato_csv = 1, N'FORMAT = ''CSV'', FIELDQUOTE = ''"'', FIELDTERMINATOR = '','', ',
                                      N'FIELDTERMINATOR = ''\t'', ')
-             + N'FIRSTROW = 2, CODEPAGE = ''65001'', ROWTERMINATOR = ''0x0a'');';
+             + N'FIRSTROW = 2, CODEPAGE = ''' + IIF(@linux = 1, N'RAW', N'65001') + N''', ROWTERMINATOR = ''0x0a'');';
+    IF @linux = 1
+    BEGIN
+        SELECT @columnas = STRING_AGG(CAST(QUOTENAME(name) AS NVARCHAR(MAX)) + N' VARCHAR('
+                                      + IIF(max_length = -1, N'MAX', CAST(max_length AS NVARCHAR(4)))
+                                      + N') COLLATE Latin1_General_100_CI_AI_SC_UTF8', N', ') WITHIN GROUP (ORDER BY column_id)
+        FROM tempdb.sys.columns WHERE object_id = OBJECT_ID(N'tempdb..' + @tabla_destino);
+        SET @sql = N'CREATE TABLE #archivo_utf8 (' + @columnas + N'); ' + @sql
+                 + N' INSERT INTO ' + @tabla_destino + N' SELECT * FROM #archivo_utf8;';
+    END;
     BEGIN TRY
         EXEC (@sql);
     END TRY
@@ -1365,6 +1389,529 @@ BEGIN
         SET @i += 1;
     END;
 
+    EXEC importacion.lote_cerrar @lote_id, @leidos, @insertados, @actualizados, @sin_cambios, @rechazados;
+END;
+GO
+
+-- ============================================================
+-- 6. IMPORTACIÓN DE LOS DATOS OBTENIDOS POR SCRAPING (imports/scraping/*.json)
+-- ============================================================
+
+/* El scraping lo hace entrega6_scraping.py (Python): descarga en vivo las páginas de Wikipedia,
+ extrae los datos y los guarda en imports/scraping/ (ver en ese script las páginas de origen, los
+ límites de uso de la API y la técnica de scraping). Estos SP importan esos archivos:
+   sedes.json        -> torneo.importar_sedes        -> torneo.sede
+   selecciones.json  -> torneo.importar_selecciones  -> torneo.seleccion y torneo.seleccion_estadistica
+   planteles.json    -> plantel.importar_planteles   -> plantel.jugador, plantel.convocatoria y
+                                                        plantel.cuerpo_tecnico
+ Un archivo que no se puede leer o que no tiene el arreglo esperado rechaza el lote (THROW 50003). */
+
+-- Versiones anteriores, que descargaban y parseaban la página en T-SQL.
+DROP PROCEDURE IF EXISTS torneo.scrapear_sedes, torneo.scrapear_selecciones, plantel.scrapear_planteles,
+                         importacion.obtener_wikitext;
+GO
+
+-- 6.1 Lectura del archivo de scraping
+
+/* Lee un archivo generado por entrega6_scraping.py y verifica que tenga el arreglo esperado.
+ Archivo ilegible o sin ese arreglo: THROW 50003. */
+
+CREATE OR ALTER PROCEDURE importacion.archivo_leer_scraping
+    @ruta_archivo VARCHAR(500),
+    @arreglo      VARCHAR(30),
+    @json         NVARCHAR(MAX) OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @mensaje VARCHAR(2100);
+
+    EXEC importacion.archivo_leer_texto @ruta_archivo, @json OUTPUT;
+    IF ISJSON(@json) <> 1 OR JSON_QUERY(@json, '$.' + @arreglo) IS NULL
+    BEGIN
+        SET @mensaje = 'El archivo no es un JSON con el arreglo "' + @arreglo + '" (salida de entrega6_scraping.py).';
+        THROW 50003, @mensaje, 1;
+    END;
+END;
+GO
+
+-- 6.2 Sedes (sedes.json)
+
+/* Una sede por estadio de la tabla "List of tournament venues": estadio, ciudad, país (código
+ FIFA), capacidad y huso horario (calculado por el script para junio de 2026). Clave natural:
+ estadio + ciudad. */
+
+CREATE OR ALTER PROCEDURE torneo.importar_sedes
+    @ruta_archivo VARCHAR(500)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @json NVARCHAR(MAX),
+            @lote_id INT, @mensaje VARCHAR(2100), @numero INT, @nl CHAR(2) = CHAR(13) + CHAR(10),
+            @errores VARCHAR(2000), @leidos INT = 0, @insertados INT = 0, @actualizados INT = 0,
+            @sin_cambios INT = 0, @rechazados INT = 0, @i INT = 1, @registro VARCHAR(1000),
+            @nombre VARCHAR(200), @ciudad VARCHAR(200), @pais_txt VARCHAR(10),
+            @capacidad_txt VARCHAR(50), @huso VARCHAR(10), @pais_id INT, @capacidad INT, @sede_id INT,
+            @pais_actual INT, @capacidad_actual INT, @huso_actual CHAR(6);
+
+    EXEC importacion.lote_abrir 'torneo.importar_sedes', @ruta_archivo, @lote_id OUTPUT;
+
+    BEGIN TRY
+        EXEC importacion.archivo_leer_scraping @ruta_archivo, 'sedes', @json OUTPUT;
+    END TRY
+    BEGIN CATCH
+        SELECT @numero = ERROR_NUMBER(), @mensaje = ERROR_MESSAGE();
+        EXEC importacion.lote_rechazar @lote_id, @numero, @mensaje;
+        THROW;
+    END CATCH;
+
+    SELECT CAST(s.[key] AS INT) + 1 AS fila, d.*
+    INTO #sedes
+    FROM OPENJSON(@json, '$.sedes') s
+    CROSS APPLY OPENJSON(s.value) WITH (
+        estadio      NVARCHAR(200) '$.estadio',
+        ciudad       NVARCHAR(200) '$.ciudad',
+        pais         NVARCHAR(10)  '$.pais',
+        capacidad    NVARCHAR(50)  '$.capacidad',
+        huso_horario NVARCHAR(10)  '$.huso_horario'
+    ) d;
+
+    SELECT @leidos = COUNT(*) FROM #sedes;
+
+    WHILE @i <= @leidos
+    BEGIN
+        SELECT @nombre = estadio, @ciudad = ciudad, @pais_txt = pais, @capacidad_txt = capacidad, @huso = huso_horario,
+               @registro = CONCAT(estadio, ' | ', ciudad, ' | ', pais, ' | ', capacidad, ' | ', huso_horario)
+        FROM #sedes WHERE fila = @i;
+        SELECT @errores = '', @sede_id = NULL;
+
+        BEGIN TRY
+            SET @pais_id = importacion.fn_pais_id(@pais_txt);
+            SET @capacidad = TRY_CONVERT(INT, @capacidad_txt);
+            IF @nombre IS NULL OR LEN(@nombre) > 80
+                SET @errores += '- El nombre del estadio es obligatorio (hasta 80 caracteres).' + @nl;
+            IF @ciudad IS NULL OR LEN(@ciudad) > 80
+                SET @errores += '- La ciudad es obligatoria (hasta 80 caracteres).' + @nl;
+            IF @pais_id IS NULL
+                SET @errores += '- El país ''' + ISNULL(@pais_txt, '') + ''' no está registrado.' + @nl;
+            IF @capacidad IS NULL
+                SET @errores += '- La capacidad ''' + ISNULL(@capacidad_txt, '') + ''' no es un número entero.' + @nl;
+            IF @huso IS NULL
+                SET @errores += '- No hay zona horaria definida para la ciudad ''' + ISNULL(@ciudad, '') + '''.' + @nl;
+            IF @errores <> ''
+            BEGIN
+                SET @errores = 'Fila rechazada:' + @nl + @errores;
+                THROW 50004, @errores, 1;
+            END;
+
+            SELECT @sede_id = sede_id, @pais_actual = pais_id, @capacidad_actual = capacidad, @huso_actual = huso_horario
+            FROM torneo.sede WHERE nombre = @nombre AND ciudad = @ciudad;
+
+            IF @sede_id IS NULL
+            BEGIN
+                EXEC torneo.sede_insertar @nombre, @ciudad, @pais_id, @capacidad, @huso;
+                SET @insertados += 1;
+            END
+            ELSE IF @pais_actual <> @pais_id OR @capacidad_actual <> @capacidad OR @huso_actual <> @huso
+            BEGIN
+                EXEC torneo.sede_modificar @sede_id, @nombre, @ciudad, @pais_id, @capacidad, @huso;
+                SET @actualizados += 1;
+            END
+            ELSE
+                SET @sin_cambios += 1;
+        END TRY
+        BEGIN CATCH
+            SELECT @numero = ERROR_NUMBER(), @mensaje = ERROR_MESSAGE();
+            IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+            EXEC importacion.error_registrar @lote_id, @i, @registro, @numero, @mensaje;
+            SET @rechazados += 1;
+        END CATCH;
+
+        SET @i += 1;
+    END;
+
+    EXEC importacion.lote_cerrar @lote_id, @leidos, @insertados, @actualizados, @sin_cambios, @rechazados;
+END;
+GO
+
+-- 6.3 Selecciones (selecciones.json)
+
+/* Dos arreglos: "selecciones" (código FIFA, confederación y tabla final: posición, ganados,
+ empatados, perdidos y goles) y "grupos" (nombre en inglés de la selección y su grupo). Los
+ puntos se calculan (3 por victoria, 1 por empate); los partidos definidos por penales cuentan
+ como empate, según la convención de la página. Clave natural: el país. La selección se da de
+ alta o se modifica con los SP de la Entrega 5; la tabla final va a torneo.seleccion_estadistica. */
+
+CREATE OR ALTER PROCEDURE torneo.importar_selecciones
+    @ruta_archivo VARCHAR(500)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @json NVARCHAR(MAX),
+            @lote_id INT, @mensaje VARCHAR(2100), @numero INT, @nl CHAR(2) = CHAR(13) + CHAR(10),
+            @errores VARCHAR(2000), @leidos INT = 0, @insertados INT = 0, @actualizados INT = 0,
+            @sin_cambios INT = 0, @rechazados INT = 0, @i INT = 1, @registro VARCHAR(1000), @resultado VARCHAR(12),
+            @codigo VARCHAR(10), @pais_id INT, @confederacion VARCHAR(20), @grupo VARCHAR(5),
+            @confederacion_id INT, @seleccion_id INT, @confederacion_actual INT, @grupo_actual CHAR(1),
+            @posicion INT, @ganados INT, @empatados INT, @perdidos INT, @gf INT, @gc INT;
+
+    EXEC importacion.lote_abrir 'torneo.importar_selecciones', @ruta_archivo, @lote_id OUTPUT;
+
+    BEGIN TRY
+        EXEC importacion.archivo_leer_scraping @ruta_archivo, 'selecciones', @json OUTPUT;
+        IF JSON_QUERY(@json, '$.grupos') IS NULL
+            THROW 50003, 'El archivo no trae el arreglo "grupos" (salida de entrega6_scraping.py).', 1;
+    END TRY
+    BEGIN CATCH
+        SELECT @numero = ERROR_NUMBER(), @mensaje = ERROR_MESSAGE();
+        EXEC importacion.lote_rechazar @lote_id, @numero, @mensaje;
+        THROW;
+    END CATCH;
+
+    -- Selecciones clasificadas: confederación y tabla final.
+    SELECT d.codigo, d.confederacion, TRY_CONVERT(INT, d.posicion) AS posicion,
+           d.ganados, d.empatados, d.perdidos, d.gf, d.gc
+    INTO #clasificados
+    FROM OPENJSON(@json, '$.selecciones') s
+    CROSS APPLY OPENJSON(s.value) WITH (
+        codigo        NVARCHAR(10) '$.codigo',
+        confederacion NVARCHAR(20) '$.confederacion',
+        posicion      NVARCHAR(10) '$.posicion',
+        ganados       NVARCHAR(10) '$.ganados',
+        empatados     NVARCHAR(10) '$.empatados',
+        perdidos      NVARCHAR(10) '$.perdidos',
+        gf            NVARCHAR(10) '$.goles_a_favor',
+        gc            NVARCHAR(10) '$.goles_en_contra'
+    ) d;
+
+    -- Grupo de cada selección, por su nombre en la página de planteles.
+    SELECT importacion.fn_pais_id(d.equipo) AS pais_id, d.grupo
+    INTO #grupos
+    FROM OPENJSON(@json, '$.grupos') g
+    CROSS APPLY OPENJSON(g.value) WITH (equipo NVARCHAR(100) '$.equipo', grupo NVARCHAR(5) '$.grupo') d;
+
+    SELECT ROW_NUMBER() OVER (ORDER BY c.confederacion, c.codigo) AS fila, c.codigo, c.confederacion,
+           importacion.fn_pais_id(c.codigo) AS pais_id, c.posicion, c.ganados, c.empatados, c.perdidos, c.gf, c.gc
+    INTO #selecciones
+    FROM #clasificados c;
+
+    SELECT @leidos = COUNT(*) FROM #selecciones;
+
+    WHILE @i <= @leidos
+    BEGIN
+        SELECT @codigo = s.codigo, @confederacion = s.confederacion, @pais_id = s.pais_id, @grupo = g.grupo,
+               @posicion = s.posicion, @ganados = TRY_CONVERT(INT, s.ganados), @empatados = TRY_CONVERT(INT, s.empatados),
+               @perdidos = TRY_CONVERT(INT, s.perdidos), @gf = TRY_CONVERT(INT, s.gf), @gc = TRY_CONVERT(INT, s.gc),
+               @registro = CONCAT(s.codigo, ' | ', s.confederacion, ' | grupo ', g.grupo, ' | puesto ', s.posicion)
+        FROM #selecciones s
+        OUTER APPLY (SELECT TOP 1 grupo FROM #grupos x WHERE x.pais_id = s.pais_id) g
+        WHERE s.fila = @i;
+        SELECT @errores = '', @seleccion_id = NULL, @confederacion_id = NULL, @resultado = 'sin_cambios';
+
+        BEGIN TRY
+            SELECT @confederacion_id = confederacion_id FROM torneo.confederacion WHERE nombre = @confederacion;
+            IF @pais_id IS NULL
+                SET @errores += '- El país de código ''' + ISNULL(@codigo, '') + ''' no está registrado.' + @nl;
+            IF @confederacion_id IS NULL
+                SET @errores += '- No se pudo determinar la confederación.' + @nl;
+            IF @grupo IS NULL
+                SET @errores += '- La selección no figura en ningún grupo de la página de planteles.' + @nl;
+            IF @posicion IS NULL OR @ganados IS NULL OR @empatados IS NULL OR @perdidos IS NULL OR @gf IS NULL OR @gc IS NULL
+                SET @errores += '- La selección no figura completa en la tabla final del torneo.' + @nl;
+            IF @errores <> ''
+            BEGIN
+                SET @errores = 'Fila rechazada:' + @nl + @errores;
+                THROW 50004, @errores, 1;
+            END;
+
+            BEGIN TRANSACTION;
+
+            SELECT @seleccion_id = seleccion_id, @confederacion_actual = confederacion_id, @grupo_actual = grupo
+            FROM torneo.seleccion WHERE pais_id = @pais_id;
+
+            IF @seleccion_id IS NULL
+            BEGIN
+                EXEC torneo.seleccion_insertar @pais_id, @confederacion_id, @grupo, @seleccion_id OUTPUT;
+                SET @resultado = 'insertado';
+            END
+            ELSE IF @confederacion_actual <> @confederacion_id OR @grupo_actual <> @grupo
+            BEGIN
+                EXEC torneo.seleccion_modificar @seleccion_id, @pais_id, @confederacion_id, @grupo;
+                SET @resultado = 'actualizado';
+            END;
+
+            IF NOT EXISTS (SELECT 1 FROM torneo.seleccion_estadistica WHERE seleccion_id = @seleccion_id)
+            BEGIN
+                INSERT INTO torneo.seleccion_estadistica (seleccion_id, posicion_final, partidos, ganados, empatados,
+                       perdidos, goles_a_favor, goles_en_contra, puntos, archivo_origen)
+                VALUES (@seleccion_id, @posicion, @ganados + @empatados + @perdidos, @ganados, @empatados, @perdidos,
+                        @gf, @gc, 3 * @ganados + @empatados, @ruta_archivo);
+                IF @resultado = 'sin_cambios' SET @resultado = 'actualizado';
+            END
+            ELSE IF EXISTS (SELECT @posicion, @ganados, @empatados, @perdidos, @gf, @gc
+                            EXCEPT
+                            SELECT posicion_final, ganados, empatados, perdidos, goles_a_favor, goles_en_contra
+                            FROM torneo.seleccion_estadistica WHERE seleccion_id = @seleccion_id)
+            BEGIN
+                UPDATE torneo.seleccion_estadistica
+                SET posicion_final = @posicion, partidos = @ganados + @empatados + @perdidos, ganados = @ganados,
+                    empatados = @empatados, perdidos = @perdidos, goles_a_favor = @gf, goles_en_contra = @gc,
+                    puntos = 3 * @ganados + @empatados, archivo_origen = @ruta_archivo, importado_en = SYSDATETIMEOFFSET()
+                WHERE seleccion_id = @seleccion_id;
+                IF @resultado = 'sin_cambios' SET @resultado = 'actualizado';
+            END;
+
+            COMMIT TRANSACTION;
+
+            IF @resultado = 'insertado' SET @insertados += 1;
+            ELSE IF @resultado = 'actualizado' SET @actualizados += 1;
+            ELSE SET @sin_cambios += 1;
+        END TRY
+        BEGIN CATCH
+            SELECT @numero = ERROR_NUMBER(), @mensaje = ERROR_MESSAGE();
+            IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+            EXEC importacion.error_registrar @lote_id, @i, @registro, @numero, @mensaje;
+            SET @rechazados += 1;
+        END CATCH;
+
+        SET @i += 1;
+    END;
+
+    EXEC importacion.lote_cerrar @lote_id, @leidos, @insertados, @actualizados, @sin_cambios, @rechazados;
+END;
+GO
+
+-- 6.4 Planteles (planteles.json)
+
+/* Una fila por jugador (dorsal, posición GK/DF/MF/FW, nombre, nombre para ordenar "Apellido,
+ Nombre", fecha de nacimiento y club) o por director técnico (rol DT), con su selección.
+   * Nombre y apellido: el apellido son las últimas tantas palabras del nombre completo
+     como palabras tenga la parte anterior a la coma del nombre para ordenar. Sin nombre
+     de pila (ej. 'Casemiro'), van iguales.
+   * Jugador: clave natural nombre + apellido + fecha de nacimiento.
+   * Convocatoria: alta si el jugador no está vigente en la selección; cambio de dorsal si
+     ya estaba. Nunca se borra: es información histórica.
+   * El archivo trae la lista completa de cada selección que incluye: los convocados
+     vigentes que ya no figuran se dan de baja con fecha y motivo (la fila queda, con
+     fecha_baja). Las bajas se procesan antes que las altas, para liberar cupo y dorsales,
+     y sólo en selecciones cuyas filas pasaron todas la validación de formato (una fila mal
+     leída no puede dar de baja a nadie).
+   * DT: alta del director técnico, o modificación si cambió.
+   * Las selecciones se importan antes, con torneo.importar_selecciones. */
+
+CREATE OR ALTER PROCEDURE plantel.importar_planteles
+    @ruta_archivo       VARCHAR(500),
+    @fecha_convocatoria DATE = '2026-06-01'
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @json NVARCHAR(MAX),
+            @lote_id INT, @mensaje VARCHAR(2100), @numero INT, @nl CHAR(2) = CHAR(13) + CHAR(10),
+            @errores VARCHAR(2000), @leidos INT = 0, @insertados INT = 0, @actualizados INT = 0,
+            @sin_cambios INT = 0, @rechazados INT = 0, @bajas INT = 0, @i INT = 1, @n INT,
+            @registro VARCHAR(1000), @hoy DATE = CAST(SYSDATETIME() AS DATE), @resultado VARCHAR(12),
+            @seleccion_id INT, @es_dt BIT, @dorsal INT, @posicion VARCHAR(13), @nombre VARCHAR(100),
+            @apellido VARCHAR(100), @fecha_nacimiento DATE, @club VARCHAR(120), @jugador_id INT,
+            @posicion_actual VARCHAR(13), @club_actual VARCHAR(120), @convocatoria_id INT, @dorsal_actual INT,
+            @fecha_alta DATE, @motivo_alta VARCHAR(150), @staff_id INT, @nombre_actual VARCHAR(100),
+            @apellido_actual VARCHAR(100), @fecha_baja DATE;
+
+    EXEC importacion.lote_abrir 'plantel.importar_planteles', @ruta_archivo, @lote_id OUTPUT;
+
+    BEGIN TRY
+        EXEC importacion.archivo_leer_scraping @ruta_archivo, 'planteles', @json OUTPUT;
+    END TRY
+    BEGIN CATCH
+        SELECT @numero = ERROR_NUMBER(), @mensaje = ERROR_MESSAGE();
+        EXEC importacion.lote_rechazar @lote_id, @numero, @mensaje;
+        THROW;
+    END CATCH;
+
+    -- 1) Lectura: una fila por jugador o director técnico, con su selección.
+    SELECT CAST(p.[key] AS INT) + 1 AS fila, d.equipo,
+           IIF(d.rol = N'DT', N'DT', d.posicion) AS posicion_txt, d.dorsal AS dorsal_txt, d.jugador,
+           d.apellido_orden, d.fecha_txt, d.club
+    INTO #leidas
+    FROM OPENJSON(@json, '$.planteles') p
+    CROSS APPLY OPENJSON(p.value) WITH (
+        equipo         NVARCHAR(100) '$.equipo',
+        rol            NVARCHAR(10)  '$.rol',
+        dorsal         NVARCHAR(10)  '$.dorsal',
+        posicion       NVARCHAR(10)  '$.posicion',
+        jugador        NVARCHAR(200) '$.nombre_completo',
+        apellido_orden NVARCHAR(200) '$.nombre_orden',
+        fecha_txt      NVARCHAR(20)  '$.fecha_nacimiento',
+        club           NVARCHAR(200) '$.club'
+    ) d;
+
+    SELECT @leidos = COUNT(*) FROM #leidas;
+
+    -- 2) Transformación por conjunto: selección, dorsal, posición, fecha, nombre y apellido.
+    SELECT l.fila, l.equipo, l.jugador, l.dorsal_txt, l.posicion_txt, l.fecha_txt, l.club,
+           importacion.fn_seleccion_id(l.equipo) AS seleccion_id,
+           IIF(l.posicion_txt = N'DT', 1, 0) AS es_dt,
+           TRY_CONVERT(INT, l.dorsal_txt) AS dorsal,
+           CASE LEFT(l.posicion_txt, 2) WHEN N'GK' THEN 'arquero' WHEN N'DF' THEN 'defensor'
+                WHEN N'MF' THEN 'mediocampista' WHEN N'FW' THEN 'delantero' END AS posicion,
+           TRY_CONVERT(DATE, l.fecha_txt, 23) AS fecha_nacimiento,
+           CAST(n.nombre AS VARCHAR(100)) COLLATE DATABASE_DEFAULT AS nombre,
+           CAST(n.apellido AS VARCHAR(100)) COLLATE DATABASE_DEFAULT AS apellido
+    INTO #filas
+    FROM #leidas l
+    CROSS APPLY (
+        SELECT CASE WHEN l.posicion_txt = N'DT' OR CHARINDEX(N',', ISNULL(l.apellido_orden, N'')) = 0 THEN 1
+                    ELSE LEN(LTRIM(RTRIM(LEFT(l.apellido_orden, CHARINDEX(N',', l.apellido_orden) - 1))))
+                       - LEN(REPLACE(LTRIM(RTRIM(LEFT(l.apellido_orden, CHARINDEX(N',', l.apellido_orden) - 1))), N' ', N'')) + 1
+               END AS palabras_apellido
+    ) c
+    OUTER APPLY (
+        SELECT LEFT(STRING_AGG(CASE WHEN w.parte = 'N' THEN w.value END, N' ') WITHIN GROUP (ORDER BY w.n), 100) AS nombre_pila,
+               LEFT(STRING_AGG(CASE WHEN w.parte = 'A' THEN w.value END, N' ') WITHIN GROUP (ORDER BY w.n), 100) AS apellido
+        FROM (SELECT x.value, x.n, IIF(x.n <= x.total - c.palabras_apellido, 'N', 'A') AS parte
+              FROM (SELECT s.value, ROW_NUMBER() OVER (ORDER BY s.ordinal) AS n, COUNT(*) OVER () AS total
+                    FROM STRING_SPLIT(ISNULL(l.jugador, N''), N' ', 1) s WHERE s.value <> N'') x) w
+    ) a
+    CROSS APPLY (SELECT ISNULL(a.nombre_pila, a.apellido) AS nombre, a.apellido) n;
+
+    ALTER TABLE #filas ADD formato_ok BIT;
+    UPDATE #filas
+    SET formato_ok = IIF(seleccion_id IS NOT NULL AND nombre IS NOT NULL
+                         AND (es_dt = 1 OR (dorsal BETWEEN 1 AND 99 AND posicion IS NOT NULL AND fecha_nacimiento IS NOT NULL)),
+                         1, 0);
+
+    -- 3) Bajas de los convocados vigentes que la lista ya no incluye.
+    SELECT IDENTITY(INT, 1, 1) AS orden, c.convocatoria_id, c.dorsal, c.fecha_alta, c.motivo_alta,
+           CONCAT(j.nombre, ' ', j.apellido, ' | dorsal ', c.dorsal) AS registro
+    INTO #bajas
+    FROM plantel.convocatoria c
+    JOIN plantel.jugador j ON j.jugador_id = c.jugador_id
+    WHERE c.fecha_baja IS NULL
+      AND c.seleccion_id IN (SELECT seleccion_id FROM #filas WHERE seleccion_id IS NOT NULL
+                             GROUP BY seleccion_id HAVING MIN(CAST(formato_ok AS INT)) = 1)
+      AND NOT EXISTS (SELECT 1 FROM #filas f
+                      WHERE f.seleccion_id = c.seleccion_id AND f.es_dt = 0 AND f.nombre = j.nombre
+                        AND f.apellido = j.apellido AND f.fecha_nacimiento = j.fecha_nacimiento);
+
+    SELECT @n = COUNT(*) FROM #bajas;
+    WHILE @i <= @n
+    BEGIN
+        SELECT @convocatoria_id = convocatoria_id, @dorsal = dorsal, @fecha_alta = fecha_alta,
+               @motivo_alta = motivo_alta, @registro = registro
+        FROM #bajas WHERE orden = @i;
+        SET @fecha_baja = IIF(@hoy < @fecha_alta, @fecha_alta, @hoy);
+        BEGIN TRY
+            EXEC plantel.convocatoria_modificar @convocatoria_id, @dorsal, @fecha_alta, @motivo_alta,
+                 @fecha_baja, 'Ya no figura en la lista oficial (importación de plantel)';
+            SET @bajas += 1;
+        END TRY
+        BEGIN CATCH
+            SELECT @numero = ERROR_NUMBER(), @mensaje = ERROR_MESSAGE();
+            EXEC importacion.error_registrar @lote_id, NULL, @registro, @numero, @mensaje;
+        END CATCH;
+        SET @i += 1;
+    END;
+    IF @bajas > 0
+        PRINT CONCAT('plantel.importar_planteles: ', @bajas, ' convocados dados de baja (siguen en el historial).');
+
+    -- 4) Altas y modificaciones, fila por fila.
+    SET @i = 1;
+    WHILE @i <= @leidos
+    BEGIN
+        SELECT @seleccion_id = seleccion_id, @es_dt = es_dt, @dorsal = dorsal, @posicion = posicion,
+               @nombre = nombre, @apellido = apellido, @fecha_nacimiento = fecha_nacimiento, @club = LEFT(club, 120),
+               @registro = CONCAT(equipo, ' | ', dorsal_txt, ' | ', posicion_txt, ' | ', jugador, ' | ', fecha_txt),
+               @errores = ''
+        FROM #filas WHERE fila = @i;
+        SELECT @jugador_id = NULL, @convocatoria_id = NULL, @staff_id = NULL, @resultado = 'sin_cambios';
+
+        BEGIN TRY
+            IF @seleccion_id IS NULL
+                SET @errores += '- La selección no está registrada en el torneo.' + @nl;
+            IF @nombre IS NULL
+                SET @errores += '- El nombre está vacío.' + @nl;
+            IF @es_dt = 0
+            BEGIN
+                IF @dorsal IS NULL OR @dorsal NOT BETWEEN 1 AND 99
+                    SET @errores += '- El dorsal debe ser un número entre 1 y 99.' + @nl;
+                IF @posicion IS NULL
+                    SET @errores += '- La posición debe ser GK, DF, MF o FW.' + @nl;
+                IF @fecha_nacimiento IS NULL
+                    SET @errores += '- La fecha de nacimiento no es válida.' + @nl;
+            END;
+            IF @errores <> ''
+            BEGIN
+                SET @errores = 'Fila rechazada:' + @nl + @errores;
+                THROW 50004, @errores, 1;
+            END;
+
+            BEGIN TRANSACTION;
+
+            IF @es_dt = 1
+            BEGIN
+                SELECT @staff_id = staff_id, @nombre_actual = nombre, @apellido_actual = apellido
+                FROM plantel.cuerpo_tecnico WHERE seleccion_id = @seleccion_id AND rol = 'director_tecnico';
+                IF @staff_id IS NULL
+                BEGIN
+                    EXEC plantel.cuerpo_tecnico_insertar @seleccion_id, @nombre, @apellido, 'director_tecnico';
+                    SET @resultado = 'insertado';
+                END
+                ELSE IF @nombre_actual <> @nombre OR @apellido_actual <> @apellido
+                BEGIN
+                    EXEC plantel.cuerpo_tecnico_modificar @staff_id, @seleccion_id, @nombre, @apellido, 'director_tecnico';
+                    SET @resultado = 'actualizado';
+                END;
+            END
+            ELSE
+            BEGIN
+                SELECT @jugador_id = jugador_id, @posicion_actual = posicion_habitual, @club_actual = club_origen
+                FROM plantel.jugador
+                WHERE nombre = @nombre AND apellido = @apellido AND fecha_nacimiento = @fecha_nacimiento;
+
+                IF @jugador_id IS NULL
+                BEGIN
+                    EXEC plantel.jugador_insertar @nombre, @apellido, @fecha_nacimiento, @posicion, @club, @jugador_id OUTPUT;
+                    SET @resultado = 'insertado';
+                END
+                ELSE IF @posicion_actual <> @posicion OR ISNULL(@club_actual, '') <> ISNULL(@club, '')
+                BEGIN
+                    EXEC plantel.jugador_modificar @jugador_id, @nombre, @apellido, @fecha_nacimiento, @posicion, @club;
+                    SET @resultado = 'actualizado';
+                END;
+
+                SELECT @convocatoria_id = convocatoria_id, @dorsal_actual = dorsal, @fecha_alta = fecha_alta,
+                       @motivo_alta = motivo_alta
+                FROM plantel.convocatoria
+                WHERE seleccion_id = @seleccion_id AND jugador_id = @jugador_id AND fecha_baja IS NULL;
+
+                IF @convocatoria_id IS NULL
+                BEGIN
+                    EXEC plantel.convocatoria_insertar @seleccion_id, @jugador_id, @dorsal, @fecha_convocatoria,
+                         'Lista oficial (importación de plantel)';
+                    SET @resultado = 'insertado';
+                END
+                ELSE IF @dorsal_actual <> @dorsal
+                BEGIN
+                    EXEC plantel.convocatoria_modificar @convocatoria_id, @dorsal, @fecha_alta, @motivo_alta;
+                    IF @resultado = 'sin_cambios' SET @resultado = 'actualizado';
+                END;
+            END;
+
+            COMMIT TRANSACTION;
+
+            IF @resultado = 'insertado' SET @insertados += 1;
+            ELSE IF @resultado = 'actualizado' SET @actualizados += 1;
+            ELSE SET @sin_cambios += 1;
+        END TRY
+        BEGIN CATCH
+            SELECT @numero = ERROR_NUMBER(), @mensaje = ERROR_MESSAGE();
+            IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+            EXEC importacion.error_registrar @lote_id, @i, @registro, @numero, @mensaje;
+            SET @rechazados += 1;
+        END CATCH;
+
+        SET @i += 1;
+    END;
+
+    SET @actualizados += @bajas;
     EXEC importacion.lote_cerrar @lote_id, @leidos, @insertados, @actualizados, @sin_cambios, @rechazados;
 END;
 GO
