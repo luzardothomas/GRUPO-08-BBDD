@@ -1,0 +1,120 @@
+{
+  "fuentes": [
+    "https://en.wikipedia.org/wiki/2026_FIFA_World_Cup"
+  ],
+  "obtenido_en": "2026-10-27T23:07:33+00:00",
+  "sedes": [
+    {
+      "estadio": "Estadio Azteca",
+      "ciudad": "Mexico City",
+      "pais": "MEX",
+      "capacidad": "80824",
+      "huso_horario": "UTC-06"
+    },
+    {
+      "estadio": "MetLife Stadium",
+      "ciudad": "New York/New Jersey",
+      "pais": "USA",
+      "capacidad": "80663",
+      "huso_horario": "UTC-04"
+    },
+    {
+      "estadio": "AT&T Stadium",
+      "ciudad": "Dallas",
+      "pais": "USA",
+      "capacidad": "70649",
+      "huso_horario": "UTC-05"
+    },
+    {
+      "estadio": "SoFi Stadium",
+      "ciudad": "Los Angeles",
+      "pais": "USA",
+      "capacidad": "70492",
+      "huso_horario": "UTC-07"
+    },
+    {
+      "estadio": "Arrowhead Stadium",
+      "ciudad": "Kansas City",
+      "pais": "USA",
+      "capacidad": "69045",
+      "huso_horario": "UTC-05"
+    },
+    {
+      "estadio": "Levi's Stadium",
+      "ciudad": "San Francisco Bay Area",
+      "pais": "USA",
+      "capacidad": "68827",
+      "huso_horario": "UTC-07"
+    },
+    {
+      "estadio": "NRG Stadium",
+      "ciudad": "Houston",
+      "pais": "USA",
+      "capacidad": "68777",
+      "huso_horario": "UTC-05"
+    },
+    {
+      "estadio": "Lincoln Financial Field",
+      "ciudad": "Philadelphia",
+      "pais": "USA",
+      "capacidad": "68324",
+      "huso_horario": "UTC-04"
+    },
+    {
+      "estadio": "Mercedes-Benz Stadium",
+      "ciudad": "Atlanta",
+      "pais": "USA",
+      "capacidad": "68239",
+      "huso_horario": "UTC-04"
+    },
+    {
+      "estadio": "Lumen Field",
+      "ciudad": "Seattle",
+      "pais": "USA",
+      "capacidad": "66925",
+      "huso_horario": "UTC-07"
+    },
+    {
+      "estadio": "Hard Rock Stadium",
+      "ciudad": "Miami",
+      "pais": "USA",
+      "capacidad": "64478",
+      "huso_horario": "UTC-04"
+    },
+    {
+      "estadio": "Gillette Stadium",
+      "ciudad": "Boston",
+      "pais": "USA",
+      "capacidad": "64146",
+      "huso_horario": "UTC-04"
+    },
+    {
+      "estadio": "BC Place",
+      "ciudad": "Vancouver",
+      "pais": "CAN",
+      "capacidad": "52497",
+      "huso_horario": "UTC-07"
+    },
+    {
+      "estadio": "Estadio BBVA",
+      "ciudad": "Monterrey",
+      "pais": "MEX",
+      "capacidad": "51243",
+      "huso_horario": "UTC-06"
+    },
+    {
+      "estadio": "Estadio Akron",
+      "ciudad": "Guadalajara",
+      "pais": "MEX",
+      "capacidad": "45664",
+      "huso_horario": "UTC-06"
+    },
+    {
+      "estadio": "BMO Field",
+      "ciudad": "Toronto",
+      "pais": "CAN",
+      "capacidad": "43036",
+      "huso_horario": "UTC-04"
+    }
+  ]
+}

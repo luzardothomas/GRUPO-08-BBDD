@@ -2,7 +2,7 @@
 -- UNIVERSIDAD NACIONAL DE LA MATANZA
 -- MATERIA: 3641 - Bases de Datos Aplicada (Comisión 02-5600)
 -- TRABAJO PRÁCTICO: Sistema de registro y gestión del mundial de fútbol
--- ENTREGA 5: Base de Datos - LOTES DE PRUEBA
+-- ENTREGA 5: Base de Datos - LOTES DE PRUEBA: CASOS EXITOSOS
 --
 -- INTEGRANTES:
 --   LUZARDO, THOMAS GASTON
@@ -11,20 +11,74 @@
 --   LARAN, JEAN PIERRE
 --
 -- DESCRIPCIÓN:
---   Test exhaustivo de los procedimientos de entrega5_sp.sql: se verifican todas las
---   condiciones de cada SP, tanto los casos válidos como cada uno de los errores
---   posibles (incluidos los casos que combinan varias condiciones).
+--   Pruebas de lo que los SP de entrega5_sp_ABM.sql y entrega5_sp_logica_negocio.sql deben ACEPTAR,
+--   con evidencia (consulta del resultado + verificación OK/FALLO). Las validaciones que deben
+--   rechazarse están en entrega5_test_fallidos.sql.
+--     PARTE 1: SP de ABM sobre un escenario encadenado (Argentina, Francia, México y Japón; partidos P1 a P4).
+--     PARTE 2: SP de lógica de negocio sobre el mismo escenario, incluidos los casos obligatorios de la sección IV.
+--     PARTE 3: casos detallados por SP (bordes y variantes válidas), con sus propios datos de prueba.
 --
--- CÓMO USARLO:
---   La gran mayoría de bloques tienen un apartado llamado -- Preparación de <sp> (ejecutar UNA sola vez)
---   el cual se ejecuta una vez sola al comienzo del testeo.
---   Luego, cada SP tiene un bloque "-- Verificacion <esquema>.<sp>" con una línea por caso
---   y el resultado esperado a la derecha (-->). Se ejecuta comentando y descomentando
---   la línea correspondiente al error que se quiere ver: una sola línea inválida
---   activa por vez.
---   Por ultimo, cada bloque posee un apartado de limpieza, el cual se debe de ejecutar luego de finalizar
---   el testeo, para no dejar la base llena de basura.
+-- IDENTIFICACIÓN DE LOS LOTES:
+--   Cada lote empieza con PRINT '--- <id> <descripción>', seguido de "-- Resultado esperado" y "-- Requiere".
+--     Lote 0       preparación de la sesión: tablas #resultado e #id y el procedimiento #registrar
+--     E-x.y.nn     prueba exitosa de la sección x.y (en la Parte 3, un lote por SP agrupa sus casos)
+--     P-x.y.nn     preparación de datos (sin verificaciones)
+--     RESUMEN      listado final: cantidad de OK y FALLO, y el detalle de cada prueba
+--
+-- ÍNDICE (sección, ids):
+--   1.1   torneo.parametro                                               E-1.1.01
+--   1.2   torneo.pais y torneo.confederacion                             E-1.2.01 a E-1.2.02
+--   1.3   torneo.sede                                                    E-1.3.01
+--   1.4   torneo.seleccion                                               E-1.4.01
+--   1.5   torneo.partido                                                 E-1.5.01
+--   1.6   plantel.persona, plantel.cuerpo_tecnico y plantel.jugador      E-1.6.01 a E-1.6.03
+--   1.7   plantel.convocatoria                                           E-1.7.01 a E-1.7.02
+--   1.8   plantel.formacion y plantel.formacion_jugador                  P-1.8.01; E-1.8.01 a E-1.8.02
+--   1.9   evento.sustitucion                                             E-1.9.01
+--   1.10  evento.gol                                                     E-1.10.01 a E-1.10.02
+--   1.11  evento.tarjeta, evento.criterio_suspension y evento.suspension E-1.11.01 a E-1.11.03
+--   1.12  arbitraje: arbitro, arbitro_idioma, designacion_arbitral e inf E-1.12.01 a E-1.12.02
+--   1.13  publicidad: anunciante, campania, campania_pais_interes, pieza E-1.13.01 a E-1.13.02
+--   2.1   plantel.reemplazar_convocado                                   E-2.1.01
+--   2.2   plantel.cargar_formacion                                       E-2.2.01
+--   2.3   evento.registrar_sustitucion                                   E-2.3.01 a E-2.3.02
+--   2.4   evento.registrar_gol                                           E-2.4.01
+--   2.5   evento.registrar_tarjeta                                       E-2.5.01 a E-2.5.03
+--   2.6   publicidad.asignar_espacios_partido                            E-2.6.01 a E-2.6.02
+--   2.7   torneo.registrar_resultado                                     E-2.7.01
+--   2.8   Acumulación de amarillas, doble amarilla y jugador suspendido  E-2.8.01 a E-2.8.04
+--   2.9   arbitraje.designar_arbitros                                    E-2.9.01
+--   2.10  Partido de eliminación directa completo                        E-2.10.01 a E-2.10.04
+--   2.11  Transaccionalidad: todo o nada en operaciones que afectan vari E-2.11.01
+--   3.0   Preparación de los datos de la Parte 3                         P-3.01 a P-3.16
+--   3.1   torneo.parametro                                               E-3.1.01 a E-3.1.14
+--   3.2   torneo.pais y torneo.confederacion                             E-3.2.01 a E-3.2.24
+--   3.3   torneo.sede                                                    E-3.3.01 a E-3.3.06
+--   3.4   torneo.seleccion                                               E-3.4.01 a E-3.4.06
+--   3.5   torneo.partido                                                 E-3.5.01 a E-3.5.10
+--   3.6   plantel.persona, plantel.cuerpo_tecnico y plantel.jugador      E-3.6.01 a E-3.6.37
+--   3.7   plantel.convocatoria                                           E-3.7.01 a E-3.7.28
+--   3.8   plantel.formacion y plantel.formacion_jugador                  E-3.8.01 a E-3.8.25
+--   3.9   evento.sustitucion                                             E-3.9.01 a E-3.9.13
+--   3.10  evento.gol                                                     E-3.10.01 a E-3.10.39
+--   3.11  evento.tarjeta, evento.criterio_suspension y evento.suspension P-3.17; E-3.11.01 a E-3.11.39
+--   3.12  arbitraje: arbitro, arbitro_idioma, designacion_arbitral e inf P-3.18; E-3.12.01 a E-3.12.35
+--   3.13  publicidad: anunciante, campania, campania_pais_interes, pieza P-3.19 a P-3.25; E-3.13.01 a E-3.13.46
+--
+-- CÓMO EJECUTARLO:
+--   Todo junto: recrear la base (entrega5_db_definition.sql, entrega5_sp_ABM.sql y
+--   entrega5_sp_logica_negocio.sql) y ejecutar este archivo completo, de una vez.
+--   Con Docker: ./sqlserver-docker/entrega5.sh exitosos  (recrea la base y lo ejecuta).
+--   Un lote puntual: sobre la base recién creada y en una misma ventana de consulta, ejecutar el
+--   Lote 0, luego los lotes que indica su línea "Requiere" y por último el lote buscado (buscar
+--   su id con Ctrl+F). En la Parte 3 hay un lote por SP: cada caso son dos o tres líneas que empiezan
+--   con "-- <id>"; para ejecutar uno solo, seleccionar el DECLARE del lote y las líneas del caso. Cada prueba informa OK o FALLO en Mensajes y queda en #resultado;
+--   el lote RESUMEN las lista. Las Partes 1 y 2 son un escenario encadenado: cada lote va
+--   después de los anteriores. Los casos válidos de la Parte 3 también se aplican en orden.
+--   Los datos se cargan a través de los SP. Las únicas sentencias directas son las de algunas
+--   preparaciones de la Parte 3, que dejan partidos de prueba en estado 'finalizado'.
 -- ============================================================
+
 
 USE mundial_2026;
 GO
@@ -32,27 +86,1170 @@ GO
 SET NOCOUNT ON;
 GO
 
--- El script necesita la base recién creada: si ya tiene datos, no ejecuta nada.
-
+PRINT '--- Control de la ejecución completa: la base tiene que estar recién creada';
+-- Al ejecutar el archivo completo sobre una base con datos, avisa y no ejecuta nada más.
+-- (Al ejecutar lotes sueltos se puede omitir este lote.)
 IF EXISTS (SELECT 1 FROM torneo.pais)
 BEGIN
-    RAISERROR('La base ya tiene datos: ejecutar primero entrega5_definition.sql y entrega5_sp.sql para recrearla. No se ejecuta ninguna prueba.', 16, 1);
+    RAISERROR('La base ya tiene datos: ejecutar primero entrega5_db_definition.sql, entrega5_sp_ABM.sql y entrega5_sp_logica_negocio.sql para recrearla. No se ejecuta ninguna prueba.', 16, 1);
     SET NOEXEC ON;
 END;
 GO
 
+PRINT '--- Lote 0: preparación de la sesión';
+-- Ejecutar primero, en la misma ventana de consulta que el resto de los lotes. Se puede volver a ejecutar:
+-- recrea las tablas temporales y los procedimientos de registro de resultados.
+
 IF OBJECT_ID('tempdb..#resultado') IS NOT NULL DROP TABLE #resultado;
-IF OBJECT_ID('tempdb..#id') IS NOT NULL DROP TABLE #id;
-CREATE TABLE #resultado (orden INT IDENTITY(1, 1), prueba VARCHAR(10), descripcion VARCHAR(120),
-                         resultado VARCHAR(5), detalle VARCHAR(2100));
-CREATE TABLE #id (clave VARCHAR(20) PRIMARY KEY, valor INT);   -- ids generados, para los lotes siguientes
+IF OBJECT_ID('tempdb..#id') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM torneo.pais) DROP TABLE #id;   -- se conserva si ya hay escenario
+CREATE TABLE #resultado (orden INT IDENTITY(1, 1), prueba VARCHAR(12) COLLATE DATABASE_DEFAULT,
+                         descripcion VARCHAR(300) COLLATE DATABASE_DEFAULT, resultado VARCHAR(5) COLLATE DATABASE_DEFAULT,
+                         detalle VARCHAR(2100) COLLATE DATABASE_DEFAULT);
+IF OBJECT_ID('tempdb..#id') IS NULL
+    CREATE TABLE #id (clave VARCHAR(20) PRIMARY KEY, valor INT);   -- ids generados por el escenario, para los lotes siguientes
 GO
 
--- =======================================================================================================
---                                          PREPARACION
--- =======================================================================================================
+IF OBJECT_ID('tempdb..#registrar') IS NOT NULL DROP PROCEDURE #registrar;
+GO
 
--- Preparación de torneo.parametro_* (ejecutar UNA sola vez)
+-- Registra el resultado de una prueba en #resultado y lo informa en Mensajes con OK o FALLO al comienzo de la línea.
+--   @esperado = 0: la operación debe aceptarse.  @esperado = N > 0: debe rechazarse con N condiciones.
+--   El error a evaluar (50001 validación o 50002 lógica de negocio) es el que se pasa en @numero y @mensaje,
+--   el que está capturando el CATCH desde el que se lo llama o el que guardó #capturar. Con @errores evalúa la
+--   salida de un SP *_validar. Sin error ni @errores, la operación terminó sin error.
+--   (Las variables de un procedimiento temporal usan la intercalación de tempdb: por eso los COLLATE.)
+CREATE PROCEDURE #registrar
+    @prueba      VARCHAR(12),
+    @descripcion VARCHAR(300),
+    @esperado    INT,
+    @errores     VARCHAR(2000) = NULL,
+    @numero      INT = NULL,
+    @mensaje     VARCHAR(2100) = NULL
+AS
+BEGIN
+    DECLARE @condiciones INT, @resultado VARCHAR(5), @detalle VARCHAR(2100);
+    IF @numero IS NULL SELECT @numero = ERROR_NUMBER(), @mensaje = ERROR_MESSAGE();
+    IF @numero IS NULL   -- error guardado por #capturar (sobrevive al ROLLBACK de la prueba)
+        SELECT @numero = CAST(SESSION_CONTEXT(N'prueba_error_numero') AS INT),
+               @mensaje = CAST(SESSION_CONTEXT(N'prueba_error_mensaje') AS VARCHAR(2100));
+    EXEC sp_set_session_context N'prueba_error_numero', NULL;
+    EXEC sp_set_session_context N'prueba_error_mensaje', NULL;
+    IF @numero IS NULL SET @mensaje = @errores;
+    SET @mensaje = ISNULL(@mensaje, '') COLLATE DATABASE_DEFAULT;
+    SET @condiciones = LEN(CHAR(10) + @mensaje COLLATE DATABASE_DEFAULT)
+                     - LEN(REPLACE(CHAR(10) + @mensaje COLLATE DATABASE_DEFAULT, CHAR(10) + '-', CHAR(10)));
+
+    IF @numero IS NOT NULL
+        SELECT @resultado = IIF(@esperado > 0 AND @numero IN (50001, 50002) AND @condiciones = @esperado, 'OK', 'FALLO'),
+               @detalle = CONCAT('Error ', @numero, ' con ', @condiciones, ' condición(es): ', @mensaje COLLATE DATABASE_DEFAULT);
+    ELSE IF @errores IS NOT NULL
+        SELECT @resultado = IIF(@condiciones = @esperado, 'OK', 'FALLO'),
+               @detalle = IIF(LEN(@mensaje) = 0, IIF(@esperado = 0, '', 'El SP *_validar no informó ninguna condición'),
+                              CONCAT(@condiciones, ' condición(es): ', @mensaje COLLATE DATABASE_DEFAULT));
+    ELSE
+        SELECT @resultado = IIF(@esperado = 0, 'OK', 'FALLO'), @detalle = IIF(@esperado = 0, '', 'No se rechazó');
+
+    INSERT INTO #resultado (prueba, descripcion, resultado, detalle) VALUES (@prueba, @descripcion, @resultado, @detalle);
+    PRINT CONCAT(LEFT(@resultado COLLATE DATABASE_DEFAULT + '      ', 6), @prueba COLLATE DATABASE_DEFAULT, ' ', @descripcion COLLATE DATABASE_DEFAULT);
+    IF LEN(@detalle) > 0 PRINT CONCAT('      ', @detalle COLLATE DATABASE_DEFAULT);
+END;
+GO
+
+IF OBJECT_ID('tempdb..#capturar') IS NOT NULL DROP PROCEDURE #capturar;
+GO
+
+-- Llamado desde un CATCH, guarda el error en el contexto de la sesión para que #registrar lo evalúe después
+-- del ROLLBACK de la prueba (una tabla temporal se desharía junto con la transacción).
+CREATE PROCEDURE #capturar
+AS
+BEGIN
+    DECLARE @numero INT = ERROR_NUMBER(), @mensaje NVARCHAR(2100) = ERROR_MESSAGE();
+    EXEC sp_set_session_context N'prueba_error_numero', @numero;
+    EXEC sp_set_session_context N'prueba_error_mensaje', @mensaje;
+END;
+GO
+
+EXEC sp_set_session_context N'prueba_error_numero', NULL;
+EXEC sp_set_session_context N'prueba_error_mensaje', NULL;
+GO
+
+IF OBJECT_ID('tempdb..#informar') IS NOT NULL DROP PROCEDURE #informar;
+GO
+
+-- Informa con OK o FALLO las verificaciones que un lote del escenario registró en #resultado.
+CREATE PROCEDURE #informar
+    @prueba VARCHAR(12)
+AS
+BEGIN
+    DECLARE @linea VARCHAR(2500), @orden INT = 0;
+    WHILE 1 = 1
+    BEGIN
+        SELECT TOP (1) @orden = orden,
+               @linea = CONCAT(LEFT(resultado + '      ', 6), prueba, ' ', descripcion, IIF(resultado = 'OK' OR detalle = '', '', CHAR(13) + CHAR(10) + '      ' + detalle))
+        FROM #resultado WHERE prueba = @prueba COLLATE DATABASE_DEFAULT AND orden > @orden ORDER BY orden;
+        IF @@ROWCOUNT = 0 BREAK;
+        PRINT @linea;
+    END;
+    IF NOT EXISTS (SELECT 1 FROM #resultado WHERE prueba = @prueba COLLATE DATABASE_DEFAULT)
+        PRINT CONCAT('FALLO ', @prueba COLLATE DATABASE_DEFAULT, ' no registró ningún resultado');
+END;
+GO
+
+PRINT '################ PARTE 1: PROCEDIMIENTOS DE ABM (escenario) ################';
+GO
+
+-- ============================================================
+-- 1.1 torneo.parametro
+-- ============================================================
+
+PRINT '--- E-1.1.01 Alta, modificación y baja de un parámetro';
+-- Resultado esperado: el parámetro de prueba se crea con valor 7, pasa a 9 y se elimina.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+EXEC torneo.parametro_insertar 'parametro_de_prueba', 7, 'Parámetro creado por el test';
+EXEC torneo.parametro_modificar 'parametro_de_prueba', 9;
+SELECT clave, valor, descripcion FROM torneo.parametro WHERE clave = 'parametro_de_prueba';
+INSERT INTO #resultado SELECT 'E-1.1.01', 'parametro: alta y modificación', IIF(COUNT(*) = 1 AND MAX(valor) = 9, 'OK', 'FALLO'), ''
+FROM torneo.parametro WHERE clave = 'parametro_de_prueba';
+EXEC torneo.parametro_eliminar 'parametro_de_prueba';
+INSERT INTO #resultado SELECT 'E-1.1.01', 'parametro: baja', IIF(COUNT(*) = 0, 'OK', 'FALLO'), ''
+FROM torneo.parametro WHERE clave = 'parametro_de_prueba';
+EXEC #informar 'E-1.1.01';
+GO
+
+-- ============================================================
+-- 1.2 torneo.pais y torneo.confederacion
+-- ============================================================
+
+PRINT '--- E-1.2.01 Alta de países y confederaciones';
+-- Resultado esperado: 11 países (uno temporal) y 6 confederaciones.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @id INT;
+EXEC torneo.pais_insertar 'ARG', 'Argentina',      'UTC-03', 13700, @id OUTPUT; INSERT INTO #id VALUES ('pais_ARG', @id);
+EXEC torneo.pais_insertar 'BRA', 'Brasil',         'UTC-03', 10300, @id OUTPUT; INSERT INTO #id VALUES ('pais_BRA', @id);
+EXEC torneo.pais_insertar 'URY', 'Uruguay',        'UTC-03', 22000, @id OUTPUT; INSERT INTO #id VALUES ('pais_URY', @id);
+EXEC torneo.pais_insertar 'USA', 'Estados Unidos', 'UTC-05', 82700, @id OUTPUT; INSERT INTO #id VALUES ('pais_USA', @id);
+EXEC torneo.pais_insertar 'CAN', 'Canadá',         'UTC-05', 53400, @id OUTPUT; INSERT INTO #id VALUES ('pais_CAN', @id);
+EXEC torneo.pais_insertar 'MEX', 'México',         'UTC-06', 13800, @id OUTPUT; INSERT INTO #id VALUES ('pais_MEX', @id);
+EXEC torneo.pais_insertar 'FRA', 'Francia',        'UTC+01', 44700, @id OUTPUT; INSERT INTO #id VALUES ('pais_FRA', @id);
+EXEC torneo.pais_insertar 'DEU', 'Alemania',       'UTC+01', 52700, @id OUTPUT; INSERT INTO #id VALUES ('pais_DEU', @id);
+EXEC torneo.pais_insertar 'ESP', 'España',         'UTC+01', 33500, @id OUTPUT; INSERT INTO #id VALUES ('pais_ESP', @id);
+EXEC torneo.pais_insertar 'JPN', 'Japón',          'UTC+09', 33800, @id OUTPUT; INSERT INTO #id VALUES ('pais_JPN', @id);
+EXEC torneo.pais_insertar 'zzz', 'País temporal',  'UTC+00', NULL,  @id OUTPUT; INSERT INTO #id VALUES ('pais_ZZZ', @id);
+
+EXEC torneo.confederacion_insertar 'CONMEBOL', @id OUTPUT; INSERT INTO #id VALUES ('conf_CONMEBOL', @id);
+EXEC torneo.confederacion_insertar 'UEFA',     @id OUTPUT; INSERT INTO #id VALUES ('conf_UEFA', @id);
+EXEC torneo.confederacion_insertar 'CONCACAF', @id OUTPUT; INSERT INTO #id VALUES ('conf_CONCACAF', @id);
+EXEC torneo.confederacion_insertar 'AFC',      @id OUTPUT; INSERT INTO #id VALUES ('conf_AFC', @id);
+EXEC torneo.confederacion_insertar 'CAF',      @id OUTPUT; INSERT INTO #id VALUES ('conf_CAF', @id);
+EXEC torneo.confederacion_insertar 'OFC',      @id OUTPUT; INSERT INTO #id VALUES ('conf_OFC', @id);
+
+SELECT pais_id, codigo_iso, nombre, huso_horario, pbi_per_capita FROM torneo.pais ORDER BY pais_id;
+SELECT confederacion_id, nombre FROM torneo.confederacion ORDER BY confederacion_id;
+INSERT INTO #resultado SELECT 'E-1.2.01', 'pais: alta (el código se guarda en mayúsculas)',
+       IIF(COUNT(*) = 11 AND SUM(CASE WHEN codigo_iso = 'ZZZ' COLLATE Latin1_General_CS_AS THEN 1 ELSE 0 END) = 1, 'OK', 'FALLO'), ''
+FROM torneo.pais;
+INSERT INTO #resultado SELECT 'E-1.2.01', 'confederacion: alta', IIF(COUNT(*) = 6, 'OK', 'FALLO'), '' FROM torneo.confederacion;
+EXEC #informar 'E-1.2.01';
+GO
+
+PRINT '--- E-1.2.02 Modificación y baja de país; modificación y baja de confederación';
+-- Resultado esperado: Argentina queda con PBI 14000; el país temporal y la confederación OFC se eliminan.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @arg INT = (SELECT valor FROM #id WHERE clave = 'pais_ARG'), @zzz INT = (SELECT valor FROM #id WHERE clave = 'pais_ZZZ'),
+        @ofc INT = (SELECT valor FROM #id WHERE clave = 'conf_OFC');
+EXEC torneo.pais_modificar @arg, 'ARG', 'Argentina', 'UTC-03', 14000;
+EXEC torneo.pais_eliminar @zzz;
+EXEC torneo.confederacion_modificar @ofc, 'OFC';
+EXEC torneo.confederacion_eliminar @ofc;
+SELECT codigo_iso, nombre, pbi_per_capita FROM torneo.pais WHERE codigo_iso IN ('ARG', 'ZZZ');
+INSERT INTO #resultado SELECT 'E-1.2.02', 'pais: modificación y baja',
+       IIF(SUM(CASE WHEN codigo_iso = 'ARG' AND pbi_per_capita = 14000 THEN 1 ELSE 0 END) = 1
+           AND SUM(CASE WHEN codigo_iso = 'ZZZ' THEN 1 ELSE 0 END) = 0, 'OK', 'FALLO'), '' FROM torneo.pais;
+INSERT INTO #resultado SELECT 'E-1.2.02', 'confederacion: baja', IIF(COUNT(*) = 5, 'OK', 'FALLO'), '' FROM torneo.confederacion;
+EXEC #informar 'E-1.2.02';
+GO
+
+-- ============================================================
+-- 1.3 torneo.sede
+-- ============================================================
+
+PRINT '--- E-1.3.01 Alta, modificación y baja de sedes';
+-- Resultado esperado: quedan 3 sedes (husos UTC-04 y UTC-06); MetLife pasa a capacidad 82500; la temporal se elimina.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @id INT, @usa INT = (SELECT valor FROM #id WHERE clave = 'pais_USA'),
+        @mex INT = (SELECT valor FROM #id WHERE clave = 'pais_MEX'), @can INT = (SELECT valor FROM #id WHERE clave = 'pais_CAN');
+EXEC torneo.sede_insertar 'MetLife Stadium', 'East Rutherford', @usa, 82000, 'UTC-04', @id OUTPUT; INSERT INTO #id VALUES ('sede_NY', @id);
+EXEC torneo.sede_insertar 'Estadio Azteca', 'Ciudad de México', @mex, 83000, 'UTC-06', @id OUTPUT; INSERT INTO #id VALUES ('sede_MX', @id);
+EXEC torneo.sede_insertar 'BMO Field', 'Toronto', @can, 45000, 'UTC-04', @id OUTPUT;              INSERT INTO #id VALUES ('sede_TO', @id);
+EXEC torneo.sede_insertar 'Estadio temporal', 'Ciudad temporal', @can, 100, 'UTC-04', @id OUTPUT;
+EXEC torneo.sede_eliminar @id;
+SET @id = (SELECT valor FROM #id WHERE clave = 'sede_NY');
+EXEC torneo.sede_modificar @id, 'MetLife Stadium', 'East Rutherford', @usa, 82500, 'UTC-04';
+SELECT sede_id, nombre, ciudad, capacidad, huso_horario FROM torneo.sede ORDER BY sede_id;
+INSERT INTO #resultado SELECT 'E-1.3.01', 'sede: alta, modificación y baja',
+       IIF(COUNT(*) = 3 AND MAX(capacidad) = 83000 AND SUM(CASE WHEN capacidad = 82500 THEN 1 ELSE 0 END) = 1, 'OK', 'FALLO'), '' FROM torneo.sede;
+EXEC #informar 'E-1.3.01';
+GO
+
+-- ============================================================
+-- 1.4 torneo.seleccion
+-- ============================================================
+
+PRINT '--- E-1.4.01 Alta, modificación y baja de selecciones';
+-- Resultado esperado: 4 selecciones en el grupo A y Brasil en el B; la de España (temporal) se elimina.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @id INT, @conmebol INT = (SELECT valor FROM #id WHERE clave = 'conf_CONMEBOL'), @uefa INT = (SELECT valor FROM #id WHERE clave = 'conf_UEFA'),
+        @concacaf INT = (SELECT valor FROM #id WHERE clave = 'conf_CONCACAF'), @afc INT = (SELECT valor FROM #id WHERE clave = 'conf_AFC'), @pais INT;
+SET @pais = (SELECT valor FROM #id WHERE clave = 'pais_ARG'); EXEC torneo.seleccion_insertar @pais, @conmebol, 'A', @id OUTPUT; INSERT INTO #id VALUES ('ARG', @id);
+SET @pais = (SELECT valor FROM #id WHERE clave = 'pais_FRA'); EXEC torneo.seleccion_insertar @pais, @uefa, 'A', @id OUTPUT;     INSERT INTO #id VALUES ('FRA', @id);
+SET @pais = (SELECT valor FROM #id WHERE clave = 'pais_MEX'); EXEC torneo.seleccion_insertar @pais, @concacaf, 'A', @id OUTPUT; INSERT INTO #id VALUES ('MEX', @id);
+SET @pais = (SELECT valor FROM #id WHERE clave = 'pais_JPN'); EXEC torneo.seleccion_insertar @pais, @afc, 'A', @id OUTPUT;      INSERT INTO #id VALUES ('JPN', @id);
+SET @pais = (SELECT valor FROM #id WHERE clave = 'pais_BRA'); EXEC torneo.seleccion_insertar @pais, @conmebol, 'C', @id OUTPUT; INSERT INTO #id VALUES ('BRA', @id);
+EXEC torneo.seleccion_modificar @id, @pais, @conmebol, 'b';
+SET @pais = (SELECT valor FROM #id WHERE clave = 'pais_ESP'); EXEC torneo.seleccion_insertar @pais, @uefa, 'B', @id OUTPUT;
+EXEC torneo.seleccion_eliminar @id;
+SELECT s.seleccion_id, p.nombre AS pais, c.nombre AS confederacion, s.grupo
+FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id JOIN torneo.confederacion c ON c.confederacion_id = s.confederacion_id
+ORDER BY s.seleccion_id;
+INSERT INTO #resultado SELECT 'E-1.4.01', 'seleccion: alta, modificación y baja',
+       IIF(COUNT(*) = 5 AND SUM(CASE WHEN grupo = 'A' THEN 1 ELSE 0 END) = 4 AND SUM(CASE WHEN grupo = 'B' THEN 1 ELSE 0 END) = 1, 'OK', 'FALLO'), ''
+FROM torneo.seleccion;
+EXEC #informar 'E-1.4.01';
+GO
+
+-- ============================================================
+-- 1.5 torneo.partido
+-- ============================================================
+
+PRINT '--- E-1.5.01 Alta, modificación y baja de partidos';
+-- Resultado esperado: 4 partidos programados, con la hora UTC derivada de la hora local
+-- (P1 20:00 UTC-04 = 00:00 UTC del día siguiente). P3 se reprograma a las 16:00. El partido temporal se elimina.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @id INT, @ny INT = (SELECT valor FROM #id WHERE clave = 'sede_NY'), @mx INT = (SELECT valor FROM #id WHERE clave = 'sede_MX'),
+        @to INT = (SELECT valor FROM #id WHERE clave = 'sede_TO'), @arg INT = (SELECT valor FROM #id WHERE clave = 'ARG'),
+        @fra INT = (SELECT valor FROM #id WHERE clave = 'FRA'), @mex INT = (SELECT valor FROM #id WHERE clave = 'MEX'),
+        @jpn INT = (SELECT valor FROM #id WHERE clave = 'JPN');
+EXEC torneo.partido_insertar @ny, '2026-06-12T20:00:00-04:00', 'grupos', @arg, @fra, NULL, @id OUTPUT;        INSERT INTO #id VALUES ('P1', @id);
+EXEC torneo.partido_insertar @mx, '2026-06-17T18:00:00-06:00', 'grupos', @arg, @mex, NULL, @id OUTPUT;        INSERT INTO #id VALUES ('P2', @id);
+EXEC torneo.partido_insertar @to, '2026-06-22T13:00:00-04:00', 'grupos', @arg, @jpn, NULL, @id OUTPUT;        INSERT INTO #id VALUES ('P3', @id);
+EXEC torneo.partido_modificar @id, @to, '2026-06-22T16:00:00-04:00', 'grupos', @arg, @jpn;
+EXEC torneo.partido_insertar @ny, '2026-06-29T18:00:00-04:00', 'dieciseisavos', @fra, @jpn, NULL, @id OUTPUT; INSERT INTO #id VALUES ('P4', @id);
+EXEC torneo.partido_insertar @mx, '2026-06-25T18:00:00-06:00', 'grupos', @mex, @jpn, NULL, @id OUTPUT;
+EXEC torneo.partido_eliminar @id;
+SELECT partido_id, fase, fecha_hora_local, fecha_hora_utc, seleccion_local_id, seleccion_visitante_id, estado FROM torneo.partido ORDER BY partido_id;
+INSERT INTO #resultado SELECT 'E-1.5.01', 'partido: alta (UTC derivada), modificación y baja',
+       IIF(COUNT(*) = 4
+           AND SUM(CASE WHEN fecha_hora_utc = '2026-06-13T00:00:00+00:00' AND DATEPART(TZOFFSET, fecha_hora_utc) = 0 THEN 1 ELSE 0 END) = 1
+           AND SUM(CASE WHEN fecha_hora_local = '2026-06-22T16:00:00-04:00' THEN 1 ELSE 0 END) = 1, 'OK', 'FALLO'), ''
+FROM torneo.partido;
+EXEC #informar 'E-1.5.01';
+GO
+
+-- ============================================================
+-- 1.6 plantel.persona, plantel.cuerpo_tecnico y plantel.jugador
+-- ============================================================
+
+PRINT '--- E-1.6.01 Alta, modificación y baja de cuerpo técnico (crea y borra su persona)';
+-- Resultado esperado: 3 integrantes (DT y ayudante de Argentina, DT de Francia), cada uno con su persona 'cuerpo_tecnico'.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @id INT, @persona INT, @arg INT = (SELECT valor FROM #id WHERE clave = 'ARG'), @fra INT = (SELECT valor FROM #id WHERE clave = 'FRA');
+EXEC plantel.cuerpo_tecnico_insertar @arg, 'Lionel', 'Scaloni', 'director_tecnico', @id OUTPUT, @persona OUTPUT;
+EXEC plantel.cuerpo_tecnico_insertar @arg, 'Pablo', 'Aimar', 'otro', @id OUTPUT, @persona OUTPUT;
+EXEC plantel.cuerpo_tecnico_modificar @id, @arg, 'Pablo', 'Aimar', 'ayudante_tecnico';
+EXEC plantel.cuerpo_tecnico_insertar @fra, 'Didier', 'Deschamps', 'director_tecnico', @id OUTPUT, @persona OUTPUT;
+INSERT INTO #id VALUES ('persona_DT_FRA', @persona);
+EXEC plantel.cuerpo_tecnico_insertar @fra, 'Temporal', 'Temporal', 'otro', @id OUTPUT, @persona OUTPUT;
+EXEC plantel.cuerpo_tecnico_eliminar @id;
+SELECT ct.staff_id, ct.persona_id, pe.tipo_persona, ct.seleccion_id, ct.nombre, ct.apellido, ct.rol
+FROM plantel.cuerpo_tecnico ct JOIN plantel.persona pe ON pe.persona_id = ct.persona_id ORDER BY ct.staff_id;
+INSERT INTO #resultado SELECT 'E-1.6.01', 'cuerpo_tecnico: alta, modificación y baja (con su persona)',
+       IIF((SELECT COUNT(*) FROM plantel.cuerpo_tecnico) = 3 AND (SELECT COUNT(*) FROM plantel.persona) = 3
+           AND EXISTS (SELECT 1 FROM plantel.cuerpo_tecnico WHERE apellido = 'Aimar' AND rol = 'ayudante_tecnico'), 'OK', 'FALLO'), '';
+EXEC #informar 'E-1.6.01';
+GO
+
+PRINT '--- E-1.6.02 Alta masiva de jugadores (por SP, uno por uno)';
+-- Resultado esperado: 97 jugadores (27 de ARG, 23 de FRA, 23 de MEX y 24 de JPN), cada uno con su persona 'jugador'.
+-- Convención de los datos de prueba: nombre = código del país, apellido = 'Jugador NN' (NN será su dorsal).
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @plantel TABLE (codigo CHAR(3), cantidad INT);
+INSERT INTO @plantel VALUES ('ARG', 27), ('FRA', 23), ('MEX', 23), ('JPN', 24);
+DECLARE @codigo CHAR(3) = '', @cantidad INT, @n INT, @apellido VARCHAR(100), @nacimiento DATE, @posicion VARCHAR(20);
+WHILE 1 = 1
+BEGIN
+    SELECT TOP (1) @codigo = codigo, @cantidad = cantidad FROM @plantel WHERE codigo > @codigo ORDER BY codigo;
+    IF @@ROWCOUNT = 0 BREAK;
+    SET @n = 1;
+    WHILE @n <= @cantidad
+    BEGIN
+        SELECT @apellido = 'Jugador ' + RIGHT('0' + CAST(@n AS VARCHAR(2)), 2),
+               @nacimiento = DATEADD(DAY, @n * 40, '1995-03-01'),
+               @posicion = CASE WHEN @n IN (1, 12, 23) THEN 'arquero' WHEN @n % 3 = 0 THEN 'delantero'
+                                WHEN @n % 3 = 1 THEN 'mediocampista' ELSE 'defensor' END;
+        EXEC plantel.jugador_insertar @nombre = @codigo, @apellido = @apellido, @fecha_nacimiento = @nacimiento,
+             @posicion_habitual = @posicion, @club_origen = 'Club de prueba';
+        SET @n += 1;
+    END;
+END;
+SELECT nombre AS seleccion, COUNT(*) AS jugadores, MIN(fecha_nacimiento) AS mayor, MAX(fecha_nacimiento) AS menor
+FROM plantel.jugador GROUP BY nombre ORDER BY nombre;
+INSERT INTO #resultado SELECT 'E-1.6.02', 'jugador: alta masiva (con su persona)',
+       IIF((SELECT COUNT(*) FROM plantel.jugador) = 97
+           AND (SELECT COUNT(*) FROM plantel.persona WHERE tipo_persona = 'jugador') = 97, 'OK', 'FALLO'), '';
+EXEC #informar 'E-1.6.02';
+GO
+
+PRINT '--- E-1.6.03 Modificación y baja de jugador; ABM de persona';
+-- Resultado esperado: ARG Jugador 10 cambia de club; el jugador temporal se elimina junto con su persona;
+-- la persona suelta se crea, se modifica y se elimina. Quedan 97 jugadores y 100 personas.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @id INT, @persona INT;
+SELECT @id = jugador_id FROM plantel.jugador WHERE nombre = 'ARG' AND apellido = 'Jugador 10';
+EXEC plantel.jugador_modificar @id, 'ARG', 'Jugador 10', '1996-04-04', 'delantero', 'Inter Miami CF';
+EXEC plantel.jugador_insertar 'Temporal', 'Temporal', '2000-01-01', 'defensor', NULL, @id OUTPUT, @persona OUTPUT;
+EXEC plantel.jugador_eliminar @id;
+EXEC plantel.persona_insertar 'jugador', @persona OUTPUT;
+EXEC plantel.persona_modificar @persona, 'cuerpo_tecnico';
+EXEC plantel.persona_eliminar @persona;
+SELECT jugador_id, nombre, apellido, fecha_nacimiento, club_origen, posicion_habitual FROM plantel.jugador WHERE nombre = 'ARG' AND apellido = 'Jugador 10';
+INSERT INTO #resultado SELECT 'E-1.6.03', 'jugador y persona: modificación y baja',
+       IIF((SELECT COUNT(*) FROM plantel.jugador) = 97 AND (SELECT COUNT(*) FROM plantel.persona) = 100
+           AND EXISTS (SELECT 1 FROM plantel.jugador WHERE club_origen = 'Inter Miami CF'), 'OK', 'FALLO'), '';
+EXEC #informar 'E-1.6.03';
+GO
+
+-- ============================================================
+-- 1.7 plantel.convocatoria
+-- ============================================================
+
+PRINT '--- E-1.7.01 Alta de convocatorias';
+-- Resultado esperado: ARG 26 convocados (el máximo), FRA 23, MEX 23 y JPN 24, con dorsal = NN del apellido.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @lista TABLE (fila INT IDENTITY(1, 1) PRIMARY KEY, seleccion_id INT, jugador_id INT, dorsal INT);
+INSERT INTO @lista (seleccion_id, jugador_id, dorsal)
+SELECT s.seleccion_id, j.jugador_id, CAST(RIGHT(j.apellido, 2) AS INT)
+FROM plantel.jugador j
+JOIN torneo.pais p      ON p.codigo_iso = j.nombre
+JOIN torneo.seleccion s ON s.pais_id = p.pais_id
+WHERE NOT (j.nombre = 'ARG' AND j.apellido = 'Jugador 27')          -- el 27 de ARG queda sin convocar
+ORDER BY s.seleccion_id, j.jugador_id;
+DECLARE @i INT = 1, @total INT = (SELECT COUNT(*) FROM @lista), @sel INT, @jug INT, @dorsal INT;
+WHILE @i <= @total
+BEGIN
+    SELECT @sel = seleccion_id, @jug = jugador_id, @dorsal = dorsal FROM @lista WHERE fila = @i;
+    EXEC plantel.convocatoria_insertar @sel, @jug, @dorsal, '2026-06-01', 'Lista inicial';
+    SET @i += 1;
+END;
+SELECT p.codigo_iso, COUNT(*) AS convocados_vigentes, MIN(c.dorsal) AS dorsal_min, MAX(c.dorsal) AS dorsal_max
+FROM plantel.convocatoria c JOIN torneo.seleccion s ON s.seleccion_id = c.seleccion_id JOIN torneo.pais p ON p.pais_id = s.pais_id
+WHERE c.fecha_baja IS NULL GROUP BY p.codigo_iso ORDER BY p.codigo_iso;
+INSERT INTO #resultado SELECT 'E-1.7.01', 'convocatoria: alta', IIF(COUNT(*) = 96, 'OK', 'FALLO'), '' FROM plantel.convocatoria;
+EXEC #informar 'E-1.7.01';
+GO
+
+PRINT '--- E-1.7.02 Modificación y baja física de convocatoria';
+-- Resultado esperado: el convocado 26 de ARG pasa al dorsal 99; la convocatoria del jugador 24 de JPN se elimina (quedan 23).
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @conv INT;
+SELECT @conv = c.convocatoria_id FROM plantel.convocatoria c JOIN plantel.jugador j ON j.jugador_id = c.jugador_id
+WHERE j.nombre = 'ARG' AND j.apellido = 'Jugador 26';
+EXEC plantel.convocatoria_modificar @conv, 99, '2026-06-01', 'Lista inicial';
+SELECT @conv = c.convocatoria_id FROM plantel.convocatoria c JOIN plantel.jugador j ON j.jugador_id = c.jugador_id
+WHERE j.nombre = 'JPN' AND j.apellido = 'Jugador 24';
+EXEC plantel.convocatoria_eliminar @conv;
+SELECT j.nombre, j.apellido, c.dorsal, c.fecha_alta, c.fecha_baja FROM plantel.convocatoria c JOIN plantel.jugador j ON j.jugador_id = c.jugador_id
+WHERE j.apellido IN ('Jugador 24', 'Jugador 26') AND j.nombre IN ('ARG', 'JPN') ORDER BY j.nombre, j.apellido;
+INSERT INTO #resultado SELECT 'E-1.7.02', 'convocatoria: modificación y baja',
+       IIF(COUNT(*) = 95 AND SUM(CASE WHEN dorsal = 99 THEN 1 ELSE 0 END) = 1, 'OK', 'FALLO'), '' FROM plantel.convocatoria;
+EXEC #informar 'E-1.7.02';
+GO
+
+-- ============================================================
+-- 1.8 plantel.formacion y plantel.formacion_jugador (carga de a un jugador)
+-- ============================================================
+
+PRINT '--- E-1.8.01 Alta y modificación de formación y de sus jugadores';
+-- Resultado esperado: formación visitante (Japón) de P3 con esquema 3-5-2 y 2 jugadores: dorsal 1 titular
+-- y dorsal 12 suplente. El dorsal lo completa el SP desde la convocatoria.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p3 INT = (SELECT valor FROM #id WHERE clave = 'P3'), @jpn INT = (SELECT valor FROM #id WHERE clave = 'JPN'), @form INT, @j INT;
+EXEC plantel.formacion_insertar @p3, 'visitante', '4-4-2', @form OUTPUT;
+INSERT INTO #id VALUES ('form_tmp', @form);
+EXEC plantel.formacion_modificar @form, '3-5-2';
+SELECT @j = jugador_id FROM plantel.convocatoria WHERE seleccion_id = @jpn AND dorsal = 1 AND fecha_baja IS NULL;
+EXEC plantel.formacion_jugador_insertar @form, @j, 'arquero', 1;
+SELECT @j = jugador_id FROM plantel.convocatoria WHERE seleccion_id = @jpn AND dorsal = 12 AND fecha_baja IS NULL;
+EXEC plantel.formacion_jugador_insertar @form, @j, 'arquero', 1;
+EXEC plantel.formacion_jugador_modificar @form, @j, 'arquero suplente', 0;
+SELECT f.formacion_id, f.partido_id, f.condicion, f.esquema_tactico, fj.jugador_id, fj.dorsal, fj.posicion, fj.titular
+FROM plantel.formacion f JOIN plantel.formacion_jugador fj ON fj.formacion_id = f.formacion_id WHERE f.formacion_id = @form;
+INSERT INTO #resultado SELECT 'E-1.8.01', 'formacion y formacion_jugador: alta y modificación',
+       IIF(COUNT(*) = 2 AND SUM(CASE WHEN dorsal = 12 AND titular = 0 THEN 1 ELSE 0 END) = 1
+           AND (SELECT esquema_tactico FROM plantel.formacion WHERE formacion_id = @form) = '3-5-2', 'OK', 'FALLO'), ''
+FROM plantel.formacion_jugador WHERE formacion_id = @form;
+EXEC #informar 'E-1.8.01';
+GO
+
+PRINT '--- E-1.8.02 Baja de jugadores de la formación y de la formación';
+-- Resultado esperado: P3 vuelve a quedar sin formaciones.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @form INT = (SELECT valor FROM #id WHERE clave = 'form_tmp'), @p3 INT = (SELECT valor FROM #id WHERE clave = 'P3'), @j INT;
+SELECT @j = MIN(jugador_id) FROM plantel.formacion_jugador WHERE formacion_id = @form;
+EXEC plantel.formacion_jugador_eliminar @form, @j;
+SELECT @j = MIN(jugador_id) FROM plantel.formacion_jugador WHERE formacion_id = @form;
+EXEC plantel.formacion_jugador_eliminar @form, @j;
+EXEC plantel.formacion_eliminar @form;
+INSERT INTO #resultado SELECT 'E-1.8.02', 'formacion y formacion_jugador: baja', IIF(COUNT(*) = 0, 'OK', 'FALLO'), ''
+FROM plantel.formacion WHERE partido_id = @p3;
+EXEC #informar 'E-1.8.02';
+GO
+
+-- ============================================================
+-- PREPARACIÓN: formaciones de P1 (Argentina vs Francia), necesarias para probar el ABM de los
+-- eventos. Se cargan con plantel.cargar_formacion, cuyas pruebas propias están en 2.2.
+-- Titulares: dorsales 1 a 11. Suplentes: 12 a 23.
+-- ============================================================
+
+PRINT '--- P-1.8.01 Preparación: formaciones de P1 (Argentina vs Francia), necesarias para probar el ABM de los';
+-- Sin verificaciones: carga las formaciones de P1 con plantel.cargar_formacion (sus pruebas están en 2.2).
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p1 INT = (SELECT valor FROM #id WHERE clave = 'P1'), @arg INT = (SELECT valor FROM #id WHERE clave = 'ARG'),
+        @fra INT = (SELECT valor FROM #id WHERE clave = 'FRA'), @form INT;
+DECLARE @local plantel.tt_formacion_jugador, @visitante plantel.tt_formacion_jugador;
+INSERT INTO @local (jugador_id, posicion, titular)
+SELECT c.jugador_id, j.posicion_habitual, IIF(c.dorsal <= 11, 1, 0)
+FROM plantel.convocatoria c JOIN plantel.jugador j ON j.jugador_id = c.jugador_id
+WHERE c.seleccion_id = @arg AND c.fecha_baja IS NULL AND c.dorsal <= 23;
+INSERT INTO @visitante (jugador_id, posicion, titular)
+SELECT c.jugador_id, j.posicion_habitual, IIF(c.dorsal <= 11, 1, 0)
+FROM plantel.convocatoria c JOIN plantel.jugador j ON j.jugador_id = c.jugador_id
+WHERE c.seleccion_id = @fra AND c.fecha_baja IS NULL AND c.dorsal <= 23;
+EXEC plantel.cargar_formacion @p1, 'local', '4-3-3', @local, @form OUTPUT;         INSERT INTO #id VALUES ('P1_local', @form);
+EXEC plantel.cargar_formacion @p1, 'visitante', '4-4-2', @visitante, @form OUTPUT; INSERT INTO #id VALUES ('P1_visitante', @form);
+GO
+
+-- ============================================================
+-- 1.9 evento.sustitucion
+-- ============================================================
+
+PRINT '--- E-1.9.01 Alta, modificación y baja de sustitución';
+-- Resultado esperado: queda un cambio de Argentina (sale el 9, entra el 14) en el minuto 62 del ST, ventana 1.
+-- El segundo cambio (sale 8, entra 15, ventana 2) se elimina.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @form INT = (SELECT valor FROM #id WHERE clave = 'P1_local'), @sust INT, @tmp INT,
+        @j8 INT, @j9 INT, @j14 INT, @j15 INT;
+SELECT @j8  = jugador_id FROM plantel.formacion_jugador WHERE formacion_id = @form AND dorsal = 8;
+SELECT @j9  = jugador_id FROM plantel.formacion_jugador WHERE formacion_id = @form AND dorsal = 9;
+SELECT @j14 = jugador_id FROM plantel.formacion_jugador WHERE formacion_id = @form AND dorsal = 14;
+SELECT @j15 = jugador_id FROM plantel.formacion_jugador WHERE formacion_id = @form AND dorsal = 15;
+EXEC evento.sustitucion_insertar @form, @j9, @j14, 60, 'ST', 1, 'tactico', @sust OUTPUT;
+EXEC evento.sustitucion_modificar @sust, 62, 'ST', 1, 'precaucion';
+EXEC evento.sustitucion_insertar @form, @j8, @j15, 75, 'ST', 2, 'tactico', @tmp OUTPUT;
+EXEC evento.sustitucion_eliminar @tmp;
+SELECT sustitucion_id, formacion_id, jugador_sale_id, jugador_entra_id, minuto, periodo, numero_ventana, motivo FROM evento.sustitucion;
+INSERT INTO #resultado SELECT 'E-1.9.01', 'sustitucion: alta, modificación y baja',
+       IIF(COUNT(*) = 1 AND MAX(minuto) = 62 AND MAX(motivo) = 'precaucion', 'OK', 'FALLO'), '' FROM evento.sustitucion;
+EXEC #informar 'E-1.9.01';
+GO
+
+-- ============================================================
+-- 1.10 evento.gol (cada operación actualiza el marcador del partido en la misma transacción)
+-- ============================================================
+
+PRINT '--- E-1.10.01 Alta, modificación y baja de gol';
+-- Resultado esperado: gol del 10 de Argentina con asistencia del 11 (queda como 'cabezazo', minuto 24) => 1 a 0.
+-- Un gol en contra del 2 de Francia lleva el marcador a 2 a 0; al eliminarlo vuelve a 1 a 0.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p1 INT = (SELECT valor FROM #id WHERE clave = 'P1'), @local INT = (SELECT valor FROM #id WHERE clave = 'P1_local'),
+        @visitante INT = (SELECT valor FROM #id WHERE clave = 'P1_visitante'), @gol INT, @tmp INT, @j10 INT, @j11 INT, @f2 INT, @marcador VARCHAR(10);
+SELECT @j10 = jugador_id FROM plantel.formacion_jugador WHERE formacion_id = @local AND dorsal = 10;
+SELECT @j11 = jugador_id FROM plantel.formacion_jugador WHERE formacion_id = @local AND dorsal = 11;
+SELECT @f2 = jugador_id FROM plantel.formacion_jugador WHERE formacion_id = @visitante AND dorsal = 2;
+EXEC evento.gol_insertar @local, @j10, 23, 'jugada', 'PT', @j11, @gol OUTPUT;
+EXEC evento.gol_modificar @gol, 24, 'cabezazo', 'PT', @j11;
+EXEC evento.gol_insertar @visitante, @f2, 35, 'en_contra', 'PT', NULL, @tmp OUTPUT;
+SELECT @marcador = CAST(goles_local AS VARCHAR(2)) + '-' + CAST(goles_visitante AS VARCHAR(2)) FROM torneo.partido WHERE partido_id = @p1;
+PRINT 'Marcador con el gol en contra: ' + @marcador;
+INSERT INTO #resultado VALUES ('E-1.10.01', 'gol: el gol en contra suma al rival (2-0)', IIF(@marcador = '2-0', 'OK', 'FALLO'), @marcador);
+EXEC evento.gol_eliminar @tmp;
+SELECT g.gol_id, g.formacion_id, g.jugador_id, g.asistencia_jugador_id, g.minuto, g.tipo_gol, g.periodo FROM evento.gol g;
+SELECT partido_id, goles_local, goles_visitante, penales_local, penales_visitante, estado FROM torneo.partido WHERE partido_id = @p1;
+INSERT INTO #resultado SELECT 'E-1.10.01', 'gol: alta, modificación y baja con marcador sincronizado (1-0)',
+       IIF(goles_local = 1 AND goles_visitante = 0 AND penales_local IS NULL
+           AND (SELECT COUNT(*) FROM evento.gol WHERE tipo_gol = 'cabezazo' AND minuto = 24) = 1, 'OK', 'FALLO'), ''
+FROM torneo.partido WHERE partido_id = @p1;
+EXEC #informar 'E-1.10.01';
+GO
+
+PRINT '--- E-1.10.02 Alta de gol inválida';
+-- autor (20) suplente que no ingresó, asistente igual al autor y asistente que no ingresó.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p1 INT = (SELECT valor FROM #id WHERE clave = 'P1'), @local INT = (SELECT valor FROM #id WHERE clave = 'P1_local'), @j20 INT;
+SELECT @j20 = jugador_id FROM plantel.formacion_jugador WHERE formacion_id = @local AND dorsal = 20;
+INSERT INTO #resultado SELECT 'E-1.10.02', 'gol: el rechazo no altera el marcador', IIF(goles_local = 1 AND goles_visitante = 0, 'OK', 'FALLO'), ''
+FROM torneo.partido WHERE partido_id = @p1;
+EXEC #informar 'E-1.10.02';
+GO
+
+-- ============================================================
+-- 1.11 evento.tarjeta, evento.criterio_suspension y evento.suspension
+-- ============================================================
+
+PRINT '--- E-1.11.01 Alta, modificación y baja de tarjeta';
+-- Resultado esperado: queda una amarilla al 6 de Francia (minuto 31 del PT). La amarilla temporal al 7 se elimina.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p1 INT = (SELECT valor FROM #id WHERE clave = 'P1'), @visitante INT = (SELECT valor FROM #id WHERE clave = 'P1_visitante'),
+        @pers6 INT, @pers7 INT, @tarjeta INT, @tmp INT;
+SELECT @pers6 = j.persona_id FROM plantel.formacion_jugador fj JOIN plantel.jugador j ON j.jugador_id = fj.jugador_id
+WHERE fj.formacion_id = @visitante AND fj.dorsal = 6;
+SELECT @pers7 = j.persona_id FROM plantel.formacion_jugador fj JOIN plantel.jugador j ON j.jugador_id = fj.jugador_id
+WHERE fj.formacion_id = @visitante AND fj.dorsal = 7;
+EXEC evento.tarjeta_insertar @p1, @pers6, 30, 'PT', 'amarilla', 'Juego brusco', NULL, @tarjeta OUTPUT;
+INSERT INTO #id VALUES ('tarjeta_FRA6', @tarjeta);
+EXEC evento.tarjeta_modificar @tarjeta, 31, 'PT', 'Juego brusco grave';
+EXEC evento.tarjeta_insertar @p1, @pers7, 40, 'PT', 'amarilla', 'Protesta', NULL, @tmp OUTPUT;
+EXEC evento.tarjeta_eliminar @tmp;
+SELECT tarjeta_id, partido_id, persona_id, minuto, periodo, tipo, motivo, tipo_expulsion FROM evento.tarjeta;
+INSERT INTO #resultado SELECT 'E-1.11.01', 'tarjeta: alta, modificación y baja',
+       IIF(COUNT(*) = 1 AND MAX(minuto) = 31, 'OK', 'FALLO'), '' FROM evento.tarjeta;
+EXEC #informar 'E-1.11.01';
+GO
+
+PRINT '--- E-1.11.02 ABM de criterios de suspensión';
+-- Resultado esperado: quedan 2 criterios activos: general (2 amarillas => 1 partido) y cuerpo técnico (3 amarillas => 1 partido).
+-- El criterio temporal de semifinal se modifica y se elimina.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @id INT;
+EXEC evento.criterio_suspension_insertar 2, 1, NULL, NULL, 1, @id OUTPUT;             INSERT INTO #id VALUES ('criterio_general', @id);
+EXEC evento.criterio_suspension_insertar 3, 1, NULL, 'cuerpo_tecnico', 1, @id OUTPUT;
+EXEC evento.criterio_suspension_insertar 1, 1, 'semifinal', NULL, 1, @id OUTPUT;
+EXEC evento.criterio_suspension_modificar @id, 1, 2, 'semifinal', NULL, 0;
+EXEC evento.criterio_suspension_eliminar @id;
+SELECT criterio_id, fase_aplicable, tipo_persona_aplicable, cantidad_amarillas, partidos_suspension, activo FROM evento.criterio_suspension;
+INSERT INTO #resultado SELECT 'E-1.11.02', 'criterio_suspension: alta, modificación y baja', IIF(COUNT(*) = 2, 'OK', 'FALLO'), '' FROM evento.criterio_suspension;
+EXEC #informar 'E-1.11.02';
+GO
+
+PRINT '--- E-1.11.03 ABM de suspensión (carga manual)';
+-- Resultado esperado: se carga a mano una suspensión del 6 de Francia para P4, se le corrige el motivo y se elimina.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @tarjeta INT = (SELECT valor FROM #id WHERE clave = 'tarjeta_FRA6'), @criterio INT = (SELECT valor FROM #id WHERE clave = 'criterio_general'),
+        @p2 INT = (SELECT valor FROM #id WHERE clave = 'P2'), @p4 INT = (SELECT valor FROM #id WHERE clave = 'P4'), @susp INT, @antes INT;
+EXEC evento.suspension_insertar @tarjeta, 'Sanción de oficio', @criterio, @p4, @susp OUTPUT;
+EXEC evento.suspension_modificar @susp, 'Sanción de oficio del comité disciplinario', @p4;
+SELECT suspension_id, criterio_id, tarjeta_id, partido_afectado_id, motivo FROM evento.suspension;
+SELECT @antes = COUNT(*) FROM evento.suspension WHERE motivo LIKE '%comité%';
+EXEC evento.suspension_eliminar @susp;
+INSERT INTO #resultado SELECT 'E-1.11.03', 'suspension: alta, modificación y baja', IIF(@antes = 1 AND COUNT(*) = 0, 'OK', 'FALLO'), '' FROM evento.suspension;
+EXEC #informar 'E-1.11.03';
+GO
+
+-- ============================================================
+-- 1.12 arbitraje: arbitro, arbitro_idioma, designacion_arbitral e informe_arbitral
+-- ============================================================
+
+PRINT '--- E-1.12.01 Alta, modificación y baja de árbitros e idiomas';
+-- Resultado esperado: 9 árbitros de 7 países; Matonte con 2 idiomas (espanol, ingles). El árbitro temporal se elimina con sus idiomas.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @id INT, @pais INT;
+SET @pais = (SELECT valor FROM #id WHERE clave = 'pais_URY');
+EXEC arbitraje.arbitro_insertar 'Andrés', 'Matonte', @pais, 'FIFA', NULL, @id OUTPUT;          INSERT INTO #id VALUES ('arb_URY1', @id);
+EXEC arbitraje.arbitro_idioma_insertar @id, 'Espanol';
+EXEC arbitraje.arbitro_idioma_insertar @id, 'frances';
+EXEC arbitraje.arbitro_idioma_modificar @id, 'frances', 'ingles';
+EXEC arbitraje.arbitro_idioma_insertar @id, 'portugues';
+EXEC arbitraje.arbitro_idioma_eliminar @id, 'portugues';
+EXEC arbitraje.arbitro_insertar 'Nicolás', 'Tarán', @pais, 'confederacion', NULL, @id OUTPUT;  INSERT INTO #id VALUES ('arb_URY2', @id);
+EXEC arbitraje.arbitro_modificar @id, 'Nicolás', 'Tarán', @pais, 'FIFA', '1980-12-25';
+SET @pais = (SELECT valor FROM #id WHERE clave = 'pais_DEU');
+EXEC arbitraje.arbitro_insertar 'Felix', 'Zwayer', @pais, 'FIFA', NULL, @id OUTPUT;            INSERT INTO #id VALUES ('arb_DEU1', @id);
+EXEC arbitraje.arbitro_insertar 'Jan', 'Seidel', @pais, 'FIFA', NULL, @id OUTPUT;              INSERT INTO #id VALUES ('arb_DEU2', @id);
+SET @pais = (SELECT valor FROM #id WHERE clave = 'pais_USA');
+EXEC arbitraje.arbitro_insertar 'Ismail', 'Elfath', @pais, 'FIFA', NULL, @id OUTPUT;           INSERT INTO #id VALUES ('arb_USA', @id);
+SET @pais = (SELECT valor FROM #id WHERE clave = 'pais_CAN');
+EXEC arbitraje.arbitro_insertar 'Drew', 'Fischer', @pais, 'FIFA', NULL, @id OUTPUT;            INSERT INTO #id VALUES ('arb_CAN', @id);
+SET @pais = (SELECT valor FROM #id WHERE clave = 'pais_MEX');
+EXEC arbitraje.arbitro_insertar 'César', 'Ramos', @pais, 'FIFA', NULL, @id OUTPUT;             INSERT INTO #id VALUES ('arb_MEX', @id);
+SET @pais = (SELECT valor FROM #id WHERE clave = 'pais_ARG');
+EXEC arbitraje.arbitro_insertar 'Facundo', 'Tello', @pais, 'FIFA', NULL, @id OUTPUT;           INSERT INTO #id VALUES ('arb_ARG', @id);
+SET @pais = (SELECT valor FROM #id WHERE clave = 'pais_BRA');
+EXEC arbitraje.arbitro_insertar 'Wilton', 'Sampaio', @pais, 'FIFA', NULL, @id OUTPUT;          INSERT INTO #id VALUES ('arb_BRA', @id);
+EXEC arbitraje.arbitro_insertar 'Temporal', 'Temporal', @pais, 'confederacion', NULL, @id OUTPUT;
+EXEC arbitraje.arbitro_idioma_insertar @id, 'portugues';
+EXEC arbitraje.arbitro_eliminar @id;
+SELECT a.arbitro_id, a.nombre, a.apellido, p.codigo_iso, a.categoria, a.fecha_nacimiento,
+       (SELECT STRING_AGG(i.idioma, ', ') FROM arbitraje.arbitro_idioma i WHERE i.arbitro_id = a.arbitro_id) AS idiomas
+FROM arbitraje.arbitro a JOIN torneo.pais p ON p.pais_id = a.pais_id ORDER BY a.arbitro_id;
+INSERT INTO #resultado SELECT 'E-1.12.01', 'arbitro y arbitro_idioma: alta, modificación y baja',
+       IIF((SELECT COUNT(*) FROM arbitraje.arbitro) = 9 AND (SELECT COUNT(*) FROM arbitraje.arbitro_idioma) = 2
+           AND EXISTS (SELECT 1 FROM arbitraje.arbitro_idioma WHERE idioma = 'ingles'), 'OK', 'FALLO'), '';
+EXEC #informar 'E-1.12.01';
+GO
+
+PRINT '--- E-1.12.02 ABM de designación arbitral (de a una) y de informe arbitral';
+-- Resultado esperado: en P2 se designa a Matonte como principal y luego se lo reemplaza por Elfath; el informe se
+-- carga, se modifica y se elimina; finalmente se elimina la designación. P2 queda sin designaciones.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p2 INT = (SELECT valor FROM #id WHERE clave = 'P2'), @ury INT = (SELECT valor FROM #id WHERE clave = 'arb_URY1'),
+        @usa INT = (SELECT valor FROM #id WHERE clave = 'arb_USA'), @arg INT = (SELECT valor FROM #id WHERE clave = 'arb_ARG'),
+        @desig INT, @informe INT, @ok INT;
+EXEC arbitraje.designacion_arbitral_insertar @p2, @ury, 'principal', @desig OUTPUT;
+EXEC arbitraje.designacion_arbitral_modificar @desig, @usa, 'principal';
+EXEC arbitraje.informe_arbitral_insertar @desig, '2026-06-18T03:00:00+00:00', 'Partido sin incidentes.', NULL, @informe OUTPUT;
+EXEC arbitraje.informe_arbitral_modificar @informe, '2026-06-18T04:00:00+00:00', 'Partido con un incidente menor en el banco visitante.', 'Apercibimiento';
+SELECT d.designacion_id, d.partido_id, a.apellido AS arbitro, d.rol, i.informe_id, i.fecha, i.contenido, i.sancion
+FROM arbitraje.designacion_arbitral d JOIN arbitraje.arbitro a ON a.arbitro_id = d.arbitro_id
+LEFT JOIN arbitraje.informe_arbitral i ON i.designacion_id = d.designacion_id;
+SELECT @ok = COUNT(*) FROM arbitraje.designacion_arbitral d JOIN arbitraje.informe_arbitral i ON i.designacion_id = d.designacion_id
+WHERE d.arbitro_id = @usa AND i.sancion = 'Apercibimiento';
+EXEC arbitraje.informe_arbitral_eliminar @informe;
+EXEC arbitraje.designacion_arbitral_eliminar @desig;
+INSERT INTO #resultado SELECT 'E-1.12.02', 'designacion_arbitral e informe_arbitral: alta, modificación y baja',
+       IIF(@ok = 1 AND (SELECT COUNT(*) FROM arbitraje.designacion_arbitral) = 0
+           AND (SELECT COUNT(*) FROM arbitraje.informe_arbitral) = 0, 'OK', 'FALLO'), '';
+EXEC #informar 'E-1.12.02';
+GO
+
+-- ============================================================
+-- 1.13 publicidad: anunciante, campania, campania_pais_interes, pieza_publicitaria y espacio_publicitario
+-- ============================================================
+
+PRINT '--- E-1.13.01 Alta de anunciantes, campañas, países de interés y piezas';
+-- Resultado esperado: 7 anunciantes con una campaña cada uno (vigentes del 01/06 al 19/07/2026), con mercados
+-- en 9 países y 12 piezas. El anunciante, la campaña, el país de interés y la pieza temporales se eliminan.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @anun INT, @camp INT, @pieza INT, @p INT, @p2 INT, @p3 INT;
+DECLARE @arg INT = (SELECT valor FROM #id WHERE clave = 'pais_ARG'), @bra INT = (SELECT valor FROM #id WHERE clave = 'pais_BRA'),
+        @ury INT = (SELECT valor FROM #id WHERE clave = 'pais_URY'), @usa INT = (SELECT valor FROM #id WHERE clave = 'pais_USA'),
+        @can INT = (SELECT valor FROM #id WHERE clave = 'pais_CAN'), @mex INT = (SELECT valor FROM #id WHERE clave = 'pais_MEX'),
+        @fra INT = (SELECT valor FROM #id WHERE clave = 'pais_FRA'), @deu INT = (SELECT valor FROM #id WHERE clave = 'pais_DEU'),
+        @jpn INT = (SELECT valor FROM #id WHERE clave = 'pais_JPN'), @esp INT = (SELECT valor FROM #id WHERE clave = 'pais_ESP')
+
+EXEC publicidad.anunciante_insertar 'Mate Pampa', 'Mate Pampa S.A.', 'ventas@matepampa.com', @anun OUTPUT;
+EXEC publicidad.campania_insertar @anun, 'Mundial en casa', '2026-06-01', '2026-07-19', @camp OUTPUT;
+EXEC publicidad.campania_pais_interes_insertar @camp, @arg;
+EXEC publicidad.campania_pais_interes_insertar @camp, @ury;
+EXEC publicidad.pieza_publicitaria_insertar @camp, 'espanol', @arg, 50000, @pieza OUTPUT;
+EXEC publicidad.pieza_publicitaria_insertar @camp, 'espanol', @ury, 20000, @pieza OUTPUT;
+
+EXEC publicidad.anunciante_insertar 'Banque Lumière', 'Banque Lumière S.A.S.', NULL, @anun OUTPUT;
+EXEC publicidad.campania_insertar @anun, 'Allez', '2026-06-01', '2026-07-19', @camp OUTPUT;
+EXEC publicidad.campania_pais_interes_insertar @camp, @fra;
+EXEC publicidad.campania_pais_interes_insertar @camp, @deu;
+EXEC publicidad.pieza_publicitaria_insertar @camp, 'frances', @fra, 90000, @pieza OUTPUT;
+EXEC publicidad.pieza_publicitaria_insertar @camp, 'aleman', @deu, 80000, @pieza OUTPUT;
+
+EXEC publicidad.anunciante_insertar 'NorthStar Motors', 'NorthStar Motors Inc.', NULL, @anun OUTPUT;
+EXEC publicidad.campania_insertar @anun, 'Drive the Cup', '2026-06-01', '2026-07-19', @camp OUTPUT;
+EXEC publicidad.campania_pais_interes_insertar @camp, @usa;
+EXEC publicidad.campania_pais_interes_insertar @camp, @can;
+EXEC publicidad.campania_pais_interes_insertar @camp, @mex;
+EXEC publicidad.pieza_publicitaria_insertar @camp, 'ingles', @usa, 120000, @pieza OUTPUT;
+EXEC publicidad.pieza_publicitaria_insertar @camp, 'ingles', @can, 70000, @pieza OUTPUT;
+EXEC publicidad.pieza_publicitaria_insertar @camp, 'espanol', @mex, 40000, @pieza OUTPUT;
+
+EXEC publicidad.anunciante_insertar 'Sakura Tech', 'Sakura Tech K.K.', NULL, @anun OUTPUT;
+EXEC publicidad.campania_insertar @anun, 'Next Goal', '2026-06-01', '2026-07-19', @camp OUTPUT;
+EXEC publicidad.campania_pais_interes_insertar @camp, @jpn;
+EXEC publicidad.campania_pais_interes_insertar @camp, @usa;
+EXEC publicidad.pieza_publicitaria_insertar @camp, 'japones', @jpn, 60000, @pieza OUTPUT;
+EXEC publicidad.pieza_publicitaria_insertar @camp, 'ingles', @usa, 100000, @pieza OUTPUT;
+
+EXEC publicidad.anunciante_insertar 'Cerveza Tropical', 'Cervejaria Tropical Ltda.', NULL, @anun OUTPUT;
+EXEC publicidad.campania_insertar @anun, 'Verano mundialista', '2026-06-01', '2026-07-19', @camp OUTPUT;
+EXEC publicidad.campania_pais_interes_insertar @camp, @bra;
+EXEC publicidad.campania_pais_interes_insertar @camp, @arg;
+EXEC publicidad.pieza_publicitaria_insertar @camp, 'portugues', @bra, 45000, @pieza OUTPUT;
+
+EXEC publicidad.anunciante_insertar 'Maple Air', 'Maple Air Ltd.', NULL, @anun OUTPUT;
+EXEC publicidad.campania_insertar @anun, 'Fly to the final', '2026-06-01', '2026-07-19', @camp OUTPUT;
+EXEC publicidad.campania_pais_interes_insertar @camp, @can;
+EXEC publicidad.pieza_publicitaria_insertar @camp, 'ingles', @can, 30000, @pieza OUTPUT;
+INSERT INTO #id VALUES ('pieza_CAN', @pieza);
+
+EXEC publicidad.anunciante_insertar 'Tequila Sol', NULL, NULL, @anun OUTPUT;
+EXEC publicidad.anunciante_modificar @anun, 'Tequila Sol', 'Tequila Sol S.A. de C.V.', 'contacto@tequilasol.example';
+EXEC publicidad.campania_insertar @anun, 'Brindis', '2026-06-01', '2026-06-30', @camp OUTPUT;
+EXEC publicidad.campania_modificar @camp, @anun, 'Brindis mundialista', '2026-06-01', '2026-07-19';
+EXEC publicidad.campania_pais_interes_insertar @camp, @mex;
+EXEC publicidad.campania_pais_interes_insertar @camp, @esp;
+EXEC publicidad.campania_pais_interes_modificar @camp, @esp, @usa;
+EXEC publicidad.pieza_publicitaria_insertar @camp, 'ingles', @mex, 99999, @pieza OUTPUT;
+EXEC publicidad.pieza_publicitaria_modificar @pieza, @camp, 'espanol', @mex, 35000;
+
+-- Temporales: se crean y se eliminan (pieza, país de interés, campaña y anunciante).
+EXEC publicidad.anunciante_insertar 'Anunciante temporal', NULL, NULL, @anun OUTPUT;
+EXEC publicidad.campania_insertar @anun, 'Campaña temporal', '2026-06-01', '2026-06-02', @camp OUTPUT;
+EXEC publicidad.campania_pais_interes_insertar @camp, @esp;
+EXEC publicidad.campania_pais_interes_insertar @camp, @deu;
+EXEC publicidad.pieza_publicitaria_insertar @camp, 'espanol', @esp, 1, @pieza OUTPUT;
+EXEC publicidad.pieza_publicitaria_eliminar @pieza;
+EXEC publicidad.campania_pais_interes_eliminar @camp, @deu;
+EXEC publicidad.campania_eliminar @camp;
+EXEC publicidad.anunciante_eliminar @anun;
+
+SELECT a.nombre AS anunciante, c.nombre AS campania, c.fecha_inicio, c.fecha_fin,
+       (SELECT STRING_AGG(p.codigo_iso, ', ') FROM publicidad.campania_pais_interes i JOIN torneo.pais p ON p.pais_id = i.pais_id
+        WHERE i.campania_id = c.campania_id) AS paises_interes,
+       (SELECT STRING_AGG(p.codigo_iso + ' ' + pz.idioma + ' ' + CAST(pz.costo_tarifa AS VARCHAR(12)), ' | ')
+        FROM publicidad.pieza_publicitaria pz JOIN torneo.pais p ON p.pais_id = pz.pais_mercado_id
+        WHERE pz.campania_id = c.campania_id) AS piezas
+FROM publicidad.anunciante a JOIN publicidad.campania c ON c.anunciante_id = a.anunciante_id ORDER BY a.anunciante_id;
+INSERT INTO #resultado SELECT 'E-1.13.01', 'anunciante, campania, pais_interes y pieza: alta, modificación y baja',
+       IIF((SELECT COUNT(*) FROM publicidad.anunciante) = 7 AND (SELECT COUNT(*) FROM publicidad.campania) = 7
+           AND (SELECT COUNT(*) FROM publicidad.campania_pais_interes) = 14 AND (SELECT COUNT(*) FROM publicidad.pieza_publicitaria) = 12
+           AND (SELECT COUNT(DISTINCT pais_id) FROM publicidad.campania_pais_interes) = 9
+           AND EXISTS (SELECT 1 FROM publicidad.pieza_publicitaria WHERE costo_tarifa = 35000 AND idioma = 'espanol'), 'OK', 'FALLO'), '';
+EXEC #informar 'E-1.13.01';
+GO
+
+PRINT '--- E-1.13.02 ABM de espacio publicitario (de a uno)';
+-- Resultado esperado: en P3 se crea el espacio 1 vacío, se le asigna la pieza de Maple Air y se elimina.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p3 INT = (SELECT valor FROM #id WHERE clave = 'P3'), @pieza INT = (SELECT valor FROM #id WHERE clave = 'pieza_CAN'), @esp INT, @ok INT;
+EXEC publicidad.espacio_publicitario_insertar @p3, 1, NULL, NULL, @esp OUTPUT;
+EXEC publicidad.espacio_publicitario_modificar @esp, @pieza, 4;
+SELECT espacio_id, partido_id, numero_espacio, pieza_id, orden_prioridad, fecha_exhibicion, facturado, monto_facturado FROM publicidad.espacio_publicitario;
+SELECT @ok = COUNT(*) FROM publicidad.espacio_publicitario WHERE espacio_id = @esp AND pieza_id = @pieza AND orden_prioridad = 4;
+EXEC publicidad.espacio_publicitario_eliminar @esp;
+INSERT INTO #resultado SELECT 'E-1.13.02', 'espacio_publicitario: alta, modificación y baja', IIF(@ok = 1 AND COUNT(*) = 0, 'OK', 'FALLO'), ''
+FROM publicidad.espacio_publicitario;
+EXEC #informar 'E-1.13.02';
+GO
+
+PRINT '################ PARTE 2: PROCEDIMIENTOS DE LÓGICA DE NEGOCIO (escenario) ################';
+GO
+
+-- ============================================================
+-- 2.1 plantel.reemplazar_convocado (baja + alta de último momento, en una transacción)
+-- ============================================================
+
+PRINT '--- E-2.1.01 Reemplazo por lesión';
+-- Resultado esperado: el jugador 26 de ARG queda con fecha y motivo de baja; el 27 entra con el mismo dorsal (99)
+-- y motivo de alta "Reemplaza a Jugador 26: ...". Argentina sigue con 26 convocados vigentes.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @arg INT = (SELECT valor FROM #id WHERE clave = 'ARG'),
+        @sale INT = (SELECT jugador_id FROM plantel.jugador WHERE nombre = 'ARG' AND apellido = 'Jugador 26'),
+        @entra INT = (SELECT jugador_id FROM plantel.jugador WHERE nombre = 'ARG' AND apellido = 'Jugador 27');
+EXEC plantel.reemplazar_convocado @arg, @sale, @entra, '2026-06-14', 'Lesión muscular en el entrenamiento';
+SELECT j.apellido, c.dorsal, c.fecha_alta, c.motivo_alta, c.fecha_baja, c.motivo_baja
+FROM plantel.convocatoria c JOIN plantel.jugador j ON j.jugador_id = c.jugador_id
+WHERE c.seleccion_id = @arg AND j.jugador_id IN (@sale, @entra) ORDER BY c.convocatoria_id;
+INSERT INTO #resultado SELECT 'E-2.1.01', 'reemplazar_convocado: baja y alta en la misma transacción',
+       IIF(SUM(CASE WHEN fecha_baja IS NULL THEN 1 ELSE 0 END) = 26
+           AND SUM(CASE WHEN jugador_id = @sale AND fecha_baja = '2026-06-14' AND motivo_baja IS NOT NULL THEN 1 ELSE 0 END) = 1
+           AND SUM(CASE WHEN jugador_id = @entra AND fecha_baja IS NULL AND dorsal = 99 THEN 1 ELSE 0 END) = 1, 'OK', 'FALLO'), ''
+FROM plantel.convocatoria WHERE seleccion_id = @arg;
+EXEC #informar 'E-2.1.01';
+GO
+
+-- ============================================================
+-- 2.2 plantel.cargar_formacion (cabecera + titulares + banco, todo o nada)
+-- ============================================================
+
+PRINT '--- E-2.2.01 Carga de las formaciones de P2 (Argentina vs México)';
+-- Resultado esperado: 2 formaciones con 11 titulares y 12 suplentes cada una; el dorsal sale de la convocatoria.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p2 INT = (SELECT valor FROM #id WHERE clave = 'P2'), @arg INT = (SELECT valor FROM #id WHERE clave = 'ARG'),
+        @mex INT = (SELECT valor FROM #id WHERE clave = 'MEX'), @form INT;
+DECLARE @local plantel.tt_formacion_jugador, @visitante plantel.tt_formacion_jugador;
+INSERT INTO @local SELECT c.jugador_id, j.posicion_habitual, IIF(c.dorsal <= 11, 1, 0)
+FROM plantel.convocatoria c JOIN plantel.jugador j ON j.jugador_id = c.jugador_id
+WHERE c.seleccion_id = @arg AND c.fecha_baja IS NULL AND c.dorsal <= 23;
+INSERT INTO @visitante SELECT c.jugador_id, j.posicion_habitual, IIF(c.dorsal <= 11, 1, 0)
+FROM plantel.convocatoria c JOIN plantel.jugador j ON j.jugador_id = c.jugador_id
+WHERE c.seleccion_id = @mex AND c.fecha_baja IS NULL AND c.dorsal <= 23;
+EXEC plantel.cargar_formacion @p2, 'local', '4-4-2', @local, @form OUTPUT;         INSERT INTO #id VALUES ('P2_local', @form);
+EXEC plantel.cargar_formacion @p2, 'visitante', '5-3-2', @visitante, @form OUTPUT; INSERT INTO #id VALUES ('P2_visitante', @form);
+SELECT f.formacion_id, f.condicion, f.esquema_tactico, SUM(CAST(fj.titular AS INT)) AS titulares, SUM(1 - CAST(fj.titular AS INT)) AS suplentes,
+       MIN(fj.dorsal) AS dorsal_min, MAX(fj.dorsal) AS dorsal_max
+FROM plantel.formacion f JOIN plantel.formacion_jugador fj ON fj.formacion_id = f.formacion_id
+WHERE f.partido_id = @p2 GROUP BY f.formacion_id, f.condicion, f.esquema_tactico;
+INSERT INTO #resultado SELECT 'E-2.2.01', 'cargar_formacion: 11 titulares y 12 suplentes por equipo',
+       IIF(COUNT(*) = 46 AND SUM(CAST(fj.titular AS INT)) = 22, 'OK', 'FALLO'), ''
+FROM plantel.formacion f JOIN plantel.formacion_jugador fj ON fj.formacion_id = f.formacion_id WHERE f.partido_id = @p2;
+EXEC #informar 'E-2.2.01';
+GO
+
+-- ============================================================
+-- 2.3 evento.registrar_sustitucion (por dorsales; ventana automática; reglamento de cambios)
+-- ============================================================
+
+PRINT '--- E-2.3.01 CASO OBLIGATORIO: cambio por lesión dentro de los primeros 20 minutos';
+-- Resultado esperado: Francia (visitante de P1) cambia al 3 por el 13 en el minuto 15 del PT, motivo lesión, ventana 1.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p1 INT = (SELECT valor FROM #id WHERE clave = 'P1'), @form INT = (SELECT valor FROM #id WHERE clave = 'P1_visitante');
+EXEC evento.registrar_sustitucion @p1, 'visitante', 3, 13, 15, 'PT', 'lesion';
+SELECT s.minuto, s.periodo, s.numero_ventana, s.motivo, sale.dorsal AS dorsal_sale, entra.dorsal AS dorsal_entra
+FROM evento.sustitucion s
+JOIN plantel.formacion_jugador sale  ON sale.formacion_id = s.formacion_id AND sale.jugador_id = s.jugador_sale_id
+JOIN plantel.formacion_jugador entra ON entra.formacion_id = s.formacion_id AND entra.jugador_id = s.jugador_entra_id
+WHERE s.formacion_id = @form;
+INSERT INTO #resultado SELECT 'E-2.3.01', 'OBLIGATORIO: cambio por lesión antes del minuto 20',
+       IIF(COUNT(*) = 1 AND MAX(minuto) = 15 AND MAX(motivo) = 'lesion' AND MAX(numero_ventana) = 1, 'OK', 'FALLO'), ''
+FROM evento.sustitucion WHERE formacion_id = @form;
+EXEC #informar 'E-2.3.01';
+GO
+
+PRINT '--- E-2.3.02 Ventanas automáticas y máximo de cambios';
+-- Resultado esperado: dos cambios en el minuto 46 comparten la ventana 2; el del minuto 70 abre la ventana 3.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p1 INT = (SELECT valor FROM #id WHERE clave = 'P1'), @form INT = (SELECT valor FROM #id WHERE clave = 'P1_visitante');
+EXEC evento.registrar_sustitucion @p1, 'visitante', 7, 14, 46, 'ST', 'tactico';
+EXEC evento.registrar_sustitucion @p1, 'visitante', 8, 15, 46, 'ST', 'tactico';
+EXEC evento.registrar_sustitucion @p1, 'visitante', 9, 16, 70, 'ST', 'precaucion';
+EXEC evento.registrar_sustitucion @p1, 'visitante', 10, 17, 70, 'ST', 'tactico';
+SELECT s.numero_ventana, s.minuto, s.periodo, s.motivo, sale.dorsal AS dorsal_sale, entra.dorsal AS dorsal_entra
+FROM evento.sustitucion s
+JOIN plantel.formacion_jugador sale  ON sale.formacion_id = s.formacion_id AND sale.jugador_id = s.jugador_sale_id
+JOIN plantel.formacion_jugador entra ON entra.formacion_id = s.formacion_id AND entra.jugador_id = s.jugador_entra_id
+WHERE s.formacion_id = @form ORDER BY s.numero_ventana, sale.dorsal;
+INSERT INTO #resultado SELECT 'E-2.3.02', 'registrar_sustitucion: 5 cambios en 3 ventanas',
+       IIF(COUNT(*) = 5 AND COUNT(DISTINCT numero_ventana) = 3 AND SUM(CASE WHEN numero_ventana = 2 THEN 1 ELSE 0 END) = 2, 'OK', 'FALLO'), ''
+FROM evento.sustitucion WHERE formacion_id = @form;
+EXEC #informar 'E-2.3.02';
+GO
+
+-- ============================================================
+-- 2.4 evento.registrar_gol (por dorsales; actualiza el marcador)
+-- ============================================================
+
+PRINT '--- E-2.4.01 Goles de P1';
+-- Resultado esperado: empata Francia (gol del 9 con asistencia del 14, que ingresó en el minuto 46) y desnivela
+-- Argentina de penal (el 10). Marcador de P1: 2 a 1.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p1 INT = (SELECT valor FROM #id WHERE clave = 'P1');
+EXEC evento.registrar_gol @p1, 'visitante', 9, 55, 'jugada', 'ST', 14;
+EXEC evento.registrar_gol @p1, 'local', 10, 88, 'penal', 'ST';
+SELECT f.condicion, fj.dorsal AS autor, a.dorsal AS asistente, g.minuto, g.periodo, g.tipo_gol
+FROM evento.gol g JOIN plantel.formacion f ON f.formacion_id = g.formacion_id
+JOIN plantel.formacion_jugador fj ON fj.formacion_id = g.formacion_id AND fj.jugador_id = g.jugador_id
+LEFT JOIN plantel.formacion_jugador a ON a.formacion_id = g.formacion_id AND a.jugador_id = g.asistencia_jugador_id
+WHERE f.partido_id = @p1 ORDER BY g.minuto;
+SELECT partido_id, goles_local, goles_visitante, estado FROM torneo.partido WHERE partido_id = @p1;
+INSERT INTO #resultado SELECT 'E-2.4.01', 'registrar_gol: marcador 2-1', IIF(goles_local = 2 AND goles_visitante = 1, 'OK', 'FALLO'), ''
+FROM torneo.partido WHERE partido_id = @p1;
+EXEC #informar 'E-2.4.01';
+GO
+
+-- ============================================================
+-- 2.5 evento.registrar_tarjeta (tarjeta + cálculo de suspensión en una transacción)
+-- ============================================================
+
+PRINT '--- E-2.5.01 Primera amarilla: todavía no hay suspensión';
+-- Resultado esperado: amarilla al 5 de Argentina en P1; lleva 1 de las 2 del criterio general => 0 suspensiones.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p1 INT = (SELECT valor FROM #id WHERE clave = 'P1'), @tarjeta INT, @susp INT;
+EXEC evento.registrar_tarjeta @partido_id = @p1, @minuto = 40, @periodo = 'PT', @tipo = 'amarilla', @motivo = 'Mano intencional',
+     @condicion = 'local', @dorsal = 5, @tarjeta_id = @tarjeta OUTPUT, @suspensiones_generadas = @susp OUTPUT;
+SELECT tarjeta_id, partido_id, persona_id, minuto, periodo, tipo, motivo FROM evento.tarjeta WHERE tarjeta_id = @tarjeta;
+INSERT INTO #resultado VALUES ('E-2.5.01', 'registrar_tarjeta: primera amarilla sin suspensión',
+       IIF(@susp = 0 AND NOT EXISTS (SELECT 1 FROM evento.suspension WHERE tarjeta_id = @tarjeta), 'OK', 'FALLO'), '');
+EXEC #informar 'E-2.5.01';
+GO
+
+PRINT '--- E-2.5.02 CASO OBLIGATORIO: roja directa';
+-- Resultado esperado: roja directa al 4 de Francia en P1 => 1 suspensión sin criterio (no es por acumulación)
+-- para el próximo partido programado de Francia: P4.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p1 INT = (SELECT valor FROM #id WHERE clave = 'P1'), @p4 INT = (SELECT valor FROM #id WHERE clave = 'P4'), @tarjeta INT, @susp INT;
+EXEC evento.registrar_tarjeta @partido_id = @p1, @minuto = 75, @periodo = 'ST', @tipo = 'roja', @motivo = 'Agresión a un rival',
+     @condicion = 'visitante', @dorsal = 4, @tarjeta_id = @tarjeta OUTPUT, @suspensiones_generadas = @susp OUTPUT;
+SELECT t.tarjeta_id, t.tipo, t.tipo_expulsion, t.minuto, s.suspension_id, s.criterio_id, s.partido_afectado_id, s.motivo
+FROM evento.tarjeta t LEFT JOIN evento.suspension s ON s.tarjeta_id = t.tarjeta_id WHERE t.tarjeta_id = @tarjeta;
+INSERT INTO #resultado SELECT 'E-2.5.02', 'OBLIGATORIO: roja directa con suspensión para el próximo partido',
+       IIF(@susp = 1 AND COUNT(*) = 1 AND SUM(CASE WHEN partido_afectado_id = @p4 AND criterio_id IS NULL THEN 1 ELSE 0 END) = 1
+           AND (SELECT tipo_expulsion FROM evento.tarjeta WHERE tarjeta_id = @tarjeta) = 'roja_directa', 'OK', 'FALLO'), ''
+FROM evento.suspension WHERE tarjeta_id = @tarjeta;
+EXEC #informar 'E-2.5.02';
+GO
+
+PRINT '--- E-2.5.03 Tarjeta a un integrante del cuerpo técnico';
+-- Resultado esperado: amarilla al DT de Francia (identificado por persona_id). Le aplica el criterio específico de
+-- cuerpo técnico (3 amarillas), no el general (2) => 0 suspensiones.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p1 INT = (SELECT valor FROM #id WHERE clave = 'P1'), @dt INT = (SELECT valor FROM #id WHERE clave = 'persona_DT_FRA'), @tarjeta INT, @susp INT;
+EXEC evento.registrar_tarjeta @partido_id = @p1, @minuto = 76, @periodo = 'ST', @tipo = 'amarilla', @motivo = 'Protesta',
+     @persona_id = @dt, @tarjeta_id = @tarjeta OUTPUT, @suspensiones_generadas = @susp OUTPUT;
+SELECT t.tarjeta_id, pe.tipo_persona, ct.apellido, t.tipo, t.minuto
+FROM evento.tarjeta t JOIN plantel.persona pe ON pe.persona_id = t.persona_id JOIN plantel.cuerpo_tecnico ct ON ct.persona_id = t.persona_id
+WHERE t.tarjeta_id = @tarjeta;
+INSERT INTO #resultado VALUES ('E-2.5.03', 'registrar_tarjeta: cuerpo técnico', IIF(@tarjeta IS NOT NULL AND @susp = 0, 'OK', 'FALLO'), '');
+EXEC #informar 'E-2.5.03';
+GO
+
+-- ============================================================
+-- 2.6 publicidad.asignar_espacios_partido (los cuatro espacios según los criterios de la sección H)
+-- ============================================================
+
+PRINT '--- E-2.6.01 CASO OBLIGATORIO: partido en prime time en más de cuatro mercados candidatos';
+-- P1 (Argentina vs Francia) se juega a las 00:00 UTC: es prime time (19 a 23 h) en 5 mercados con piezas candidatas:
+-- Argentina, Brasil y Uruguay (21 h), Estados Unidos y Canadá (19 h). No lo es en México (18 h), Francia y Alemania (1 h) ni Japón (9 h).
+-- Resultado esperado (ver el ranking que devuelve el SP): se eligen 4 de las 7 campañas candidatas:
+--   espacio 1: Mate Pampa / Argentina        (país de una selección + prime time)                      prioridad 1
+--   espacio 2: Banque Lumière / Francia      (país de una selección)                                   prioridad 1
+--   espacio 3: NorthStar Motors / EE.UU.     (mercado de mayor PBI de su campaña + prime time, tarifa 120000)  prioridad 2
+--   espacio 4: Sakura Tech / EE.UU.          (ídem, tarifa 100000)                                     prioridad 2
+-- Quedan afuera Maple Air (Canadá), Cerveza Tropical (Brasil) y Tequila Sol (México), aun estando las dos primeras en prime time.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p1 INT = (SELECT valor FROM #id WHERE clave = 'P1');
+EXEC publicidad.asignar_espacios_partido @p1;
+SELECT e.numero_espacio, a.nombre AS anunciante, m.nombre AS mercado, e.orden_prioridad, pz.costo_tarifa, e.fecha_exhibicion, e.facturado
+FROM publicidad.espacio_publicitario e
+JOIN publicidad.pieza_publicitaria pz ON pz.pieza_id = e.pieza_id JOIN publicidad.campania c ON c.campania_id = pz.campania_id
+JOIN publicidad.anunciante a ON a.anunciante_id = c.anunciante_id JOIN torneo.pais m ON m.pais_id = pz.pais_mercado_id
+WHERE e.partido_id = @p1 ORDER BY e.numero_espacio;
+INSERT INTO #resultado SELECT 'E-2.6.01', 'OBLIGATORIO: priorización de 4 piezas con más de 4 mercados en prime time',
+       IIF(COUNT(*) = 4
+           AND SUM(CASE WHEN (e.numero_espacio = 1 AND a.nombre = 'Mate Pampa')
+                          OR (e.numero_espacio = 2 AND a.nombre = 'Banque Lumière')
+                          OR (e.numero_espacio = 3 AND a.nombre = 'NorthStar Motors')
+                          OR (e.numero_espacio = 4 AND a.nombre = 'Sakura Tech') THEN 1 ELSE 0 END) = 4, 'OK', 'FALLO'), ''
+FROM publicidad.espacio_publicitario e
+JOIN publicidad.pieza_publicitaria pz ON pz.pieza_id = e.pieza_id JOIN publicidad.campania c ON c.campania_id = pz.campania_id
+JOIN publicidad.anunciante a ON a.anunciante_id = c.anunciante_id
+WHERE e.partido_id = @p1;
+EXEC #informar 'E-2.6.01';
+GO
+
+PRINT '--- E-2.6.02 Reasignación y rechazos';
+-- Resultado esperado: (1) rechazo (50002): P1 ya tiene espacios asignados. (2) con @reemplazar = 1 se recalcula y
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p1 INT = (SELECT valor FROM #id WHERE clave = 'P1');
+EXEC publicidad.asignar_espacios_partido @p1, @reemplazar = 1, @mostrar_detalle = 0;
+INSERT INTO #resultado SELECT 'E-2.6.02', 'asignar_espacios_partido: reemplazo', IIF(COUNT(*) = 4 AND COUNT(pieza_id) = 4, 'OK', 'FALLO'), ''
+FROM publicidad.espacio_publicitario WHERE partido_id = @p1;
+EXEC #informar 'E-2.6.02';
+GO
+
+-- ============================================================
+-- 2.7 torneo.registrar_resultado (cierre del partido + pauta exhibida) y facturación
+-- ============================================================
+
+PRINT '--- E-2.7.01 Cierre de P1 y facturación de su pauta';
+-- Resultado esperado: P1 queda 'finalizado' 2 a 1 (tomado del detalle de goles) con 80000 espectadores; sus 4 espacios
+-- quedan con fecha de exhibición. Al facturar, cada espacio guarda la tarifa de su pieza: total 360000.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p1 INT = (SELECT valor FROM #id WHERE clave = 'P1'), @total NUMERIC(14,2);
+EXEC torneo.registrar_resultado @partido_id = @p1, @asistencia_publico = 80000;
+SELECT partido_id, estado, goles_local, goles_visitante, penales_local, penales_visitante, asistencia_publico FROM torneo.partido WHERE partido_id = @p1;
+INSERT INTO #resultado SELECT 'E-2.7.01', 'registrar_resultado: finalizado 2-1 y pauta exhibida',
+       IIF(p.estado = 'finalizado' AND p.goles_local = 2 AND p.goles_visitante = 1 AND p.asistencia_publico = 80000
+           AND (SELECT COUNT(*) FROM publicidad.espacio_publicitario e WHERE e.partido_id = p.partido_id AND e.fecha_exhibicion = p.fecha_hora_utc) = 4, 'OK', 'FALLO'), ''
+FROM torneo.partido p WHERE p.partido_id = @p1;
+EXEC publicidad.facturar_espacios_partido @p1, @total OUTPUT;
+SELECT numero_espacio, pieza_id, orden_prioridad, fecha_exhibicion, facturado, monto_facturado FROM publicidad.espacio_publicitario WHERE partido_id = @p1 ORDER BY numero_espacio;
+PRINT 'Total facturado de P1: ' + CAST(@total AS VARCHAR(20));
+INSERT INTO #resultado VALUES ('E-2.7.01', 'facturar_espacios_partido: total 360000', IIF(@total = 360000, 'OK', 'FALLO'), CAST(@total AS VARCHAR(20)));
+EXEC #informar 'E-2.7.01';
+GO
+
+-- ============================================================
+-- 2.8 Acumulación de amarillas, doble amarilla y jugador suspendido fuera de la formación
+-- ============================================================
+
+PRINT '--- E-2.8.01 CASO OBLIGATORIO: suspensión por acumulación de amarillas';
+-- Resultado esperado: el 5 de Argentina recibe en P2 su segunda amarilla en partidos distintos (P1 y P2) => 1 suspensión
+-- con el criterio general, para el próximo partido de Argentina: P3.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p2 INT = (SELECT valor FROM #id WHERE clave = 'P2'), @p3 INT = (SELECT valor FROM #id WHERE clave = 'P3'),
+        @criterio INT = (SELECT valor FROM #id WHERE clave = 'criterio_general'), @tarjeta INT, @susp INT;
+EXEC evento.registrar_tarjeta @partido_id = @p2, @minuto = 20, @periodo = 'PT', @tipo = 'amarilla', @motivo = 'Falta táctica',
+     @condicion = 'local', @dorsal = 5, @tarjeta_id = @tarjeta OUTPUT, @suspensiones_generadas = @susp OUTPUT;
+SELECT j.apellido, t.partido_id, t.minuto, t.tipo, s.suspension_id, s.criterio_id, s.partido_afectado_id, s.motivo
+FROM evento.tarjeta t JOIN plantel.jugador j ON j.persona_id = t.persona_id LEFT JOIN evento.suspension s ON s.tarjeta_id = t.tarjeta_id
+WHERE j.nombre = 'ARG' AND j.apellido = 'Jugador 05' ORDER BY t.tarjeta_id;
+INSERT INTO #resultado SELECT 'E-2.8.01', 'OBLIGATORIO: suspensión por acumulación de amarillas',
+       IIF(@susp = 1 AND COUNT(*) = 1 AND SUM(CASE WHEN partido_afectado_id = @p3 AND criterio_id = @criterio THEN 1 ELSE 0 END) = 1, 'OK', 'FALLO'), ''
+FROM evento.suspension WHERE tarjeta_id = @tarjeta;
+EXEC #informar 'E-2.8.01';
+GO
+
+PRINT '--- E-2.8.02 CASO OBLIGATORIO: expulsión por doble amonestación';
+-- Resultado esperado: el 8 de México recibe dos amarillas en P2; la segunda se registra sola como roja por doble amarilla
+-- y genera 1 suspensión. México no tiene otro partido programado: queda con partido NULL ("a definir").
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p2 INT = (SELECT valor FROM #id WHERE clave = 'P2'), @tarjeta INT, @susp INT;
+EXEC evento.registrar_tarjeta @partido_id = @p2, @minuto = 30, @periodo = 'PT', @tipo = 'amarilla', @motivo = 'Juego brusco',
+     @condicion = 'visitante', @dorsal = 8;
+EXEC evento.registrar_tarjeta @partido_id = @p2, @minuto = 60, @periodo = 'ST', @tipo = 'amarilla', @motivo = 'Reiteración de faltas',
+     @condicion = 'visitante', @dorsal = 8, @tarjeta_id = @tarjeta OUTPUT, @suspensiones_generadas = @susp OUTPUT;
+SELECT j.apellido, t.minuto, t.periodo, t.tipo, t.tipo_expulsion, s.criterio_id, s.partido_afectado_id, s.motivo
+FROM evento.tarjeta t JOIN plantel.jugador j ON j.persona_id = t.persona_id LEFT JOIN evento.suspension s ON s.tarjeta_id = t.tarjeta_id
+WHERE j.nombre = 'MEX' AND j.apellido = 'Jugador 08' ORDER BY t.tarjeta_id;
+INSERT INTO #resultado SELECT 'E-2.8.02', 'OBLIGATORIO: expulsión por doble amarilla',
+       IIF(@susp = 1 AND t.tipo = 'roja' AND t.tipo_expulsion = 'doble_amarilla'
+           AND (SELECT COUNT(*) FROM evento.suspension s WHERE s.tarjeta_id = t.tarjeta_id AND s.partido_afectado_id IS NULL AND s.criterio_id IS NULL) = 1, 'OK', 'FALLO'), ''
+FROM evento.tarjeta t WHERE t.tarjeta_id = @tarjeta;
+EXEC #informar 'E-2.8.02';
+GO
+
+PRINT '--- E-2.8.03 Cierre de P2 sin goles (resultado tomado del detalle: 0 a 0)';
+-- Resultado esperado: P2 finalizado 0 a 0 sin informar goles.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p2 INT = (SELECT valor FROM #id WHERE clave = 'P2');
+EXEC torneo.registrar_resultado @partido_id = @p2, @asistencia_publico = 83000;
+SELECT partido_id, estado, goles_local, goles_visitante, asistencia_publico FROM torneo.partido WHERE partido_id = @p2;
+INSERT INTO #resultado SELECT 'E-2.8.03', 'registrar_resultado: 0-0 desde el detalle',
+       IIF(estado = 'finalizado' AND goles_local = 0 AND goles_visitante = 0, 'OK', 'FALLO'), '' FROM torneo.partido WHERE partido_id = @p2;
+EXEC #informar 'E-2.8.03';
+GO
+
+PRINT '--- E-2.8.04 CASO OBLIGATORIO: el suspendido queda afuera de la formación del siguiente partido';
+-- (3) la misma formación con el 12 en lugar del 5 se carga bien.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p3 INT = (SELECT valor FROM #id WHERE clave = 'P3'), @arg INT = (SELECT valor FROM #id WHERE clave = 'ARG'), @form INT, @j5 INT;
+DECLARE @con5 plantel.tt_formacion_jugador, @sin5 plantel.tt_formacion_jugador;
+INSERT INTO @con5 SELECT c.jugador_id, j.posicion_habitual, IIF(c.dorsal <= 11, 1, 0)
+FROM plantel.convocatoria c JOIN plantel.jugador j ON j.jugador_id = c.jugador_id
+WHERE c.seleccion_id = @arg AND c.fecha_baja IS NULL AND c.dorsal <= 23;
+INSERT INTO @sin5 SELECT c.jugador_id, j.posicion_habitual, IIF(c.dorsal <= 12, 1, 0)
+FROM plantel.convocatoria c JOIN plantel.jugador j ON j.jugador_id = c.jugador_id
+WHERE c.seleccion_id = @arg AND c.fecha_baja IS NULL AND c.dorsal <= 23 AND c.dorsal <> 5;
+SELECT @j5 = jugador_id FROM plantel.convocatoria WHERE seleccion_id = @arg AND dorsal = 5 AND fecha_baja IS NULL;
+EXEC plantel.cargar_formacion @p3, 'local', '4-3-3', @sin5, @form OUTPUT;
+SELECT fj.dorsal, j.apellido, fj.posicion, fj.titular FROM plantel.formacion_jugador fj JOIN plantel.jugador j ON j.jugador_id = fj.jugador_id
+WHERE fj.formacion_id = @form AND fj.titular = 1 ORDER BY fj.dorsal;
+INSERT INTO #resultado SELECT 'E-2.8.04', 'OBLIGATORIO: formación sin el suspendido cargada',
+       IIF(COUNT(*) = 22 AND SUM(CAST(titular AS INT)) = 11 AND SUM(CASE WHEN dorsal = 5 THEN 1 ELSE 0 END) = 0, 'OK', 'FALLO'), ''
+FROM plantel.formacion_jugador WHERE formacion_id = @form;
+EXEC #informar 'E-2.8.04';
+GO
+
+-- ============================================================
+-- 2.9 arbitraje.designar_arbitros (terna completa, con validación de conflicto de nacionalidad)
+-- ============================================================
+
+PRINT '--- E-2.9.01 Designación válida en fase de grupos y con advertencia en eliminación directa';
+-- Resultado esperado: P3 queda con sus 5 roles y sin advertencia (fase de grupos). P4 (dieciseisavos, Francia vs Japón)
+-- queda con sus 5 roles y devuelve una ADVERTENCIA por César Ramos (México) y Wilton Sampaio (Brasil): sus países tienen
+-- selección en competencia. No es un bloqueo.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p3 INT = (SELECT valor FROM #id WHERE clave = 'P3'), @p4 INT = (SELECT valor FROM #id WHERE clave = 'P4'),
+        @ury1 INT = (SELECT valor FROM #id WHERE clave = 'arb_URY1'), @ury2 INT = (SELECT valor FROM #id WHERE clave = 'arb_URY2'),
+        @deu1 INT = (SELECT valor FROM #id WHERE clave = 'arb_DEU1'), @deu2 INT = (SELECT valor FROM #id WHERE clave = 'arb_DEU2'),
+        @usa INT = (SELECT valor FROM #id WHERE clave = 'arb_USA'), @can INT = (SELECT valor FROM #id WHERE clave = 'arb_CAN'),
+        @mex INT = (SELECT valor FROM #id WHERE clave = 'arb_MEX'), @bra INT = (SELECT valor FROM #id WHERE clave = 'arb_BRA'),
+        @adv3 VARCHAR(1000), @adv4 VARCHAR(1000);
+EXEC arbitraje.designar_arbitros @p3, @ury1, @ury2, @deu2, @usa, @deu1, @adv3 OUTPUT;
+EXEC arbitraje.designar_arbitros @p4, @deu1, @deu2, @can, @mex, @bra, @adv4 OUTPUT;
+SELECT d.partido_id, d.rol, a.nombre + ' ' + a.apellido AS arbitro, p.codigo_iso AS pais
+FROM arbitraje.designacion_arbitral d JOIN arbitraje.arbitro a ON a.arbitro_id = d.arbitro_id JOIN torneo.pais p ON p.pais_id = a.pais_id
+ORDER BY d.partido_id, d.designacion_id;
+INSERT INTO #resultado VALUES ('E-2.9.01', 'designar_arbitros: terna completa sin advertencia en grupos',
+       IIF(@adv3 IS NULL AND (SELECT COUNT(*) FROM arbitraje.designacion_arbitral WHERE partido_id = @p3) = 5, 'OK', 'FALLO'), ISNULL(@adv3, ''));
+INSERT INTO #resultado VALUES ('E-2.9.01', 'designar_arbitros: advertencia desde dieciseisavos (no bloquea)',
+       IIF(@adv4 LIKE 'ADVERTENCIA%' AND @adv4 LIKE '%Ramos%' AND @adv4 LIKE '%Sampaio%' AND (SELECT COUNT(*) FROM arbitraje.designacion_arbitral WHERE partido_id = @p4) = 5, 'OK', 'FALLO'), ISNULL(@adv4, ''));
+EXEC #informar 'E-2.9.01';
+GO
+
+-- ============================================================
+-- 2.10 Partido de eliminación directa completo (P4: Francia vs Japón, dieciseisavos)
+-- ============================================================
+
+PRINT '--- E-2.10.01 Formaciones de P4: el expulsado por roja directa en P1 no puede jugar';
+-- sin el 4 se carga bien. La de Japón se carga completa.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p4 INT = (SELECT valor FROM #id WHERE clave = 'P4'), @fra INT = (SELECT valor FROM #id WHERE clave = 'FRA'),
+        @jpn INT = (SELECT valor FROM #id WHERE clave = 'JPN'), @form INT;
+DECLARE @con4 plantel.tt_formacion_jugador, @sin4 plantel.tt_formacion_jugador, @japon plantel.tt_formacion_jugador;
+INSERT INTO @con4 SELECT c.jugador_id, j.posicion_habitual, IIF(c.dorsal <= 11, 1, 0)
+FROM plantel.convocatoria c JOIN plantel.jugador j ON j.jugador_id = c.jugador_id WHERE c.seleccion_id = @fra AND c.fecha_baja IS NULL;
+INSERT INTO @sin4 SELECT c.jugador_id, j.posicion_habitual, IIF(c.dorsal <= 12, 1, 0)
+FROM plantel.convocatoria c JOIN plantel.jugador j ON j.jugador_id = c.jugador_id WHERE c.seleccion_id = @fra AND c.fecha_baja IS NULL AND c.dorsal <> 4;
+INSERT INTO @japon SELECT c.jugador_id, j.posicion_habitual, IIF(c.dorsal <= 11, 1, 0)
+FROM plantel.convocatoria c JOIN plantel.jugador j ON j.jugador_id = c.jugador_id WHERE c.seleccion_id = @jpn AND c.fecha_baja IS NULL;
+EXEC plantel.cargar_formacion @p4, 'local', '4-2-3-1', @sin4, @form OUTPUT;   INSERT INTO #id VALUES ('P4_local', @form);
+EXEC plantel.cargar_formacion @p4, 'visitante', '3-4-3', @japon, @form OUTPUT; INSERT INTO #id VALUES ('P4_visitante', @form);
+INSERT INTO #resultado SELECT 'E-2.10.01', 'cargar_formacion: formaciones de P4', IIF(COUNT(*) = 45, 'OK', 'FALLO'), ''
+FROM plantel.formacion f JOIN plantel.formacion_jugador fj ON fj.formacion_id = f.formacion_id WHERE f.partido_id = @p4;
+EXEC #informar 'E-2.10.01';
+GO
+
+PRINT '--- E-2.10.02 Cambio adicional del tiempo suplementario';
+-- Resultado esperado: Japón hace 5 cambios en 3 ventanas del ST. El 6.º en el ST se rechaza con 2 condiciones (máximo de
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p4 INT = (SELECT valor FROM #id WHERE clave = 'P4'), @form INT = (SELECT valor FROM #id WHERE clave = 'P4_visitante');
+EXEC evento.registrar_sustitucion @p4, 'visitante', 2, 12, 50, 'ST', 'tactico';
+EXEC evento.registrar_sustitucion @p4, 'visitante', 3, 13, 50, 'ST', 'tactico';
+EXEC evento.registrar_sustitucion @p4, 'visitante', 4, 14, 65, 'ST', 'lesion';
+EXEC evento.registrar_sustitucion @p4, 'visitante', 5, 15, 65, 'ST', 'tactico';
+EXEC evento.registrar_sustitucion @p4, 'visitante', 6, 16, 80, 'ST', 'precaucion';
+EXEC evento.registrar_sustitucion @p4, 'visitante', 7, 17, 95, 'alargue_1', 'tactico';
+SELECT numero_ventana, periodo, minuto, COUNT(*) AS cambios FROM evento.sustitucion WHERE formacion_id = @form
+GROUP BY numero_ventana, periodo, minuto ORDER BY numero_ventana;
+INSERT INTO #resultado SELECT 'E-2.10.02', 'registrar_sustitucion: cambio adicional en el alargue (6 cambios, 4 ventanas)',
+       IIF(COUNT(*) = 6 AND MAX(numero_ventana) = 4 AND SUM(CASE WHEN periodo = 'alargue_1' THEN 1 ELSE 0 END) = 1, 'OK', 'FALLO'), ''
+FROM evento.sustitucion WHERE formacion_id = @form;
+EXEC #informar 'E-2.10.02';
+GO
+
+PRINT '--- E-2.10.03 Empate, definición por penales y cierre';
+-- Con la tanda registrada (Francia 2, Japón 1) se cierra: goles 1-1, penales 2-1. Los goles de la tanda no suman al marcador.
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p4 INT = (SELECT valor FROM #id WHERE clave = 'P4');
+EXEC evento.registrar_gol @p4, 'local', 9, 30, 'tiro_libre', 'PT';
+EXEC evento.registrar_gol @p4, 'visitante', 10, 77, 'jugada', 'ST', 12;
+EXEC evento.registrar_gol @p4, 'local', 9, 120, 'penal', 'penales';
+EXEC evento.registrar_gol @p4, 'visitante', 10, 120, 'penal', 'penales';
+EXEC evento.registrar_gol @p4, 'local', 10, 120, 'penal', 'penales';
+EXEC torneo.registrar_resultado @partido_id = @p4, @asistencia_publico = 70000;
+SELECT partido_id, fase, estado, goles_local, goles_visitante, penales_local, penales_visitante, asistencia_publico FROM torneo.partido WHERE partido_id = @p4;
+INSERT INTO #resultado SELECT 'E-2.10.03', 'registrar_resultado: 1-1 con penales 2-1',
+       IIF(estado = 'finalizado' AND goles_local = 1 AND goles_visitante = 1 AND penales_local = 2 AND penales_visitante = 1, 'OK', 'FALLO'), ''
+FROM torneo.partido WHERE partido_id = @p4;
+EXEC #informar 'E-2.10.03';
+GO
+
+PRINT '--- E-2.10.04 Resultado sin detalle (como llegaría de una importación) y sus validaciones';
+-- Resultado esperado: se programa un partido de grupos sin formaciones (México vs Japón). Cerrarlo sin informar goles se
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @mx INT = (SELECT valor FROM #id WHERE clave = 'sede_MX'), @mex INT = (SELECT valor FROM #id WHERE clave = 'MEX'),
+        @jpn INT = (SELECT valor FROM #id WHERE clave = 'JPN'), @p5 INT;
+EXEC torneo.partido_insertar @mx, '2026-06-25T18:00:00-06:00', 'grupos', @mex, @jpn, NULL, @p5 OUTPUT;
+EXEC torneo.registrar_resultado @p5, 2, 0, NULL, NULL, 60000;
+SELECT partido_id, fase, estado, goles_local, goles_visitante, asistencia_publico FROM torneo.partido WHERE partido_id = @p5;
+INSERT INTO #resultado SELECT 'E-2.10.04', 'registrar_resultado: resultado informado sin detalle',
+       IIF(estado = 'finalizado' AND goles_local = 2 AND goles_visitante = 0, 'OK', 'FALLO'), '' FROM torneo.partido WHERE partido_id = @p5;
+EXEC #informar 'E-2.10.04';
+GO
+
+-- ============================================================
+-- 2.11 Transaccionalidad: todo o nada en operaciones que afectan varias tablas
+-- ============================================================
+
+PRINT '--- E-2.11.01 Una operación multi-tabla se deshace completa';
+-- Una roja genera 1 tarjeta (evento.tarjeta) y 1 suspensión (evento.suspension). Se la ejecuta dentro de una
+-- transacción abierta por quien llama y se hace ROLLBACK.
+-- Resultado esperado: dentro de la transacción hay +1 tarjeta y +1 suspensión; después del ROLLBACK no queda
+-- ninguna de las dos (el SP no confirma por su cuenta lo que no abrió).
+-- Requiere: Lote 0 y todos los lotes anteriores de las Partes 1 y 2 (escenario encadenado: va en su lugar de la secuencia).
+DECLARE @p3 INT = (SELECT valor FROM #id WHERE clave = 'P3'), @t0 INT = (SELECT COUNT(*) FROM evento.tarjeta),
+        @s0 INT = (SELECT COUNT(*) FROM evento.suspension), @t1 INT, @s1 INT;
+BEGIN TRANSACTION;
+    EXEC evento.registrar_tarjeta @partido_id = @p3, @minuto = 10, @periodo = 'PT', @tipo = 'roja', @motivo = 'Prueba de rollback',
+         @condicion = 'local', @dorsal = 7;
+    SELECT @t1 = COUNT(*) FROM evento.tarjeta;
+    SELECT @s1 = COUNT(*) FROM evento.suspension;
+ROLLBACK TRANSACTION;
+SELECT @t0 AS tarjetas_antes, @t1 AS tarjetas_durante, (SELECT COUNT(*) FROM evento.tarjeta) AS tarjetas_despues,
+       @s0 AS suspensiones_antes, @s1 AS suspensiones_durante, (SELECT COUNT(*) FROM evento.suspension) AS suspensiones_despues;
+INSERT INTO #resultado VALUES ('E-2.11.01', 'transacción: tarjeta + suspensión se deshacen juntas',
+       IIF(@t1 = @t0 + 1 AND @s1 = @s0 + 1 AND (SELECT COUNT(*) FROM evento.tarjeta) = @t0
+           AND (SELECT COUNT(*) FROM evento.suspension) = @s0, 'OK', 'FALLO'), '');
+EXEC #informar 'E-2.11.01';
+GO
+
+PRINT '################ PARTE 3: CASOS DETALLADOS POR SP ################';
+GO
+
+-- ============================================================
+-- 3.0 Preparación de los datos de la Parte 3
+-- ============================================================
+
+PRINT '--- P-3.01 Preparación de torneo.parametro_* (ejecutar UNA sola vez)';
+-- Preparación (sin verificaciones) de los casos detallados. Ejecutar UNA sola vez.
+-- Requiere: Lote 0, las Partes 1 y 2 y las preparaciones P-3.xx anteriores.
 DECLARE @h INT = (SELECT valor FROM torneo.parametro WHERE clave = 'prime_time_hora_hasta'),
         @d INT = (SELECT valor FROM torneo.parametro WHERE clave = 'prime_time_hora_desde');
 EXEC torneo.parametro_insertar 'tst_ins', 1, 'Base de insertar (para duplicados)';
@@ -62,7 +1259,9 @@ EXEC torneo.parametro_insertar 'tst_backup_hasta', @h, 'Respaldo de prime_time_h
 EXEC torneo.parametro_insertar 'tst_backup_desde', @d, 'Respaldo de prime_time_hora_desde';
 GO
 
--- Preparación de torneo.pais_* (ejecutar UNA sola vez)
+PRINT '--- P-3.02 Preparación de torneo.pais_* (ejecutar UNA sola vez)';
+-- Preparación (sin verificaciones) de los casos detallados. Ejecutar UNA sola vez.
+-- Requiere: Lote 0, las Partes 1 y 2 y las preparaciones P-3.xx anteriores.
 DECLARE @conf INT = (SELECT TOP 1 confederacion_id FROM torneo.confederacion ORDER BY confederacion_id);
 IF @conf IS NULL THROW 50000, 'No hay confederaciones en torneo.confederacion: cargar al menos una con torneo.confederacion_insertar.', 1; 
     -- SI TIRA EL SIGUIENTE  ERROR, HAY QUE EJECUTAR LA PREPARACION DE CONFEDERACIONES DE FORMA PREVIA PARA PODER CONTINUAR
@@ -95,11 +1294,13 @@ EXEC publicidad.pieza_publicitaria_insertar @camp, 'espanol', @pP, 1000, @x OUTP
 EXEC publicidad.pieza_publicitaria_insertar @camp, 'espanol', @pT, 1000, @x OUTPUT;
 GO
 
--- Preparación de torneo.confederacion_* (ejecutar UNA sola vez)
+PRINT '--- P-3.03 Preparación de torneo.confederacion_* (ejecutar UNA sola vez)';
+-- Preparación (sin verificaciones) de los casos detallados. Ejecutar UNA sola vez.
+-- Requiere: Lote 0, las Partes 1 y 2 y las preparaciones P-3.xx anteriores.
 DECLARE @id INT, @x INT, @conmebol INT;
-SET @id = (SELECT confederacion_id FROM torneo.confederacion WHERE nombre = 'CAF');      IF @id IS NOT NULL EXEC torneo.confederacion_eliminar @id;
-SET @id = (SELECT confederacion_id FROM torneo.confederacion WHERE nombre = 'CONCACAF'); IF @id IS NOT NULL EXEC torneo.confederacion_eliminar @id;
-SET @id = (SELECT confederacion_id FROM torneo.confederacion WHERE nombre = 'OFC');      IF @id IS NOT NULL EXEC torneo.confederacion_eliminar @id;
+SET @id = (SELECT confederacion_id FROM torneo.confederacion WHERE nombre = 'CAF');      IF @id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM torneo.seleccion WHERE confederacion_id = @id) EXEC torneo.confederacion_eliminar @id;
+SET @id = (SELECT confederacion_id FROM torneo.confederacion WHERE nombre = 'CONCACAF'); IF @id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM torneo.seleccion WHERE confederacion_id = @id) EXEC torneo.confederacion_eliminar @id;
+SET @id = (SELECT confederacion_id FROM torneo.confederacion WHERE nombre = 'OFC');      IF @id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM torneo.seleccion WHERE confederacion_id = @id) EXEC torneo.confederacion_eliminar @id;
 IF NOT EXISTS (SELECT 1 FROM torneo.confederacion WHERE nombre = 'CONMEBOL') EXEC torneo.confederacion_insertar 'CONMEBOL';
 IF NOT EXISTS (SELECT 1 FROM torneo.confederacion WHERE nombre = 'UEFA')     EXEC torneo.confederacion_insertar 'UEFA';
 IF NOT EXISTS (SELECT 1 FROM torneo.confederacion WHERE nombre = 'AFC')      EXEC torneo.confederacion_insertar 'AFC';
@@ -111,7 +1312,9 @@ BEGIN
 END;
 GO
 
--- Preparación de torneo.sede_* (ejecutar UNA sola vez)
+PRINT '--- P-3.04 Preparación de torneo.sede_* (ejecutar UNA sola vez)';
+-- Preparación (sin verificaciones) de los casos detallados. Ejecutar UNA sola vez.
+-- Requiere: Lote 0, las Partes 1 y 2 y las preparaciones P-3.xx anteriores.
 DECLARE @conf INT = (SELECT TOP 1 confederacion_id FROM torneo.confederacion ORDER BY confederacion_id);
 IF @conf IS NULL THROW 50000, 'No hay confederaciones en torneo.confederacion: cargar al menos una con torneo.confederacion_insertar.', 1;
 DECLARE @pa INT, @pb INT, @pc INT, @x INT, @s1 INT, @s2 INT, @sp INT, @part INT,
@@ -130,7 +1333,9 @@ EXEC torneo.partido_insertar @sp, @f, 'grupos', @s1, @s2, NULL, @part OUTPUT;
 UPDATE torneo.partido SET asistencia_publico = 40000 WHERE partido_id = @part;
 GO
 
--- Preparación de torneo.seleccion_* (ejecutar UNA sola vez)
+PRINT '--- P-3.05 Preparación de torneo.seleccion_* (ejecutar UNA sola vez)';
+-- Preparación (sin verificaciones) de los casos detallados. Ejecutar UNA sola vez.
+-- Requiere: Lote 0, las Partes 1 y 2 y las preparaciones P-3.xx anteriores.
 DECLARE @c1 INT = (SELECT TOP 1 confederacion_id FROM torneo.confederacion ORDER BY confederacion_id);
 IF @c1 IS NULL THROW 50000, 'No hay confederaciones en torneo.confederacion: cargar al menos una con torneo.confederacion_insertar.', 1;
 DECLARE @c2 INT = ISNULL((SELECT TOP 1 confederacion_id FROM torneo.confederacion WHERE confederacion_id > @c1 ORDER BY confederacion_id), @c1);
@@ -167,9 +1372,19 @@ EXEC torneo.seleccion_insertar @pk, @c1, 'D', @sk OUTPUT;   -- Todo (partido + c
 EXEC torneo.sede_insertar 'Test Sel Sede', 'Ciudad Sel', @pa, 50000, 'UTC-03', @sede OUTPUT;
 EXEC torneo.partido_insertar @sede, @f1, 'grupos', @sp, @sr, NULL, @part OUTPUT;   -- Partido vs Rival
 EXEC torneo.partido_insertar @sede, @f2, 'grupos', @sk, @sr, NULL, @part OUTPUT;   -- Todo vs Rival
+DECLARE @jv INT, @jk INT, @sv INT = (SELECT seleccion_id FROM torneo.seleccion WHERE pais_id = @pv),
+        @st INT = (SELECT seleccion_id FROM torneo.seleccion WHERE pais_id = @pt);
+EXEC plantel.jugador_insertar 'Test SEL', 'Convocado V', '1995-03-15', 'delantero', NULL, @jv OUTPUT;
+EXEC plantel.jugador_insertar 'Test SEL', 'Convocado K', '1995-03-15', 'delantero', NULL, @jk OUTPUT;
+EXEC plantel.convocatoria_insertar @sv, @jv, 10, '2026-06-01', NULL;   -- selección con convocatoria
+EXEC plantel.convocatoria_insertar @sk, @jk, 10, '2026-06-01', NULL;   -- selección con partido + convocatoria + cuerpo técnico
+EXEC plantel.cuerpo_tecnico_insertar @st, 'Test SEL', 'CT T', 'otro';   -- selección con cuerpo técnico
+EXEC plantel.cuerpo_tecnico_insertar @sk, 'Test SEL', 'CT K', 'otro';
 GO
 
--- Preparación de torneo.partido* (ejecutar UNA sola vez)
+PRINT '--- P-3.06 Preparación de torneo.partido* (ejecutar UNA sola vez)';
+-- Preparación (sin verificaciones) de los casos detallados. Ejecutar UNA sola vez.
+-- Requiere: Lote 0, las Partes 1 y 2 y las preparaciones P-3.xx anteriores.
 -- Ciertas validaciones de esta seccion necesitan que se ejecute la preparacion de convocatoria, tarjetas, etc
 -- De lo contrario, no funcionaran de forma correta.
 DECLARE @conf INT = (SELECT TOP 1 confederacion_id FROM torneo.confederacion ORDER BY confederacion_id);
@@ -205,11 +1420,31 @@ EXEC torneo.partido_insertar @sb, '2026-07-15 15:00:00 -03:00', 'tercer_puesto',
 EXEC torneo.partido_insertar @sb, '2026-07-20 15:00:00 -03:00', 'final',         @a1, @a2, NULL, @p_pub  OUTPUT;  -- con espacios publicitarios
 EXEC torneo.partido_insertar @sb, '2026-07-25 15:00:00 -03:00', 'dieciseisavos', @a1, @a2, NULL, @p_all  OUTPUT;  -- finalizado + todas las dependencias
 EXEC torneo.partido_insertar @sb, '2026-07-30 15:00:00 -03:00', 'dieciseisavos', @a3, @a4, NULL, @p_elim OUTPUT;  -- sin dependencias (baja válida)
+-- Dependencias de los partidos de prueba (p_form, p_tarj, p_susp, p_arb, p_pub y p_all con todas)
+DECLARE @arb INT, @ct1 INT, @ct2 INT, @ct3 INT, @p_src INT, @t INT, @f INT;
+EXEC arbitraje.arbitro_insertar 'Test', 'Arbitro Partido', @pe, 'FIFA', NULL, @arb OUTPUT;
+EXEC plantel.cuerpo_tecnico_insertar @a1, 'Test PA', 'CT A1', 'otro', @x OUTPUT, @ct1 OUTPUT;
+EXEC plantel.cuerpo_tecnico_insertar @a2, 'Test PA', 'CT A2', 'otro', @x OUTPUT, @ct2 OUTPUT;
+EXEC plantel.cuerpo_tecnico_insertar @a3, 'Test PA', 'CT A3', 'otro', @x OUTPUT, @ct3 OUTPUT;
+EXEC torneo.partido_insertar @sl, '2026-07-02 15:00:00 -03:00', 'octavos', @a1, @a2, NULL, @p_src OUTPUT;  -- origen de las rojas
+EXEC plantel.formacion_insertar @p_form, 'local', '4-4-2', @f OUTPUT;
+EXEC plantel.formacion_insertar @p_all,  'local', '4-4-2', @f OUTPUT;
+EXEC evento.tarjeta_insertar @p_tarj, @ct3, 10, 'PT', 'amarilla', 'Protesta', NULL, @tarjeta_id = @t OUTPUT;
+EXEC evento.tarjeta_insertar @p_all,  @ct1, 10, 'PT', 'amarilla', 'Protesta', NULL, @tarjeta_id = @t OUTPUT;
+EXEC evento.tarjeta_insertar @p_src,  @ct2, 20, 'PT', 'roja', 'Insultos', 'roja_directa', @tarjeta_id = @t OUTPUT;
+EXEC evento.suspension_insertar @t, 'Roja directa', NULL, @p_susp;
+EXEC evento.tarjeta_insertar @p_src,  @ct1, 30, 'PT', 'roja', 'Insultos', 'roja_directa', @tarjeta_id = @t OUTPUT;
+EXEC evento.suspension_insertar @t, 'Roja directa', NULL, @p_all;
+EXEC arbitraje.designacion_arbitral_insertar @p_arb, @arb, 'principal';
+EXEC arbitraje.designacion_arbitral_insertar @p_all, @arb, 'principal';
+EXEC publicidad.espacio_publicitario_insertar @p_pub, 1, NULL, NULL;
+EXEC publicidad.espacio_publicitario_insertar @p_all, 1, NULL, NULL;
 UPDATE torneo.partido SET estado = 'finalizado' WHERE partido_id IN (@p_fin, @p_all);
 GO
 
-
--- Preparación de plantel.cuerpo_tecnico_* (ejecutar UNA sola vez)
+PRINT '--- P-3.07 Preparación de plantel.cuerpo_tecnico_* (ejecutar UNA sola vez)';
+-- Preparación (sin verificaciones) de los casos detallados. Ejecutar UNA sola vez.
+-- Requiere: Lote 0, las Partes 1 y 2 y las preparaciones P-3.xx anteriores.
 DECLARE @conf INT = (SELECT TOP 1 confederacion_id FROM torneo.confederacion ORDER BY confederacion_id);
 IF @conf IS NULL THROW 50000, 'No hay confederaciones en torneo.confederacion: cargar al menos una con torneo.confederacion_insertar.', 1;
 DECLARE @pa INT, @pb INT, @pc INT, @s1 INT, @s2 INT, @s3 INT, @x INT, @pt INT;
@@ -229,7 +1464,9 @@ EXEC plantel.cuerpo_tecnico_insertar @s1, 'Test CT', 'Elim Tran', 'otro',       
 EXEC plantel.cuerpo_tecnico_insertar @s2, 'Test CT', 'Tarjeta',   'otro',              @x OUTPUT, @pt OUTPUT;  
 GO
 
--- Preparación de plantel.jugador_* (ejecutar UNA sola vez)
+PRINT '--- P-3.08 Preparación de plantel.jugador_* (ejecutar UNA sola vez)';
+-- Preparación (sin verificaciones) de los casos detallados. Ejecutar UNA sola vez.
+-- Requiere: Lote 0, las Partes 1 y 2 y las preparaciones P-3.xx anteriores.
 DECLARE @x INT;
 EXEC plantel.jugador_insertar 'Test JU', 'Base',      '1995-03-15', 'delantero',     'Club Test', @x OUTPUT;
 EXEC plantel.jugador_insertar 'Test JU', 'Mod',       '1995-03-15', 'defensor',      'Club Mod',  @x OUTPUT; 
@@ -241,7 +1478,9 @@ EXEC plantel.jugador_insertar 'Test JU', 'Formacion', '1995-03-15', 'defensor', 
 EXEC plantel.jugador_insertar 'Test JU', 'Tarjeta',   '1995-03-15', 'arquero',       NULL,        @x OUTPUT;
 GO
 
--- Preparación de plantel.persona_* (ejecutar UNA sola vez, y usar siempre la misma ventana de consulta)
+PRINT '--- P-3.09 Preparación de plantel.persona_* (ejecutar UNA sola vez, y usar siempre la misma ventana de consulta)';
+-- Preparación (sin verificaciones) de los casos detallados. Ejecutar UNA sola vez.
+-- Requiere: Lote 0, las Partes 1 y 2 y las preparaciones P-3.xx anteriores.
 IF OBJECT_ID('tempdb..##test_persona') IS NULL
     CREATE TABLE ##test_persona (persona_id INT NOT NULL PRIMARY KEY, clave VARCHAR(10) NOT NULL);
 DECLARE @id INT;
@@ -254,7 +1493,9 @@ EXEC plantel.persona_insertar 'jugador',        @id OUTPUT; INSERT INTO ##test_p
 EXEC plantel.persona_insertar 'jugador',        @id OUTPUT; INSERT INTO ##test_persona VALUES (@id, 'todo');     -- jugador + cuerpo tecnico + tarjetas
 GO
 
--- Preparación de plantel.convocatoria_* (ejecutar UNA sola vez)
+PRINT '--- P-3.10 Preparación de plantel.convocatoria_* (ejecutar UNA sola vez)';
+-- Preparación (sin verificaciones) de los casos detallados. Ejecutar UNA sola vez.
+-- Requiere: Lote 0, las Partes 1 y 2 y las preparaciones P-3.xx anteriores.
 -- Requiere haber ejecutado antes las preparaciones de plantel.cuerpo_tecnico_* (selecciones ZCA/ZCB/ZCC) y plantel.jugador_* (jugadores 'Test JU').
 -- Datos fijos para las futuras preparaciones (formacion_jugador, etc.): s1 = ZCA: 'Convocado' (dorsal 10) y 'Formacion' (dorsal 3) quedan convocados vigentes.
 DECLARE @s1 INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZCA'),
@@ -308,8 +1549,9 @@ SET @j = (SELECT jugador_id FROM plantel.jugador WHERE nombre = 'Test JU' AND ap
 EXEC plantel.convocatoria_insertar @s2, @j, 11, '2026-06-01', 'Motivo inicial', @c OUTPUT;
 GO
 
-
--- Preparación de plantel.formacion_* (ejecutar UNA sola vez, y usar siempre la misma ventana de consulta)
+PRINT '--- P-3.11 Preparación de plantel.formacion_* (ejecutar UNA sola vez, y usar siempre la misma ventana de consulta)';
+-- Preparación (sin verificaciones) de los casos detallados. Ejecutar UNA sola vez.
+-- Requiere: Lote 0, las Partes 1 y 2 y las preparaciones P-3.xx anteriores.
 -- Requiere haber ejecutado antes la preparación de plantel.cuerpo_tecnico_* (selecciones ZCA/ZCB/ZCC, todas del grupo 'A') y al menos una sede en torneo.sede.
 IF OBJECT_ID('tempdb..##test_formacion') IS NULL
     CREATE TABLE ##test_formacion (clave VARCHAR(10) NOT NULL PRIMARY KEY, partido_id INT NOT NULL, formacion_id INT NULL);
@@ -346,7 +1588,9 @@ EXEC plantel.formacion_insertar @pf, 'local', '4-4-2', @f OUTPUT; INSERT INTO ##
 UPDATE torneo.partido SET estado = 'finalizado' WHERE partido_id = @pf;
 GO
 
--- Preparación de plantel.formacion_jugador_* (ejecutar UNA sola vez, y usar siempre la misma ventana de consulta)
+PRINT '--- P-3.12 Preparación de plantel.formacion_jugador_* (ejecutar UNA sola vez, y usar siempre la misma ventana de consulta)';
+-- Preparación (sin verificaciones) de los casos detallados. Ejecutar UNA sola vez.
+-- Requiere: Lote 0, las Partes 1 y 2 y las preparaciones P-3.xx anteriores.
 -- Requiere haber ejecutado antes, en esta misma ventana: plantel.cuerpo_tecnico_* (ZCA/ZCB/ZCC), plantel.jugador_* (Test JU),
 -- plantel.convocatoria_* ('Convocado' y 'Formacion' convocados en ZCA) y plantel.formacion_* (##test_formacion).
 IF OBJECT_ID('tempdb..##test_formacion') IS NULL
@@ -506,7 +1750,9 @@ EXEC plantel.convocatoria_modificar @c, 48, '2026-06-01', 'Convocatoria FJ', '20
 UPDATE torneo.partido SET estado = 'finalizado' WHERE partido_id = @pf;
 GO
 
--- Preparación de evento.sustitucion_* (ejecutar UNA sola vez, y usar siempre la misma ventana de consulta)
+PRINT '--- P-3.13 Preparación de evento.sustitucion_* (ejecutar UNA sola vez, y usar siempre la misma ventana de consulta)';
+-- Preparación (sin verificaciones) de los casos detallados. Ejecutar UNA sola vez.
+-- Requiere: Lote 0, las Partes 1 y 2 y las preparaciones P-3.xx anteriores.
 -- Requiere haber ejecutado antes, en esta misma ventana: plantel.cuerpo_tecnico_* (ZCA/ZCB/ZCC), plantel.jugador_*, plantel.convocatoria_*,
 -- plantel.formacion_* (##test_formacion) y plantel.formacion_jugador_* (##test_fjugador).
 -- No crea jugadores ni convocatorias nuevos: reutiliza los jugadores de ZCB y ZCC (convocados vigentes)
@@ -664,7 +1910,9 @@ INSERT INTO ##test_sustitucion (clave, formacion_id, sustitucion_id) VALUES ('el
 UPDATE torneo.partido SET estado = 'finalizado' WHERE partido_id = @p5;
 GO
 
--- Preparación de evento.gol_* (ejecutar UNA sola vez, y usar siempre la misma ventana de consulta)
+PRINT '--- P-3.14 Preparación de evento.gol_* (ejecutar UNA sola vez, y usar siempre la misma ventana de consulta)';
+-- Preparación (sin verificaciones) de los casos detallados. Ejecutar UNA sola vez.
+-- Requiere: Lote 0, las Partes 1 y 2 y las preparaciones P-3.xx anteriores.
 -- Requiere haber ejecutado antes, en esta misma ventana: plantel.cuerpo_tecnico_* (ZCA/ZCB/ZCC), plantel.jugador_*, plantel.convocatoria_*,
 -- plantel.formacion_* (##test_formacion) y plantel.formacion_jugador_* (##test_fjugador).
 -- Usa evento.sustitucion_insertar (para tener un suplente que ingresó), pero NO requiere la preparación de evento.sustitucion_*.
@@ -783,7 +2031,10 @@ END;
     -- Partido finalizado: se carga primero (el SP rechaza partidos finalizados) y luego se finaliza
 UPDATE torneo.partido SET estado = 'finalizado' WHERE partido_id = @pz;
 GO
--- Preparación de evento.tarjeta_* (ejecutar UNA sola vez, y usar siempre la misma ventana de consulta)
+
+PRINT '--- P-3.15 Preparación de evento.tarjeta_* (ejecutar UNA sola vez, y usar siempre la misma ventana de consulta)';
+-- Preparación (sin verificaciones) de los casos detallados. Ejecutar UNA sola vez.
+-- Requiere: Lote 0, las Partes 1 y 2 y las preparaciones P-3.xx anteriores.
 -- Requiere haber ejecutado antes, en esta misma ventana: plantel.cuerpo_tecnico_* (ZCA/ZCB/ZCC), plantel.jugador_*, plantel.convocatoria_*,
 -- plantel.formacion_* (##test_formacion) y plantel.formacion_jugador_* (##test_fjugador). NO requiere las preparaciones de evento.sustitucion_* ni evento.gol_*.
 IF OBJECT_ID('tempdb..##test_fjugador') IS NULL OR OBJECT_ID('tempdb..##test_formacion') IS NULL
@@ -899,10 +2150,19 @@ EXEC evento.tarjeta_insertar @pt, @u_susp, 85, 'ST', 'roja',     'Agresion',    
 EXEC evento.tarjeta_insertar @pm, @u_tarj, 30, 'PT', 'amarilla', NULL,               NULL,             @tarjeta_id = @tid OUTPUT; INSERT INTO ##test_tarjeta (clave, tarjeta_id) VALUES ('t_jug',   @tid);  -- partido 'mod' (grupos), jugador 'tarj'
 EXEC evento.tarjeta_insertar @pz, @u_fin,  10, 'PT', 'amarilla', NULL,               NULL,             @tarjeta_id = @tid OUTPUT; INSERT INTO ##test_tarjeta (clave, tarjeta_id) VALUES ('t_fin',   @tid);  -- partido a finalizar
     -- Partido finalizado: se carga primero (el SP rechaza partidos finalizados) y luego se finaliza
+DECLARE @ctt INT = (SELECT persona_id FROM plantel.cuerpo_tecnico WHERE nombre = 'Test CT' AND apellido = 'Tarjeta'),
+        @jut INT = (SELECT jugador_id FROM plantel.jugador WHERE nombre = 'Test JU' AND apellido = 'Tarjeta');
+DECLARE @put INT = (SELECT persona_id FROM plantel.jugador WHERE jugador_id = @jut);
+EXEC evento.tarjeta_insertar @pt, @ctt, 50, 'ST', 'amarilla', 'Protesta', NULL, @tarjeta_id = @tid OUTPUT;
+EXEC plantel.convocatoria_insertar @s2, @jut, 95, '2026-06-01', NULL;
+EXEC plantel.formacion_jugador_insertar @fl, @jut, 'Arquero', 0;
+EXEC evento.tarjeta_insertar @pt, @put, 55, 'ST', 'amarilla', 'Demora', NULL, @tarjeta_id = @tid OUTPUT;
 UPDATE torneo.partido SET estado = 'finalizado' WHERE partido_id = @pz;
 GO
 
--- Preparación de evento.criterio_suspension_* (ejecutar UNA sola vez, y usar siempre la misma ventana de consulta)
+PRINT '--- P-3.16 Preparación de evento.criterio_suspension_* (ejecutar UNA sola vez, y usar siempre la misma ventana de consulta)';
+-- Preparación (sin verificaciones) de los casos detallados. Ejecutar UNA sola vez.
+-- Requiere: Lote 0, las Partes 1 y 2 y las preparaciones P-3.xx anteriores.
 -- No requiere ninguna otra preparación. Todos los criterios de prueba usan cantidad_amarillas entre 70 y 99 (nunca se alcanzan en un partido real).
 IF OBJECT_ID('tempdb..##test_criterio') IS NULL
     CREATE TABLE ##test_criterio (clave VARCHAR(12) COLLATE DATABASE_DEFAULT NOT NULL PRIMARY KEY, criterio_id INT NOT NULL);
@@ -942,195 +2202,134 @@ GO
 -- =======================================================================================================
 
 -- ============================================================
--- 1.1 torneo.parametro
--- ============================================================
--- Verificacion torneo.parametro_insertar
-EXEC torneo.parametro_insertar 'tst_ins_ok', 10, 'Alta valida'; --> Valido
--- EXEC torneo.parametro_insertar 'tst_cero', 0, 'Valor cero'; --> Valido: valor 0 (borde)
--- EXEC torneo.parametro_insertar 'tst_valor_max', 2147483647, 'Valor maximo'; --> borde
--- EXEC torneo.parametro_insertar 'tst_abcdefghijklmnopqrstuvwxyz0123456789', 1, --> Valido: clave de 40 caracteres (borde)
--- EXEC torneo.parametro_insertar 'tst_desc_esp', 1, '  Descripcion con espacios  '; --> Valido: la descripcion se guarda tal cual, sin recortar
--- EXEC torneo.parametro_insertar 'TST_MAYUS', 1, 'Clave en mayusculas'; --> Valido: permite mayus la collation
--- EXEC torneo.parametro_insertar '', 1, 'Desc'; --> Clave vacia
--- EXEC torneo.parametro_insertar NULL, 1, 'Desc'; --> Clave nula
--- EXEC torneo.parametro_insertar '   ', 1, 'Desc'; --> Clave solo espacios
--- EXEC torneo.parametro_insertar 'tst_abcdefghijklmnopqrstuvwxyz0123456789x', 1, 'Desc'; --> Clave de 41 caracteres (mas de 40)
--- EXEC torneo.parametro_insertar 'tst bad', 1, 'Desc'; --> Clave con espacio
--- EXEC torneo.parametro_insertar ' tst_bad', 1, 'Desc'; --> Clave con espacio al inicio, tira error de tipo de caracteres
--- EXEC torneo.parametro_insertar 'tst-bad', 1, 'Desc'; --> Clave con guion medio
--- EXEC torneo.parametro_insertar 'tst.bad', 1, 'Desc'; --> Clave con punto
--- EXEC torneo.parametro_insertar 'tst_bad', NULL, 'Desc'; --> Valor nulo
--- EXEC torneo.parametro_insertar 'tst_bad', -1, 'Desc'; --> Valor negativo
--- EXEC torneo.parametro_insertar 'tst_bad', 1, ''; --> Descripcion vacia
--- EXEC torneo.parametro_insertar 'tst_bad', 1, NULL; --> Descripcion nula
--- EXEC torneo.parametro_insertar 'tst_bad', 1, '   '; --> Descripcion solo espacios
--- EXEC torneo.parametro_insertar 'tst_ins', 1, 'Desc'; --> Clave duplicada
--- EXEC torneo.parametro_insertar 'TST_INS', 1, 'Desc'; --> Duplicada con otra capitalizacion
--- EXEC torneo.parametro_insertar 'formacion_titulares', 1, 'Desc'; --> Duplicada con un parametro real
--- EXEC torneo.parametro_insertar '', -1, 'Desc'; --> 2 errores: clave obligatoria y valor negativo
--- EXEC torneo.parametro_insertar NULL, NULL, NULL; --> 3 errores: clave obligatoria, valor obligatorio y descripcion obligatoria
--- EXEC torneo.parametro_insertar 'tst_ins ', -1, ''; --> 4 errores: formato de clave, valor negativo, descripcion vacia y clave duplicada
+GO
 
--- Verificacion torneo.parametro_modificar
+-- ============================================================
+-- 3.1 torneo.parametro
+-- ============================================================
+
+PRINT '--- E-3.1.01 a E-3.1.06 torneo.parametro_insertar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
+
+-- E-3.1.01 Valido => se acepta
+BEGIN TRY EXEC torneo.parametro_insertar 'tst_ins_ok', 10, 'Alta valida'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.1.01', 'torneo.parametro_insertar: Valido', 0;
+-- E-3.1.02 Valido: valor 0 (borde) => se acepta
+BEGIN TRY EXEC torneo.parametro_insertar 'tst_cero', 0, 'Valor cero'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.1.02', 'torneo.parametro_insertar: Valido: valor 0 (borde)', 0;
+-- E-3.1.03 borde => se acepta
+BEGIN TRY EXEC torneo.parametro_insertar 'tst_valor_max', 2147483647, 'Valor maximo'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.1.03', 'torneo.parametro_insertar: borde', 0;
+-- E-3.1.04 Valido: clave de 40 caracteres (borde) => se acepta
+BEGIN TRY EXEC torneo.parametro_insertar 'tst_abcdefghijklmnopqrstuvwxyz0123456789', 1, 'Clave de 40'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.1.04', 'torneo.parametro_insertar: Valido: clave de 40 caracteres (borde)', 0;
+-- E-3.1.05 Valido: la descripcion se guarda tal cual, sin recortar => se acepta
+BEGIN TRY EXEC torneo.parametro_insertar 'tst_desc_esp', 1, '  Descripcion con espacios  '; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.1.05', 'torneo.parametro_insertar: Valido: la descripcion se guarda tal cual, sin recortar', 0;
+-- E-3.1.06 Valido: permite mayus la collation => se acepta
+BEGIN TRY EXEC torneo.parametro_insertar 'TST_MAYUS', 1, 'Clave en mayusculas'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.1.06', 'torneo.parametro_insertar: Valido: permite mayus la collation', 0;
+GO
+
+PRINT '--- E-3.1.07 a E-3.1.13 torneo.parametro_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @bk_hasta INT = (SELECT valor FROM torneo.parametro WHERE clave = 'tst_backup_hasta'),
         @bk_desde INT = (SELECT valor FROM torneo.parametro WHERE clave = 'tst_backup_desde');
 
--- EXEC torneo.parametro_modificar 'tst_mod', 20, 'Descripcion nueva'; --> Valido: cambia valor y descripcion
--- EXEC torneo.parametro_modificar 'tst_mod', 30; --> Valido: sin descripcion, conserva 'Descripcion nueva'
--- EXEC torneo.parametro_modificar 'tst_mod', 0, NULL; --> Valido: borde
--- EXEC torneo.parametro_modificar 'prime_time_hora_hasta', 24; --> Valido: hora de fin 24 (borde superior)
--- EXEC torneo.parametro_modificar 'prime_time_hora_hasta', 0; --> Valido: hora de fin 0 (borde inferior)
--- EXEC torneo.parametro_modificar 'prime_time_hora_hasta', @bk_hasta; --> Restaurar prime_time_hora_hasta
--- EXEC torneo.parametro_modificar 'prime_time_hora_desde', @bk_desde; --> Restaurar prime_time_hora_desde
--- EXEC torneo.parametro_modificar 'no_existe_xx', 1; --> Parametro inexistente
--- EXEC torneo.parametro_modificar NULL, 1; --> Clave nula 
--- EXEC torneo.parametro_modificar '', 1; --> Clave vacia
--- EXEC torneo.parametro_modificar 'tst_mod', NULL; --> Valor nulo
--- EXEC torneo.parametro_modificar 'tst_mod', -1; --> Valor negativo
--- EXEC torneo.parametro_modificar 'tst_mod', 1, ''; --> Descripcion vacia
--- EXEC torneo.parametro_modificar 'tst_mod', 1, '   '; --> Descripcion solo espacios
--- EXEC torneo.parametro_modificar 'prime_time_hora_hasta', 25; --> Hora de fin fuera de rango (mayor a 24)
--- EXEC torneo.parametro_modificar 'prime_time_hora_desde', 24; --> Hora de inicio fuera de rango (mayor a 23)
--- EXEC torneo.parametro_modificar 'no_existe_xx', 1, ''; --> 2 errores: parametro inexistente y descripcion vacia
--- EXEC torneo.parametro_modificar 'no_existe_xx', -1, ''; --> 3 errores: parametro inexistente, valor negativo y descripcion vacia
+-- E-3.1.07 Valido: cambia valor y descripcion => se acepta
+BEGIN TRY EXEC torneo.parametro_modificar 'tst_mod', 20, 'Descripcion nueva'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.1.07', 'torneo.parametro_modificar: Valido: cambia valor y descripcion', 0;
+-- E-3.1.08 Valido: sin descripcion, conserva 'Descripcion nueva' => se acepta
+BEGIN TRY EXEC torneo.parametro_modificar 'tst_mod', 30; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.1.08', 'torneo.parametro_modificar: Valido: sin descripcion, conserva ''Descripcion nueva''', 0;
+-- E-3.1.09 Valido: borde => se acepta
+BEGIN TRY EXEC torneo.parametro_modificar 'tst_mod', 0, NULL; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.1.09', 'torneo.parametro_modificar: Valido: borde', 0;
+-- E-3.1.10 Valido: hora de fin 24 (borde superior) => se acepta
+BEGIN TRY EXEC torneo.parametro_modificar 'prime_time_hora_hasta', 24; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.1.10', 'torneo.parametro_modificar: Valido: hora de fin 24 (borde superior)', 0;
+-- E-3.1.11 Valido: hora de fin 0 (borde inferior) => se acepta
+BEGIN TRY EXEC torneo.parametro_modificar 'prime_time_hora_hasta', 0; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.1.11', 'torneo.parametro_modificar: Valido: hora de fin 0 (borde inferior)', 0;
+-- E-3.1.12 Restaurar prime_time_hora_hasta => se acepta
+BEGIN TRY EXEC torneo.parametro_modificar 'prime_time_hora_hasta', @bk_hasta; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.1.12', 'torneo.parametro_modificar: Restaurar prime_time_hora_hasta', 0;
+-- E-3.1.13 Restaurar prime_time_hora_desde => se acepta
+BEGIN TRY EXEC torneo.parametro_modificar 'prime_time_hora_desde', @bk_desde; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.1.13', 'torneo.parametro_modificar: Restaurar prime_time_hora_desde', 0;
+GO
 
--- Verificacion torneo.parametro_eliminar
-EXEC torneo.parametro_eliminar 'tst_elim'; --> Baja valida
--- EXEC torneo.parametro_eliminar 'tst_elim'; --> Parametro inexistente 
--- EXEC torneo.parametro_eliminar 'no_existe_xx'; --> Parametro inexistente
--- EXEC torneo.parametro_eliminar NULL; --> Clave nula 
--- EXEC torneo.parametro_eliminar ''; --> Clave vacia (no existe)
--- EXEC torneo.parametro_eliminar 'convocatoria_min_jugadores'; 
--- EXEC torneo.parametro_eliminar 'convocatoria_max_jugadores'; 
--- EXEC torneo.parametro_eliminar 'formacion_titulares';
--- EXEC torneo.parametro_eliminar 'formacion_max_suplentes';
--- EXEC torneo.parametro_eliminar 'cambios_max_reglamentarios';
--- EXEC torneo.parametro_eliminar 'ventanas_max_reglamentarias'; 
--- EXEC torneo.parametro_eliminar 'cambios_extra_alargue'; 
--- EXEC torneo.parametro_eliminar 'ventanas_extra_alargue'; 
--- EXEC torneo.parametro_eliminar 'suspension_partidos_roja';
--- EXEC torneo.parametro_eliminar 'prime_time_hora_desde'; 
--- EXEC torneo.parametro_eliminar 'prime_time_hora_hasta'; 
+PRINT '--- E-3.1.14 torneo.parametro_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
+
+-- E-3.1.14 Baja valida => se acepta
+BEGIN TRY EXEC torneo.parametro_eliminar 'tst_elim'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.1.14', 'torneo.parametro_eliminar: Baja valida', 0;
 GO
 
 -- ============================================================
--- 1.2 torneo.pais y torneo.confederacion
+-- 3.2 torneo.pais y torneo.confederacion
 -- ============================================================
--- Verificacion torneo.pais_validar
+
+PRINT '--- E-3.2.01 a E-3.2.08 torneo.pais_validar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @e VARCHAR(2000),
         @m INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ZZM'),
         @n80 VARCHAR(80) = REPLICATE('N', 80);
-SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', 'Test Validar', 'UTC-03', 100, @e OUTPUT;   --> Valido
--- SET @e = ''; EXEC torneo.pais_validar @m, 'ZZM', 'Test Modificar', 'UTC-03', 100, @e OUTPUT;   --> Valido 
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', 'Test Validar', 'UTC-03', NULL, @e OUTPUT;   --> Valido: PBI nulo
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', 'Test Validar', 'UTC-03', 0, @e OUTPUT;   --> Valido: PBI 0 
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'zzv', 'Test Validar', 'UTC-03', 100, @e OUTPUT;   --> Valido: ISO en minusculas
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', @n80, 'UTC+14', 100, @e OUTPUT;   --> Valido: nombre de 80 caracteres y huso UTC+14 (bordes)
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', 'Test Validar', 'UTC-12', 100, @e OUTPUT;   --> Valido: huso UTC-12 (borde)
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', 'Test Validar', 'UTC+00', 100, @e OUTPUT;   --> Valido: huso UTC+00
--- SET @e = ''; EXEC torneo.pais_validar 999999, 'ZZV', 'Test Validar', 'UTC-03', 100, @e OUTPUT;   --> Pais inexistente (1 error)
--- SET @e = ''; EXEC torneo.pais_validar NULL, NULL, 'Test Validar', 'UTC-03', 100, @e OUTPUT;   --> ISO nulo
--- SET @e = ''; EXEC torneo.pais_validar NULL, '', 'Test Validar', 'UTC-03', 100, @e OUTPUT;   --> ISO vacio
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZ', 'Test Validar', 'UTC-03', 100, @e OUTPUT;   --> ISO de 2 letras
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZZZ', 'Test Validar', 'UTC-03', 100, @e OUTPUT;   --> ISO de 4 letras
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZ1', 'Test Validar', 'UTC-03', 100, @e OUTPUT;   --> ISO con numero
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZ-', 'Test Validar', 'UTC-03', 100, @e OUTPUT;   --> ISO con simbolo
--- SET @e = ''; EXEC torneo.pais_validar NULL, ' ZZ', 'Test Validar', 'UTC-03', 100, @e OUTPUT;   --> ISO con espacio al inicio
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZ ', 'Test Validar', 'UTC-03', 100, @e OUTPUT;   --> ISO con espacio al final 
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZI', 'Test Validar', 'UTC-03', 100, @e OUTPUT;   --> ISO duplicado 
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'zzi', 'Test Validar', 'UTC-03', 100, @e OUTPUT;   --> ISO duplicado con otra capitalizacion 
--- SET @e = ''; EXEC torneo.pais_validar @m, 'ZZN', 'Test Modificar', 'UTC-03', 100, @e OUTPUT;   --> ISO duplicado
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', NULL, 'UTC-03', 100, @e OUTPUT;   --> Nombre nulo
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', '', 'UTC-03', 100, @e OUTPUT;   --> Nombre vacio
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', '   ', 'UTC-03', 100, @e OUTPUT;   --> Nombre solo espacios
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', 'Test Validar', NULL, 100, @e OUTPUT;   --> Huso nulo
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', 'Test Validar', '', 100, @e OUTPUT;   --> Huso vacio
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', 'Test Validar', 'UTC-3', 100, @e OUTPUT;   --> Huso con 1 digito (longitud 5)
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', 'Test Validar', 'UTC-003', 100, @e OUTPUT;   --> Huso con 3 digitos (longitud 7)
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', 'Test Validar', 'GMT-03', 100, @e OUTPUT;   --> Huso con prefijo incorrecto
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', 'Test Validar', 'UTC 03', 100, @e OUTPUT;   --> Huso sin signo (espacio en su lugar)
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', 'Test Validar', 'UTC-0A', 100, @e OUTPUT;   --> Huso con letra en los digitos
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', 'Test Validar', 'UTC-03 ', 100, @e OUTPUT;   --> Huso con espacio final (formato)
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', 'Test Validar', 'UTC+15', 100, @e OUTPUT;   --> Huso fuera de rango (mayor a +14)
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', 'Test Validar', 'UTC-13', 100, @e OUTPUT;   --> Huso fuera de rango (menor a -12)
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', 'Test Validar', 'UTC+99', 100, @e OUTPUT;   --> Huso fuera de rango (+99)
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', 'Test Validar', 'UTC-03', -0.01, @e OUTPUT;   --> PBI negativo
--- SET @e = ''; EXEC torneo.pais_validar 999999, 'AB', '', 'UTC3', -1, @e OUTPUT;   --> 5 errores: pais inexistente, ISO, nombre, huso y PBI
--- SET @e = ''; EXEC torneo.pais_validar NULL, 'AB', '', 'UTC3', -1, @e OUTPUT;   --> 4 errores: ISO, nombre, huso y PBI
--- SET @e = ''; EXEC torneo.pais_validar NULL, NULL, NULL, NULL, NULL, @e OUTPUT;   --> 3 errores: ISO, nombre y huso 
+
+-- E-3.2.01 Valido => se acepta
+SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', 'Test Validar', 'UTC-03', 100, @e OUTPUT; EXEC #registrar 'E-3.2.01', 'torneo.pais_validar: Valido', 0, @e;
+-- E-3.2.02 Valido => se acepta
+SET @e = ''; EXEC torneo.pais_validar @m, 'ZZM', 'Test Modificar', 'UTC-03', 100, @e OUTPUT; EXEC #registrar 'E-3.2.02', 'torneo.pais_validar: Valido', 0, @e;
+-- E-3.2.03 Valido: PBI nulo => se acepta
+SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', 'Test Validar', 'UTC-03', NULL, @e OUTPUT; EXEC #registrar 'E-3.2.03', 'torneo.pais_validar: Valido: PBI nulo', 0, @e;
+-- E-3.2.04 Valido: PBI 0 => se acepta
+SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', 'Test Validar', 'UTC-03', 0, @e OUTPUT; EXEC #registrar 'E-3.2.04', 'torneo.pais_validar: Valido: PBI 0', 0, @e;
+-- E-3.2.05 Valido: ISO en minusculas => se acepta
+SET @e = ''; EXEC torneo.pais_validar NULL, 'zzv', 'Test Validar', 'UTC-03', 100, @e OUTPUT; EXEC #registrar 'E-3.2.05', 'torneo.pais_validar: Valido: ISO en minusculas', 0, @e;
+-- E-3.2.06 Valido: nombre de 80 caracteres y huso UTC+14 (bordes) => se acepta
+SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', @n80, 'UTC+14', 100, @e OUTPUT; EXEC #registrar 'E-3.2.06', 'torneo.pais_validar: Valido: nombre de 80 caracteres y huso UTC+14 (bordes)', 0, @e;
+-- E-3.2.07 Valido: huso UTC-12 (borde) => se acepta
+SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', 'Test Validar', 'UTC-12', 100, @e OUTPUT; EXEC #registrar 'E-3.2.07', 'torneo.pais_validar: Valido: huso UTC-12 (borde)', 0, @e;
+-- E-3.2.08 Valido: huso UTC+00 => se acepta
+SET @e = ''; EXEC torneo.pais_validar NULL, 'ZZV', 'Test Validar', 'UTC+00', 100, @e OUTPUT; EXEC #registrar 'E-3.2.08', 'torneo.pais_validar: Valido: huso UTC+00', 0, @e;
 GO
 
--- Verificacion torneo.pais_insertar
+PRINT '--- E-3.2.09 a E-3.2.13 torneo.pais_insertar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @id INT, @n80 VARCHAR(80) = REPLICATE('N', 80);
-EXEC torneo.pais_insertar 'ZZA', 'Test Alta', 'UTC-03', 1500.75, @id OUTPUT; SELECT @id AS pais_id_generado; --> Valido: devuelve el id generado
--- EXEC torneo.pais_insertar 'ZZD', 'Test PBI Cero', 'UTC-03', 0, @id OUTPUT; --> Valido: PBI 0
--- EXEC torneo.pais_insertar 'ZZG', '  Test Espacios  ', 'UTC-03', 10, @id OUTPUT; --> Valido: el nombre se guarda recortado
--- EXEC torneo.pais_insertar 'ZZH', 'Test Huso Max', 'UTC+14', 10, @id OUTPUT; --> Valido: huso UTC+14 (borde superior)
--- EXEC torneo.pais_insertar 'ZZJ', @n80, 'UTC-03', 10, @id OUTPUT; --> Valido: nombre de 80 caracteres (borde)
--- EXEC torneo.pais_insertar NULL, 'Test', 'UTC-03', 10, @id OUTPUT; --> ISO nulo
--- EXEC torneo.pais_insertar '', 'Test', 'UTC-03', 10, @id OUTPUT; --> ISO vacio
--- EXEC torneo.pais_insertar 'ZZ', 'Test', 'UTC-03', 10, @id OUTPUT; --> ISO de 2 letras
--- EXEC torneo.pais_insertar 'ZZZZ', 'Test', 'UTC-03', 10, @id OUTPUT; --> ISO de 4 letras
--- EXEC torneo.pais_insertar 'ZZ1', 'Test', 'UTC-03', 10, @id OUTPUT; --> ISO con numero
--- EXEC torneo.pais_insertar 'ZZ-', 'Test', 'UTC-03', 10, @id OUTPUT; --> ISO con simbolo
--- EXEC torneo.pais_insertar ' ZZ', 'Test', 'UTC-03', 10, @id OUTPUT; --> ISO con espacio al inicio
--- EXEC torneo.pais_insertar 'ZZ ', 'Test', 'UTC-03', 10, @id OUTPUT; --> ISO con espacio al final
--- EXEC torneo.pais_insertar 'ZZI', 'Test', 'UTC-03', 10, @id OUTPUT; --> ISO duplicado 
--- EXEC torneo.pais_insertar 'zzi', 'Test', 'UTC-03', 10, @id OUTPUT; --> ISO duplicado con otra capitalizacion
--- EXEC torneo.pais_insertar 'ZZW', NULL, 'UTC-03', 10, @id OUTPUT; --> Nombre nulo
--- EXEC torneo.pais_insertar 'ZZW', '', 'UTC-03', 10, @id OUTPUT; --> Nombre vacio
--- EXEC torneo.pais_insertar 'ZZW', '   ', 'UTC-03', 10, @id OUTPUT; --> Nombre solo espacios
--- EXEC torneo.pais_insertar 'ZZW', 'Test', NULL, 10, @id OUTPUT; --> Huso nulo
--- EXEC torneo.pais_insertar 'ZZW', 'Test', '', 10, @id OUTPUT; --> Huso vacio
--- EXEC torneo.pais_insertar 'ZZW', 'Test', 'UTC-3', 10, @id OUTPUT; --> Huso con 1 digito
--- EXEC torneo.pais_insertar 'ZZW', 'Test', 'GMT-03', 10, @id OUTPUT; --> Huso con prefijo incorrecto
--- EXEC torneo.pais_insertar 'ZZW', 'Test', 'UTC 03', 10, @id OUTPUT; --> Huso sin signo
--- EXEC torneo.pais_insertar 'ZZW', 'Test', 'UTC-0A', 10, @id OUTPUT; --> Huso con letra
--- EXEC torneo.pais_insertar 'ZZW', 'Test', 'UTC+15', 10, @id OUTPUT; --> Huso fuera de rango (mayor a +14)
--- EXEC torneo.pais_insertar 'ZZW', 'Test', 'UTC-13', 10, @id OUTPUT; --> Huso fuera de rango (menor a -12)
--- EXEC torneo.pais_insertar 'ZZW', 'Test', 'UTC-03', -0.01, @id OUTPUT; --> PBI negativo
--- EXEC torneo.pais_insertar 'ZZ', '', 'UTC-03', 10, @id OUTPUT; --> 2 errores: ISO y nombre
--- EXEC torneo.pais_insertar NULL, NULL, NULL, NULL, @id OUTPUT; --> 3 errores: ISO, nombre y huso 
--- EXEC torneo.pais_insertar 'AB', '', 'UTC3', -1, @id OUTPUT; --> 4 errores: ISO, nombre, huso y PBI
+
+-- E-3.2.09 Valido: devuelve el id generado => se acepta
+BEGIN TRY EXEC torneo.pais_insertar 'ZZA', 'Test Alta', 'UTC-03', 1500.75, @id OUTPUT; SELECT @id AS pais_id_generado; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.2.09', 'torneo.pais_insertar: Valido: devuelve el id generado', 0;
+-- E-3.2.10 Valido: PBI 0 => se acepta
+BEGIN TRY EXEC torneo.pais_insertar 'ZZD', 'Test PBI Cero', 'UTC-03', 0, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.2.10', 'torneo.pais_insertar: Valido: PBI 0', 0;
+-- E-3.2.11 Valido: el nombre se guarda recortado => se acepta
+BEGIN TRY EXEC torneo.pais_insertar 'ZZG', '  Test Espacios  ', 'UTC-03', 10, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.2.11', 'torneo.pais_insertar: Valido: el nombre se guarda recortado', 0;
+-- E-3.2.12 Valido: huso UTC+14 (borde superior) => se acepta
+BEGIN TRY EXEC torneo.pais_insertar 'ZZH', 'Test Huso Max', 'UTC+14', 10, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.2.12', 'torneo.pais_insertar: Valido: huso UTC+14 (borde superior)', 0;
+-- E-3.2.13 Valido: nombre de 80 caracteres (borde) => se acepta
+BEGIN TRY EXEC torneo.pais_insertar 'ZZJ', @n80, 'UTC-03', 10, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.2.13', 'torneo.pais_insertar: Valido: nombre de 80 caracteres (borde)', 0;
 GO
 
--- Verificacion torneo.pais_modificar
+PRINT '--- E-3.2.14 a E-3.2.18 torneo.pais_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @m INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso IN ('ZZM', 'ZZX')),
         @n80 VARCHAR(80) = REPLICATE('N', 80);
 
-EXEC torneo.pais_modificar @m, 'ZZM', 'Test Modificado', 'UTC-04', 2500; --> Valido
--- EXEC torneo.pais_modificar @m, 'ZZM', @n80, 'UTC-03', 2000; --> Valido: nombre de 80 caracteres (borde)
--- EXEC torneo.pais_modificar @m, 'ZZM', 'Test Modificar', 'UTC+14', 0; --> Valido: huso UTC+14 y PBI 0 (bordes)
--- EXEC torneo.pais_modificar @m, 'ZZM', 'Test Modificar', 'UTC-03'; --> Valido: sin PBI, lo deja en NULL
--- EXEC torneo.pais_modificar @m, 'ZZM', 'Test Modificar', 'UTC-03', 2000; --> Restaurar: deja ZZM como estaba 
--- EXEC torneo.pais_modificar 999999, 'ZZY', 'Test', 'UTC-03', 10; --> Pais inexistente 
--- EXEC torneo.pais_modificar NULL, 'ZZY', 'Test', 'UTC-03', 10; --> Id nulo 
--- EXEC torneo.pais_modificar NULL, 'ZZM', 'Test', 'UTC-03', 10; --> 2 errores: id obligatorio y ISO duplicado 
--- EXEC torneo.pais_modificar @m, NULL, 'Test', 'UTC-03', 10; --> ISO nulo
--- EXEC torneo.pais_modificar @m, '', 'Test', 'UTC-03', 10; --> ISO vacio
--- EXEC torneo.pais_modificar @m, 'ZZ', 'Test', 'UTC-03', 10; --> ISO de 2 letras
--- EXEC torneo.pais_modificar @m, 'ZZZZ', 'Test', 'UTC-03', 10; --> ISO de 4 letras
--- EXEC torneo.pais_modificar @m, 'ZZ1', 'Test', 'UTC-03', 10; --> ISO con numero
--- EXEC torneo.pais_modificar @m, 'ZZ ', 'Test', 'UTC-03', 10; --> ISO con espacio al final
--- EXEC torneo.pais_modificar @m, 'ZZN', 'Test', 'UTC-03', 10; --> ISO duplicado 
--- EXEC torneo.pais_modificar @m, 'zzn', 'Test', 'UTC-03', 10; --> ISO duplicado con otra capitalizacion
--- EXEC torneo.pais_modificar @m, 'ZZM', NULL, 'UTC-03', 10; --> Nombre nulo
--- EXEC torneo.pais_modificar @m, 'ZZM', '', 'UTC-03', 10; --> Nombre vacio
--- EXEC torneo.pais_modificar @m, 'ZZM', '   ', 'UTC-03', 10; --> Nombre solo espacios
--- EXEC torneo.pais_modificar @m, 'ZZM', 'Test', NULL, 10; --> Huso nulo
--- EXEC torneo.pais_modificar @m, 'ZZM', 'Test', '', 10; --> Huso vacio
--- EXEC torneo.pais_modificar @m, 'ZZM', 'Test', 'UTC-3', 10; --> Huso con 1 digito
--- EXEC torneo.pais_modificar @m, 'ZZM', 'Test', 'GMT-03', 10; --> Huso con prefijo incorrecto
--- EXEC torneo.pais_modificar @m, 'ZZM', 'Test', 'UTC-0A', 10; --> Huso con letra
--- EXEC torneo.pais_modificar @m, 'ZZM', 'Test', 'UTC+15', 10; --> Huso fuera de rango (mayor a +14)
--- EXEC torneo.pais_modificar @m, 'ZZM', 'Test', 'UTC-13', 10; --> Huso fuera de rango (menor a -12)
--- EXEC torneo.pais_modificar @m, 'ZZM', 'Test', 'UTC-03', -0.01; --> PBI negativo
--- EXEC torneo.pais_modificar @m, 'ZZN', 'Test', 'UTC+15', 10; --> 2 errores: ISO duplicado y huso fuera de rango
--- EXEC torneo.pais_modificar 999999, 'ZZY', '', 'UTC-03', -1; --> 3 errores: pais inexistente, nombre y PBI
--- EXEC torneo.pais_modificar @m, 'ZZN', '', 'UTC+15', -1; --> 4 errores: ISO duplicado, nombre, huso fuera de rango y PBI
--- EXEC torneo.pais_modificar 999999, 'AB', '', 'UTC3', -1; --> 5 errores: pais inexistente, ISO, nombre, huso y PBI
+-- E-3.2.14 Valido => se acepta
+BEGIN TRY EXEC torneo.pais_modificar @m, 'ZZM', 'Test Modificado', 'UTC-04', 2500; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.2.14', 'torneo.pais_modificar: Valido', 0;
+-- E-3.2.15 Valido: nombre de 80 caracteres (borde) => se acepta
+BEGIN TRY EXEC torneo.pais_modificar @m, 'ZZM', @n80, 'UTC-03', 2000; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.2.15', 'torneo.pais_modificar: Valido: nombre de 80 caracteres (borde)', 0;
+-- E-3.2.16 Valido: huso UTC+14 y PBI 0 (bordes) => se acepta
+BEGIN TRY EXEC torneo.pais_modificar @m, 'ZZM', 'Test Modificar', 'UTC+14', 0; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.2.16', 'torneo.pais_modificar: Valido: huso UTC+14 y PBI 0 (bordes)', 0;
+-- E-3.2.17 Valido: sin PBI, lo deja en NULL => se acepta
+BEGIN TRY EXEC torneo.pais_modificar @m, 'ZZM', 'Test Modificar', 'UTC-03'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.2.17', 'torneo.pais_modificar: Valido: sin PBI, lo deja en NULL', 0;
+-- E-3.2.18 Restaurar: deja ZZM como estaba => se acepta
+BEGIN TRY EXEC torneo.pais_modificar @m, 'ZZM', 'Test Modificar', 'UTC-03', 2000; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.2.18', 'torneo.pais_modificar: Restaurar: deja ZZM como estaba', 0;
+GO
 
--- Verificacion torneo.pais_eliminar
+PRINT '--- E-3.2.19 torneo.pais_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @e INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ZZE'),
         @s INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ZZS'),
         @l INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ZZL'),
@@ -1139,102 +2338,70 @@ DECLARE @e INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ZZE'),
         @p INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ZZP'),
         @t INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ZZT');
 
-EXEC torneo.pais_eliminar @e; --> Baja valida 
--- EXEC torneo.pais_eliminar 999999; --> Pais inexistente
--- EXEC torneo.pais_eliminar NULL; --> Id nulo (el mensaje dice (nulo))
--- EXEC torneo.pais_eliminar @s; --> Tiene sedes asociadas
--- EXEC torneo.pais_eliminar @l; --> Tiene una seleccion participante
--- EXEC torneo.pais_eliminar @r; --> Tiene arbitros registrados
--- EXEC torneo.pais_eliminar @c; --> Es pais de interes de campañas publicitarias
--- EXEC torneo.pais_eliminar @p; --> 2 errores: pais de interes y mercado de piezas
--- EXEC torneo.pais_eliminar @t; --> 5 errores: sedes, seleccion, arbitros, interes de campañas y mercado de piezas
+-- E-3.2.19 Baja valida => se acepta
+BEGIN TRY EXEC torneo.pais_eliminar @e; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.2.19', 'torneo.pais_eliminar: Baja valida', 0;
+GO
 
-
--- Verificacion torneo.confederacion_insertar
-DECLARE @id INT;
-
--- EXEC torneo.confederacion_insertar 'OFC', @id OUTPUT; SELECT @id AS confederacion_id_generado; --> Valido: devuelve el id generado
--- EXEC torneo.confederacion_insertar 'CAF', @id OUTPUT; --> Valido: otra confederacion libre
--- EXEC torneo.confederacion_insertar 'CONCACAF', @id OUTPUT; --> Valido: la mas larga de la lista 
--- EXEC torneo.confederacion_insertar NULL, @id OUTPUT; --> Nombre nulo
--- EXEC torneo.confederacion_insertar '', @id OUTPUT; --> Nombre vacio
--- EXEC torneo.confederacion_insertar '   ', @id OUTPUT; --> Nombre solo espacios
--- EXEC torneo.confederacion_insertar 'XYZ', @id OUTPUT; --> Nombre fuera de la lista
--- EXEC torneo.confederacion_insertar 'FIFA', @id OUTPUT; --> Nombre fuera de la lista (FIFA no es confederacion)
--- EXEC torneo.confederacion_insertar 'UEF', @id OUTPUT; --> Nombre incompleto
--- EXEC torneo.confederacion_insertar 'UEFAA', @id OUTPUT; --> Nombre con letra de mas
--- EXEC torneo.confederacion_insertar ' OFC', @id OUTPUT; --> Espacio al inicio: no coincide con la lista
--- EXEC torneo.confederacion_insertar 'AFC', @id OUTPUT; --> Duplicada 
--- EXEC torneo.confederacion_insertar 'CONMEBOL', @id OUTPUT; --> Duplicada (CONMEBOL ya esta registrada)
--- EXEC torneo.confederacion_insertar 'afc', @id OUTPUT; --> Duplicada con otra capitalizacion 
--- EXEC torneo.confederacion_insertar 'AFC ', @id OUTPUT; --> Duplicada con espacio al final 
-
--- Verificacion torneo.confederacion_modificar
+PRINT '--- E-3.2.20 a E-3.2.21 torneo.confederacion_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @u INT = (SELECT confederacion_id FROM torneo.confederacion WHERE nombre IN ('UEFA', 'OFC'));
 
-EXEC torneo.confederacion_modificar @u, 'OFC'; --> Valido: UEFA pasa a OFC
--- EXEC torneo.confederacion_modificar @u, 'UEFA'; --> Restaurar: deja la base como estaba 
--- EXEC torneo.confederacion_modificar 999999, 'OFC'; --> Confederacion inexistente
--- EXEC torneo.confederacion_modificar NULL, 'OFC'; --> Id nulo (el mensaje dice "(nulo)")
--- EXEC torneo.confederacion_modificar @u, NULL; --> Nombre nulo
--- EXEC torneo.confederacion_modificar @u, ''; --> Nombre vacio
--- EXEC torneo.confederacion_modificar @u, 'XYZ'; --> Nombre fuera de la lista
--- EXEC torneo.confederacion_modificar @u, ' UEFA'; --> Espacio al inicio: no coincide con la lista
--- EXEC torneo.confederacion_modificar @u, 'AFC'; --> Duplicada: AFC pertenece a otra confederacion
--- EXEC torneo.confederacion_modificar @u, 'CONMEBOL'; --> Duplicada: CONMEBOL pertenece a otra confederacion
--- EXEC torneo.confederacion_modificar @u, 'afc'; --> Duplicada con otra capitalizacion
--- EXEC torneo.confederacion_modificar 999999, 'AFC'; --> 2 errores: confederacion inexistente y nombre duplicado (AFC es de otro id)
+-- E-3.2.20 Valido: UEFA pasa a OFC => se acepta
+BEGIN TRY EXEC torneo.confederacion_modificar @u, 'OFC'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.2.20', 'torneo.confederacion_modificar: Valido: UEFA pasa a OFC', 0;
+-- E-3.2.21 Restaurar: deja la base como estaba => se acepta
+BEGIN TRY EXEC torneo.confederacion_modificar @u, 'UEFA'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.2.21', 'torneo.confederacion_modificar: Restaurar: deja la base como estaba', 0;
 GO
 
--- Verificacion torneo.confederacion_eliminar
-DECLARE @a INT = (SELECT confederacion_id FROM torneo.confederacion WHERE nombre = 'AFC'),
+PRINT '--- E-3.2.22 a E-3.2.23 torneo.confederacion_insertar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
+DECLARE @id INT;
+
+-- E-3.2.22 Valido: devuelve el id generado => se acepta
+BEGIN TRY EXEC torneo.confederacion_insertar 'OFC', @id OUTPUT; SELECT @id AS confederacion_id_generado; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.2.22', 'torneo.confederacion_insertar: Valido: devuelve el id generado', 0;
+-- E-3.2.23 Valido: otra confederacion libre => se acepta
+BEGIN TRY EXEC torneo.confederacion_insertar 'CAF', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.2.23', 'torneo.confederacion_insertar: Valido: otra confederacion libre', 0;
+GO
+
+PRINT '--- E-3.2.24 torneo.confederacion_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
+DECLARE @a INT = (SELECT confederacion_id FROM torneo.confederacion WHERE nombre = 'CAF'),
         @c INT = (SELECT confederacion_id FROM torneo.confederacion WHERE nombre = 'CONMEBOL');
 
-EXEC torneo.confederacion_eliminar @a; --> Baja valida (sin selecciones)
--- EXEC torneo.confederacion_eliminar 999999; --> Confederacion inexistente
--- EXEC torneo.confederacion_eliminar NULL; --> Id nulo (el mensaje dice "(nulo)")
--- EXEC torneo.confederacion_eliminar @c; --> Tiene selecciones afiliadas
+-- E-3.2.24 Baja valida (sin selecciones) => se acepta
+BEGIN TRY EXEC torneo.confederacion_eliminar @a; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.2.24', 'torneo.confederacion_eliminar: Baja valida (sin selecciones)', 0;
 GO
 
 -- ============================================================
--- 1.3 torneo.sede
+-- 3.3 torneo.sede
 -- ============================================================
--- Verificacion torneo.sede_insertar
+
+PRINT '--- E-3.3.01 a E-3.3.03 torneo.sede_insertar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @id INT,
         @pa INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ZSA'),
         @pb INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ZSB'),
         @n80 VARCHAR(80) = 'Test Sede ' + REPLICATE('N', 70);
 
-EXEC torneo.sede_insertar 'Test Sede Alta', 'Ciudad Otra', @pa, 60000, 'UTC-03', @id OUTPUT; --> Valido: mismo nombre en otra ciudad
--- EXEC torneo.sede_insertar 'Test Sede Otro', 'Ciudad Alta', @pb, 60000, 'UTC-05', @id OUTPUT; --> Valido: misma ciudad con otro nombre, otro pais
--- EXEC torneo.sede_insertar 'Test Sede Max', 'Ciudad Max', @pa, 2147483647, 'UTC-03', @id OUTPUT; --> Valido: capacidad maxima INT (borde)
--- EXEC torneo.sede_insertar NULL, 'Ciudad X', @pa, 10, 'UTC-03', @id OUTPUT; --> Nombre nulo
--- EXEC torneo.sede_insertar '', 'Ciudad X', @pa, 10, 'UTC-03', @id OUTPUT; --> Nombre vacio
--- EXEC torneo.sede_insertar '   ', 'Ciudad X', @pa, 10, 'UTC-03', @id OUTPUT; --> Nombre solo espacios
--- EXEC torneo.sede_insertar 'Test Sede X', NULL, @pa, 10, 'UTC-03', @id OUTPUT; --> Ciudad nula
--- EXEC torneo.sede_insertar 'Test Sede X', '', @pa, 10, 'UTC-03', @id OUTPUT; --> Ciudad vacia
--- EXEC torneo.sede_insertar 'Test Sede X', '   ', @pa, 10, 'UTC-03', @id OUTPUT; --> Ciudad solo espacios
--- EXEC torneo.sede_insertar 'Test Sede X', 'Ciudad X', 999999, 10, 'UTC-03', @id OUTPUT; --> Pais inexistente
--- EXEC torneo.sede_insertar 'Test Sede X', 'Ciudad X', NULL, 10, 'UTC-03', @id OUTPUT; --> Pais nulo
--- EXEC torneo.sede_insertar 'Test Sede X', 'Ciudad X', @pa, NULL, 'UTC-03', @id OUTPUT; --> Capacidad nula
--- EXEC torneo.sede_insertar 'Test Sede X', 'Ciudad X', @pa, 0, 'UTC-03', @id OUTPUT; --> Capacidad 0
--- EXEC torneo.sede_insertar 'Test Sede X', 'Ciudad X', @pa, -1, 'UTC-03', @id OUTPUT; --> Capacidad negativa
--- EXEC torneo.sede_insertar 'Test Sede X', 'Ciudad X', @pa, 10, NULL, @id OUTPUT; --> Huso nulo
--- EXEC torneo.sede_insertar 'Test Sede X', 'Ciudad X', @pa, 10, '', @id OUTPUT; --> Huso vacio
--- EXEC torneo.sede_insertar 'Test Sede X', 'Ciudad X', @pa, 10, 'UTC-3', @id OUTPUT; --> Huso con 1 digito
--- EXEC torneo.sede_insertar 'Test Sede X', 'Ciudad X', @pa, 10, 'GMT-03', @id OUTPUT; --> Huso con prefijo incorrecto
--- EXEC torneo.sede_insertar 'Test Sede X', 'Ciudad X', @pa, 10, 'UTC 03', @id OUTPUT; --> Huso sin signo
--- EXEC torneo.sede_insertar 'Test Sede X', 'Ciudad X', @pa, 10, 'UTC-0A', @id OUTPUT; --> Huso con letra
--- EXEC torneo.sede_insertar 'Test Sede X', 'Ciudad X', @pa, 10, 'UTC+15', @id OUTPUT; --> Huso fuera de rango (mayor a +14)
--- EXEC torneo.sede_insertar 'Test Sede X', 'Ciudad X', @pa, 10, 'UTC-13', @id OUTPUT; --> Huso fuera de rango (menor a -12)
--- EXEC torneo.sede_insertar 'Test Sede Base', 'Ciudad Test', @pa, 10, 'UTC-03', @id OUTPUT; --> Duplicado: mismo nombre y ciudad que la base
--- EXEC torneo.sede_insertar '', '', @pa, 10, 'UTC-03', @id OUTPUT; --> 2 errores: nombre y ciudad
--- EXEC torneo.sede_insertar 'Test Sede X', 'Ciudad X', 999999, 0, 'UTC-03', @id OUTPUT; --> 2 errores: pais inexistente y capacidad
--- EXEC torneo.sede_insertar 'Test Sede Base', 'Ciudad Test', 999999, -1, 'UTC3', @id OUTPUT; --> 4 errores: pais, capacidad, huso (formato) y duplicado
--- EXEC torneo.sede_insertar NULL, NULL, NULL, NULL, NULL, @id OUTPUT; --> 5 errores (maximo): nombre, ciudad, pais, capacidad y huso
-GO;
+-- E-3.3.01 Valido: mismo nombre en otra ciudad => se acepta
+BEGIN TRY EXEC torneo.sede_insertar 'Test Sede Alta', 'Ciudad Otra', @pa, 60000, 'UTC-03', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.3.01', 'torneo.sede_insertar: Valido: mismo nombre en otra ciudad', 0;
+-- E-3.3.02 Valido: misma ciudad con otro nombre, otro pais => se acepta
+BEGIN TRY EXEC torneo.sede_insertar 'Test Sede Otro', 'Ciudad Alta', @pb, 60000, 'UTC-05', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.3.02', 'torneo.sede_insertar: Valido: misma ciudad con otro nombre, otro pais', 0;
+-- E-3.3.03 Valido: capacidad maxima INT (borde) => se acepta
+BEGIN TRY EXEC torneo.sede_insertar 'Test Sede Max', 'Ciudad Max', @pa, 2147483647, 'UTC-03', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.3.03', 'torneo.sede_insertar: Valido: capacidad maxima INT (borde)', 0;
+GO
 
--- Verificacion torneo.sede_modificar
+PRINT '--- E-3.3.04 a E-3.3.05 torneo.sede_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @m INT = (SELECT sede_id FROM torneo.sede WHERE nombre IN ('Test Sede Mod', 'Test Sede Mod Nuevo') AND ciudad LIKE 'Ciudad Mod%'),
         @p INT = (SELECT sede_id FROM torneo.sede WHERE nombre = 'Test Sede Partido' AND ciudad = 'Ciudad Partido'),
         @pa INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ZSA'),
@@ -1242,56 +2409,32 @@ DECLARE @m INT = (SELECT sede_id FROM torneo.sede WHERE nombre IN ('Test Sede Mo
         @pc INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ZSC'),
         @n80 VARCHAR(80) = 'Test Sede ' + REPLICATE('N', 70);
 
-EXEC torneo.sede_modificar @m, 'Test Sede Mod Nuevo', 'Ciudad Mod Nueva', @pb, 45000, 'UTC-05'; --> Valido
--- EXEC torneo.sede_modificar @m, '  Test Sede Mod  ', '  Ciudad Mod  ', @pa, 40000, 'UTC-03'; --> Valido: se guarda recortado
--- EXEC torneo.sede_modificar 999999, 'Test Sede Nueva', 'Ciudad Nueva', @pa, 10, 'UTC-03'; --> Sede inexistente
--- EXEC torneo.sede_modificar NULL, 'Test Sede Nueva', 'Ciudad Nueva', @pa, 10, 'UTC-03'; --> Id nulo 
--- EXEC torneo.sede_modificar @m, NULL, 'Ciudad Mod', @pa, 40000, 'UTC-03'; --> Nombre nulo
--- EXEC torneo.sede_modificar @m, '', 'Ciudad Mod', @pa, 40000, 'UTC-03'; --> Nombre vacio
--- EXEC torneo.sede_modificar @m, '   ', 'Ciudad Mod', @pa, 40000, 'UTC-03'; --> Nombre solo espacios
--- EXEC torneo.sede_modificar @m, 'Test Sede Mod', NULL, @pa, 40000, 'UTC-03'; --> Ciudad nula
--- EXEC torneo.sede_modificar @m, 'Test Sede Mod', '', @pa, 40000, 'UTC-03'; --> Ciudad vacia
--- EXEC torneo.sede_modificar @m, 'Test Sede Mod', '   ', @pa, 40000, 'UTC-03'; --> Ciudad solo espacios
--- EXEC torneo.sede_modificar @m, 'Test Sede Mod', 'Ciudad Mod', 999999, 40000, 'UTC-03'; --> Pais inexistente
--- EXEC torneo.sede_modificar @m, 'Test Sede Mod', 'Ciudad Mod', NULL, 40000, 'UTC-03'; --> Pais nulo
--- EXEC torneo.sede_modificar @m, 'Test Sede Mod', 'Ciudad Mod', @pa, NULL, 'UTC-03'; --> Capacidad nula
--- EXEC torneo.sede_modificar @m, 'Test Sede Mod', 'Ciudad Mod', @pa, 0, 'UTC-03'; --> Capacidad 0
--- EXEC torneo.sede_modificar @m, 'Test Sede Mod', 'Ciudad Mod', @pa, -1, 'UTC-03'; --> Capacidad negativa
--- EXEC torneo.sede_modificar @m, 'Test Sede Mod', 'Ciudad Mod', @pa, 40000, NULL; --> Huso nulo
--- EXEC torneo.sede_modificar @m, 'Test Sede Mod', 'Ciudad Mod', @pa, 40000, ''; --> Huso vacio
--- EXEC torneo.sede_modificar @m, 'Test Sede Mod', 'Ciudad Mod', @pa, 40000, 'UTC-3'; --> Huso con 1 digito
--- EXEC torneo.sede_modificar @m, 'Test Sede Mod', 'Ciudad Mod', @pa, 40000, 'GMT-03'; --> Huso con prefijo incorrecto
--- EXEC torneo.sede_modificar @m, 'Test Sede Mod', 'Ciudad Mod', @pa, 40000, 'UTC-0A'; --> Huso con letra
--- EXEC torneo.sede_modificar @m, 'Test Sede Mod', 'Ciudad Mod', @pa, 40000, 'UTC+15'; --> Huso fuera de rango (mayor a +14)
--- EXEC torneo.sede_modificar @m, 'Test Sede Mod', 'Ciudad Mod', @pa, 40000, 'UTC-13'; --> Huso fuera de rango (menor a -12)
--- EXEC torneo.sede_modificar @m, 'Test Sede Otra', 'Ciudad Mod', @pa, 40000, 'UTC-03'; --> Duplicado: nombre y ciudad de otra sede
--- EXEC torneo.sede_modificar @m, 'TEST SEDE OTRA', 'CIUDAD MOD', @pa, 40000, 'UTC-03'; --> Duplicado con otra capitalizacion 
--- EXEC torneo.sede_modificar @m, 'Test Sede Otra  ', 'Ciudad Mod  ', @pa, 40000, 'UTC-03'; --> Duplicado con espacios al final
--- EXEC torneo.sede_modificar @p, 'Test Sede Partido', 'Ciudad Partido', @pa, 40000, 'UTC-04'; --> Con partidos: no se puede cambiar el huso
--- EXEC torneo.sede_modificar @p, 'Test Sede Partido', 'Ciudad Partido', @pa, 39999, 'UTC-03'; --> Capacidad menor a la asistencia registrada
--- EXEC torneo.sede_modificar @p, 'Test Sede Partido', 'Ciudad Partido', @pa, NULL, 'UTC-03'; --> 1 error: capacidad nula (el control contra la asistencia no se dispara con NULL)
--- EXEC torneo.sede_modificar 999999, 'Test Sede Otra', 'Ciudad Mod', @pa, 10, 'UTC-03'; --> 2 errores: sede inexistente y duplicado
--- EXEC torneo.sede_modificar @m, 'Test Sede Otra', 'Ciudad Mod', @pa, 0, 'UTC+15'; --> 3 errores: duplicado, capacidad y huso fuera de rango
--- EXEC torneo.sede_modificar NULL, NULL, NULL, NULL, NULL, NULL; --> 6 errores: id obligatorio, nombre, ciudad, pais, capacidad y huso
--- EXEC torneo.sede_modificar @m, '', '', 999999, -1, 'UTC3'; --> 5 errores: nombre, ciudad, pais, capacidad y huso (formato); sin partidos no hay controles extra
--- EXEC torneo.sede_modificar @p, '', '', 999999, -1, 'UTC3'; --> 7 errores (maximo): nombre, ciudad, pais, capacidad, huso (formato), cambio de huso con partidos y capacidad menor a la asistencia
-GO;
--- Verificacion torneo.sede_eliminar
+-- E-3.3.04 Valido => se acepta
+BEGIN TRY EXEC torneo.sede_modificar @m, 'Test Sede Mod Nuevo', 'Ciudad Mod Nueva', @pb, 45000, 'UTC-05'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.3.04', 'torneo.sede_modificar: Valido', 0;
+-- E-3.3.05 Valido: se guarda recortado => se acepta
+BEGIN TRY EXEC torneo.sede_modificar @m, '  Test Sede Mod  ', '  Ciudad Mod  ', @pa, 40000, 'UTC-03'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.3.05', 'torneo.sede_modificar: Valido: se guarda recortado', 0;
+GO
+
+PRINT '--- E-3.3.06 torneo.sede_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @e INT = (SELECT sede_id FROM torneo.sede WHERE nombre = 'Test Sede Elim' AND ciudad = 'Ciudad Elim'),
         @p INT = (SELECT sede_id FROM torneo.sede WHERE nombre = 'Test Sede Partido' AND ciudad = 'Ciudad Partido'),
         @pa INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ZSA');
 
-EXEC torneo.sede_eliminar @e; --> Baja valida (sin partidos)
--- EXEC torneo.sede_eliminar 999999; --> Sede inexistente
--- EXEC torneo.sede_eliminar NULL; --> Id nulo (el mensaje dice "(nulo)")
--- EXEC torneo.sede_eliminar @p; --> Tiene partidos asociados
+-- E-3.3.06 Baja valida (sin partidos) => se acepta
+BEGIN TRY EXEC torneo.sede_eliminar @e; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.3.06', 'torneo.sede_eliminar: Baja valida (sin partidos)', 0;
 GO
 
+-- ============================================================
+-- 3.4 torneo.seleccion
+-- ============================================================
 
--- ============================================================
--- 1.4 torneo.seleccion
--- ============================================================
--- Verificacion torneo.seleccion_insertar
+PRINT '--- E-3.4.01 a E-3.4.04 torneo.seleccion_insertar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @id INT,
         @c1 INT = (SELECT TOP 1 confederacion_id FROM torneo.confederacion ORDER BY confederacion_id),
         @pa INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ZQA'),
@@ -1302,31 +2445,20 @@ DECLARE @id INT,
         @pl INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ZQL');
 DECLARE @c2 INT = ISNULL((SELECT TOP 1 confederacion_id FROM torneo.confederacion WHERE confederacion_id > @c1 ORDER BY confederacion_id), @c1);
 
--- EXEC torneo.seleccion_insertar @pb, @c1, 'A', @id OUTPUT; --> Valido: grupo borde A (cada alta valida usa un pais distinto: ZQB, ZQC, ZQD, ZQE)
--- EXEC torneo.seleccion_insertar @pc, @c2, 'b', @id OUTPUT; --> Valido: grupo en minuscula (se guarda 'B')
--- EXEC torneo.seleccion_insertar @pd, @c1, 'L', @id OUTPUT; --> Valido: grupo borde L
--- EXEC torneo.seleccion_insertar @pe, @c1, 'l', @id OUTPUT; --> Valido: grupo borde L en minuscula (se guarda 'L')
--- EXEC torneo.seleccion_insertar NULL, @c1, 'A', @id OUTPUT; --> Pais nulo
--- EXEC torneo.seleccion_insertar 999999, @c1, 'A', @id OUTPUT; --> Pais inexistente
--- EXEC torneo.seleccion_insertar @pa, @c1, 'A', @id OUTPUT; --> Pais ya tiene seleccion
--- EXEC torneo.seleccion_insertar @pl, NULL, 'A', @id OUTPUT; --> Confederacion nula
--- EXEC torneo.seleccion_insertar @pl, 999999, 'A', @id OUTPUT; --> Confederacion inexistente
--- EXEC torneo.seleccion_insertar @pl, @c1, NULL, @id OUTPUT; --> Grupo nulo
--- EXEC torneo.seleccion_insertar @pl, @c1, '', @id OUTPUT; --> Grupo vacio
--- EXEC torneo.seleccion_insertar @pl, @c1, ' ', @id OUTPUT; --> Grupo solo espacio
--- EXEC torneo.seleccion_insertar @pl, @c1, 'M', @id OUTPUT; --> Grupo fuera de rango (despues de L)
--- EXEC torneo.seleccion_insertar @pl, @c1, 'm', @id OUTPUT; --> Grupo fuera de rango en minuscula
--- EXEC torneo.seleccion_insertar @pl, @c1, '@', @id OUTPUT; --> Grupo fuera de rango (antes de A)
--- EXEC torneo.seleccion_insertar @pl, @c1, '1', @id OUTPUT; --> Grupo numerico
--- EXEC torneo.seleccion_insertar @pl, @c1, 'AB', @id OUTPUT; --> Grupo con 2 letras
--- EXEC torneo.seleccion_insertar @pl, @c1, ' A', @id OUTPUT; --> Grupo con espacio al inicio
--- EXEC torneo.seleccion_insertar @pl, @c1, 'A ', @id OUTPUT; --> Grupo con espacio al final
--- EXEC torneo.seleccion_insertar @pa, 999999, NULL, @id OUTPUT; --> 3 errores: pais duplicado, confederacion y grupo
--- EXEC torneo.seleccion_insertar NULL, NULL, '', @id OUTPUT; --> 3 errores (maximo): pais, confederacion y grupo
--- EXEC torneo.seleccion_insertar 999999, 999999, 'Z', @id OUTPUT; --> 3 errores (maximo): pais inexistente, confederacion y grupo
+-- E-3.4.01 Valido: grupo borde A (cada alta valida usa un pais distinto: ZQB, ZQC, ZQD, ZQE) => se acepta
+BEGIN TRY EXEC torneo.seleccion_insertar @pb, @c1, 'A', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.4.01', 'torneo.seleccion_insertar: Valido: grupo borde A (cada alta valida usa un pais distinto: ZQB, ZQC, ZQD, ZQE)', 0;
+-- E-3.4.02 Valido: grupo en minuscula (se guarda 'B') => se acepta
+BEGIN TRY EXEC torneo.seleccion_insertar @pc, @c2, 'b', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.4.02', 'torneo.seleccion_insertar: Valido: grupo en minuscula (se guarda ''B'')', 0;
+-- E-3.4.03 Valido: grupo borde L => se acepta
+BEGIN TRY EXEC torneo.seleccion_insertar @pd, @c1, 'L', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.4.03', 'torneo.seleccion_insertar: Valido: grupo borde L', 0;
+-- E-3.4.04 Valido: grupo borde L en minuscula (se guarda 'L') => se acepta
+BEGIN TRY EXEC torneo.seleccion_insertar @pe, @c1, 'l', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.4.04', 'torneo.seleccion_insertar: Valido: grupo borde L en minuscula (se guarda ''L'')', 0;
 GO
 
--- Verificacion torneo.seleccion_modificar
+PRINT '--- E-3.4.05 torneo.seleccion_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @m INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso IN ('ZQM', 'ZQN')),
         @p INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZQP'),
         @c1 INT = (SELECT TOP 1 confederacion_id FROM torneo.confederacion ORDER BY confederacion_id),
@@ -1336,52 +2468,32 @@ DECLARE @m INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais
         @pp INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ZQP');
 DECLARE @c2 INT = ISNULL((SELECT TOP 1 confederacion_id FROM torneo.confederacion WHERE confederacion_id > @c1 ORDER BY confederacion_id), @c1);
 
-EXEC torneo.seleccion_modificar @m, @pn, @c2, 'H'; --> Valido: cambia pais (a uno libre), confederacion y grupo (sin partidos)
--- EXEC torneo.seleccion_modificar 999999, @pm, @c1, 'B'; --> Seleccion inexistente
--- EXEC torneo.seleccion_modificar NULL, @pm, @c1, 'B'; --> Id nulo (id obligatorio)
--- EXEC torneo.seleccion_modificar @m, NULL, @c1, 'B'; --> Pais nulo
--- EXEC torneo.seleccion_modificar @m, 999999, @c1, 'B'; --> Pais inexistente
--- EXEC torneo.seleccion_modificar @m, @po, @c1, 'B'; --> Pais ya tiene otra seleccion
--- EXEC torneo.seleccion_modificar @m, @pm, NULL, 'B'; --> Confederacion nula
--- EXEC torneo.seleccion_modificar @m, @pm, 999999, 'B'; --> Confederacion inexistente
--- EXEC torneo.seleccion_modificar @m, @pm, @c1, NULL; --> Grupo nulo
--- EXEC torneo.seleccion_modificar @m, @pm, @c1, ''; --> Grupo vacio
--- EXEC torneo.seleccion_modificar @m, @pm, @c1, ' '; --> Grupo solo espacio
--- EXEC torneo.seleccion_modificar @m, @pm, @c1, 'M'; --> Grupo fuera de rango (despues de L)
--- EXEC torneo.seleccion_modificar @m, @pm, @c1, 'm'; --> Grupo fuera de rango en minuscula
--- EXEC torneo.seleccion_modificar @m, @pm, @c1, '@'; --> Grupo fuera de rango (antes de A)
--- EXEC torneo.seleccion_modificar @m, @pm, @c1, '1'; --> Grupo numerico
--- EXEC torneo.seleccion_modificar @m, @pm, @c1, 'AB'; --> Grupo con 2 letras
--- EXEC torneo.seleccion_modificar @m, @pm, @c1, ' A'; --> Grupo con espacio al inicio
--- EXEC torneo.seleccion_modificar @m, @pm, @c1, 'A '; --> Grupo con espacio al final
--- EXEC torneo.seleccion_modificar @p, @pp, @c1, 'E'; --> Con partidos de grupos: no se puede cambiar el grupo
--- EXEC torneo.seleccion_modificar @p, @pp, @c1, 'e'; --> Con partidos de grupos: cambio de grupo en minuscula
--- EXEC torneo.seleccion_modificar @p, @pp, @c1, NULL; --> 1 error: grupo nulo 
--- EXEC torneo.seleccion_modificar @p, @pp, @c1, 'M'; --> 2 errores: grupo invalido y cambio de grupo con partidos
--- EXEC torneo.seleccion_modificar @p, 999999, 999999, 'Z'; --> 4 errores (maximo): pais, confederacion, grupo y cambio de grupo con partidos
+-- E-3.4.05 Valido: cambia pais (a uno libre), confederacion y grupo (sin partidos) => se acepta
+BEGIN TRY EXEC torneo.seleccion_modificar @m, @pn, @c2, 'H'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.4.05', 'torneo.seleccion_modificar: Valido: cambia pais (a uno libre), confederacion y grupo (sin partidos)', 0;
 GO
 
--- Verificacion torneo.seleccion_eliminar
+PRINT '--- E-3.4.06 torneo.seleccion_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @e INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZQX'),
         @p INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZQP'),
         @cv INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZQV'),
         @ct INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZQT'),
         @k INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZQK');
 
-EXEC torneo.seleccion_eliminar @e; --> Baja valida 
--- EXEC torneo.seleccion_eliminar NULL; --> Id nulo (el mensaje dice "(nulo)")
--- EXEC torneo.seleccion_eliminar @p; --> Tiene partidos asociados
--- EXEC torneo.seleccion_eliminar @cv; --> Tiene jugadores convocados (requiere cargar la convocatoria en la preparacion)
--- EXEC torneo.seleccion_eliminar @ct; --> Tiene cuerpo tecnico registrado (requiere cargar el cuerpo tecnico en la preparacion)
--- EXEC torneo.seleccion_eliminar @k; --> 3 errores (maximo): partidos, convocados y cuerpo tecnico (requiere los datos de plantel)
+-- E-3.4.06 Baja valida => se acepta
+BEGIN TRY EXEC torneo.seleccion_eliminar @e; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.4.06', 'torneo.seleccion_eliminar: Baja valida', 0;
 GO
 
-
 -- ============================================================
--- 1.5 torneo.partido
+-- 3.5 torneo.partido
 -- ============================================================
 
--- Verificacion torneo.partido_insertar
+PRINT '--- E-3.5.01 a E-3.5.04 torneo.partido_insertar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @id INT,
         @a1 INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZPA'),
         @a2 INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZPB'),
@@ -1392,38 +2504,20 @@ DECLARE @id INT,
         @s5 INT = (SELECT sede_id FROM torneo.sede WHERE nombre = 'Test Partido Sede Cinco'),
         @sl INT = (SELECT sede_id FROM torneo.sede WHERE nombre = 'Test Partido Sede Libre');
 
-EXEC torneo.partido_insertar @sl, '2026-09-10 15:00:00 -03:00', 'dieciseisavos', @a4, @b1, NULL, @id OUTPUT; --> Valido: UTC se deriva de la hora local (verificar con SELECT)
--- EXEC torneo.partido_insertar @sl, '2026-09-15 15:00:00 -03:00', 'octavos', @a4, @b1, '2026-09-15 18:00:00 +00:00', @id OUTPUT; --> Valido: UTC informado y consistente
--- EXEC torneo.partido_insertar @s5, '2026-09-20 15:00:00 -05:00', 'cuartos', @a3, @b1, NULL, @id OUTPUT; --> Valido: sede con huso UTC-05 (UTC derivado = 20:00 +00:00)
--- EXEC torneo.partido_insertar @sl, '2026-09-25 15:00:00 -03:00', 'grupos', @a2, @a4, NULL, @id OUTPUT; --> Valido: fase de grupos, mismo grupo
--- EXEC torneo.partido_insertar NULL, '2026-08-10 15:00:00 -03:00', 'grupos', @a1, @a3, NULL, @id OUTPUT; --> Sede nula
--- EXEC torneo.partido_insertar 999999, '2026-08-10 15:00:00 -03:00', 'grupos', @a1, @a3, NULL, @id OUTPUT; --> Sede inexistente
--- EXEC torneo.partido_insertar @sl, NULL, 'grupos', @a1, @a3, NULL, @id OUTPUT; --> Fecha local nula (el UTC derivado tambien queda nulo, un solo error)
--- EXEC torneo.partido_insertar @sl, '2026-08-10 15:00:00 -05:00', 'grupos', @a1, @a3, NULL, @id OUTPUT; --> Hora local en otro huso
--- EXEC torneo.partido_insertar @sl, '2026-08-10 18:00:00 +00:00', 'grupos', @a1, @a3, NULL, @id OUTPUT; --> Hora local expresada en UTC
--- EXEC torneo.partido_insertar @sl, '2026-08-10 15:00:00 -03:00', 'grupos', @a1, @a3, '2026-08-10 15:00:00 -03:00', @id OUTPUT; --> UTC informado con desplazamiento distinto de +00:00
--- EXEC torneo.partido_insertar @sl, '2026-08-10 15:00:00 -03:00', 'grupos', @a1, @a3, '2026-08-10 19:00:00 +00:00', @id OUTPUT; --> UTC informado que no coincide con la hora local
--- EXEC torneo.partido_insertar @sl, '2026-08-10 15:00:00 -03:00', NULL, @a1, @a3, NULL, @id OUTPUT; --> Fase nula
--- EXEC torneo.partido_insertar @sl, '2026-08-10 15:00:00 -03:00', '', @a1, @a3, NULL, @id OUTPUT; --> Fase vacia
--- EXEC torneo.partido_insertar @sl, '2026-08-10 15:00:00 -03:00', 'amistoso', @a1, @a3, NULL, @id OUTPUT; --> Fase inexistente
--- EXEC torneo.partido_insertar @sl, '2026-08-10 15:00:00 -03:00', 'grupos', NULL, @a3, NULL, @id OUTPUT; --> Seleccion local nula
--- EXEC torneo.partido_insertar @sl, '2026-08-10 15:00:00 -03:00', 'grupos', 999999, @a3, NULL, @id OUTPUT; --> Seleccion local inexistente
--- EXEC torneo.partido_insertar @sl, '2026-08-10 15:00:00 -03:00', 'grupos', @a1, NULL, NULL, @id OUTPUT; --> Seleccion visitante nula
--- EXEC torneo.partido_insertar @sl, '2026-08-10 15:00:00 -03:00', 'grupos', @a1, 999999, NULL, @id OUTPUT; --> Seleccion visitante inexistente
--- EXEC torneo.partido_insertar @sl, '2026-08-10 15:00:00 -03:00', 'grupos', @a1, @a1, NULL, @id OUTPUT; --> Local y visitante iguales
--- EXEC torneo.partido_insertar @sl, '2026-08-10 15:00:00 -03:00', 'grupos', @a1, @b1, NULL, @id OUTPUT; --> Fase de grupos con selecciones de distinto grupo
--- EXEC torneo.partido_insertar @sl, '2026-08-10 15:00:00 -03:00', 'grupos', @a1, @a2, NULL, @id OUTPUT; --> Duplicado: misma pareja y fase que el partido base
--- EXEC torneo.partido_insertar @sl, '2026-08-10 15:00:00 -03:00', 'grupos', @a2, @a1, NULL, @id OUTPUT; --> Duplicado con local y visitante invertidos
--- EXEC torneo.partido_insertar @sb, '2026-06-15 20:00:00 -03:00', 'octavos', @a3, @b1, NULL, @id OUTPUT; --> Sede ya tiene partido ese dia
--- EXEC torneo.partido_insertar @sl, '2026-06-16 14:00:00 -03:00', 'octavos', @a1, @b1, NULL, @id OUTPUT; --> Seleccion juega a menos de 24 h
--- EXEC torneo.partido_insertar @sl, '2026-08-10 15:00:00 -03:00', 'amistoso', @a1, @a1, NULL, @id OUTPUT; --> 2 errores: fase inexistente y selecciones iguales
--- EXEC torneo.partido_insertar @sb, '2026-06-15 15:00:00 -03:00', 'grupos', @a1, @a2, NULL, @id OUTPUT; --> 3 errores: duplicado, sede ocupada y 24 h (copia exacta del partido base)
--- EXEC torneo.partido_insertar 999999, NULL, 'amistoso', 999999, @a3, NULL, @id OUTPUT; --> 4 errores: sede, fecha, fase y seleccion local
--- EXEC torneo.partido_insertar NULL, NULL, NULL, NULL, NULL, NULL, @id OUTPUT; --> 5 errores: sede, fecha, fase, local y visitante
--- EXEC torneo.partido_insertar @sb, '2026-06-15 20:00:00 -05:00', 'amistoso', 999999, 999999, '2026-06-15 17:00:00 -02:00', @id OUTPUT; --> 8 errores (maximo): huso local, UTC con desplazamiento, distinto instante, fase, local, visitante, iguales y sede ocupada
+-- E-3.5.01 Valido: UTC se deriva de la hora local (verificar con SELECT) => se acepta
+BEGIN TRY EXEC torneo.partido_insertar @sl, '2026-09-10 15:00:00 -03:00', 'dieciseisavos', @a4, @b1, NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.5.01', 'torneo.partido_insertar: Valido: UTC se deriva de la hora local (verificar con SELECT)', 0;
+-- E-3.5.02 Valido: UTC informado y consistente => se acepta
+BEGIN TRY EXEC torneo.partido_insertar @sl, '2026-09-15 15:00:00 -03:00', 'octavos', @a4, @b1, '2026-09-15 18:00:00 +00:00', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.5.02', 'torneo.partido_insertar: Valido: UTC informado y consistente', 0;
+-- E-3.5.03 Valido: sede con huso UTC-05 (UTC derivado = 20:00 +00:00) => se acepta
+BEGIN TRY EXEC torneo.partido_insertar @s5, '2026-09-20 15:00:00 -05:00', 'cuartos', @a3, @b1, NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.5.03', 'torneo.partido_insertar: Valido: sede con huso UTC-05 (UTC derivado = 20:00 +00:00)', 0;
+-- E-3.5.04 Valido: fase de grupos, mismo grupo => se acepta
+BEGIN TRY EXEC torneo.partido_insertar @sl, '2026-09-25 15:00:00 -03:00', 'grupos', @a2, @a4, NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.5.04', 'torneo.partido_insertar: Valido: fase de grupos, mismo grupo', 0;
 GO
 
--- Verificacion torneo.partido_modificar
+PRINT '--- E-3.5.05 a E-3.5.09 torneo.partido_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @a1 INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZPA'),
         @a2 INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZPB'),
         @a3 INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZPC'),
@@ -1438,41 +2532,22 @@ DECLARE @m    INT = (SELECT partido_id FROM torneo.partido WHERE fase = 'grupos'
         @form INT = (SELECT partido_id FROM torneo.partido WHERE fase = 'cuartos'       AND seleccion_local_id IN (@a1, @a4) AND seleccion_visitante_id IN (@a1, @a4)),
         @all  INT = (SELECT partido_id FROM torneo.partido WHERE fase = 'dieciseisavos' AND seleccion_local_id IN (@a1, @a2) AND seleccion_visitante_id IN (@a1, @a2));
 
-EXEC torneo.partido_modificar @m, @sl, '2026-06-22 15:00:00 -03:00', 'grupos', @a3, @a4; --> Valido: cambia sede y fecha 
--- EXEC torneo.partido_modificar @m, @sm, '2026-06-20 15:00:00 -03:00', 'grupos', @a3, @a4; --> Valido: sin cambios
--- EXEC torneo.partido_modificar @m, @sm, '2026-06-20 15:00:00 -03:00', 'grupos', @a4, @a3; --> Valido: se invierten local y visitante 
--- EXEC torneo.partido_modificar @m, @sm, '2026-06-20 15:00:00 -03:00', 'grupos', @a3, @a4, 'suspendido'; --> Valido: pasa a suspendido
--- EXEC torneo.partido_modificar @form, @sb, '2026-07-01 15:00:00 -03:00', 'cuartos', @a1, @a4; --> Valido: se reprograma un partido con formaciones sin cambiar las selecciones
--- EXEC torneo.partido_modificar 999999, @sl, '2026-08-10 15:00:00 -03:00', 'grupos', @a3, @a4; --> Partido inexistente
--- EXEC torneo.partido_modificar NULL, @sl, '2026-08-10 15:00:00 -03:00', 'grupos', @a3, @a4; --> Id nulo
--- EXEC torneo.partido_modificar @m, NULL, '2026-08-10 15:00:00 -03:00', 'grupos', @a3, @a4; --> Sede nula
--- EXEC torneo.partido_modificar @m, 999999, '2026-08-10 15:00:00 -03:00', 'grupos', @a3, @a4; --> Sede inexistente
--- EXEC torneo.partido_modificar @m, @sl, NULL, 'grupos', @a3, @a4; --> Fecha local nula
--- EXEC torneo.partido_modificar @m, @sl, '2026-08-10 15:00:00 -05:00', 'grupos', @a3, @a4; --> Hora local en otro huso
--- EXEC torneo.partido_modificar @m, @sl, '2026-08-10 15:00:00 -03:00', 'grupos', @a3, @a4, 'programado', '2026-08-10 15:00:00 -03:00'; --> UTC informado con desplazamiento distinto de +00:00
--- EXEC torneo.partido_modificar @m, @sl, '2026-08-10 15:00:00 -03:00', 'grupos', @a3, @a4, 'programado', '2026-08-10 19:00:00 +00:00'; --> UTC informado que no coincide con la hora local
--- EXEC torneo.partido_modificar @m, @sl, '2026-08-10 15:00:00 -03:00', NULL, @a3, @a4; --> Fase nula
--- EXEC torneo.partido_modificar @m, @sl, '2026-08-10 15:00:00 -03:00', 'amistoso', @a3, @a4; --> Fase inexistente
--- EXEC torneo.partido_modificar @m, @sl, '2026-08-10 15:00:00 -03:00', 'grupos', NULL, @a4; --> Seleccion local nula
--- EXEC torneo.partido_modificar @m, @sl, '2026-08-10 15:00:00 -03:00', 'grupos', 999999, @a4; --> Seleccion local inexistente
--- EXEC torneo.partido_modificar @m, @sl, '2026-08-10 15:00:00 -03:00', 'grupos', @a3, NULL; --> Seleccion visitante nula
--- EXEC torneo.partido_modificar @m, @sl, '2026-08-10 15:00:00 -03:00', 'grupos', @a3, 999999; --> Seleccion visitante inexistente
--- EXEC torneo.partido_modificar @m, @sl, '2026-08-10 15:00:00 -03:00', 'grupos', @a3, @a3; --> Local y visitante iguales
--- EXEC torneo.partido_modificar @m, @sl, '2026-08-10 15:00:00 -03:00', 'grupos', @a3, @b1; --> Fase de grupos con selecciones de distinto grupo
--- EXEC torneo.partido_modificar @m, @sl, '2026-08-10 15:00:00 -03:00', 'dieciseisavos', @a3, @a4; --> Duplicado: misma pareja y fase que el partido a eliminar
--- EXEC torneo.partido_modificar @m, @sb, '2026-06-15 20:00:00 -03:00', 'grupos', @a3, @a4; --> Sede ya tiene partido ese dia
--- EXEC torneo.partido_modificar @m, @sl, '2026-06-26 14:00:00 -03:00', 'grupos', @a3, @a4; --> Seleccion juega a menos de 24 h 
--- EXEC torneo.partido_modificar @m, @sl, '2026-08-10 15:00:00 -03:00', 'grupos', @a3, @a4, NULL; --> Estado nulo
--- EXEC torneo.partido_modificar @m, @sl, '2026-08-10 15:00:00 -03:00', 'grupos', @a3, @a4, 'finalizado'; --> Estado finalizado 
--- EXEC torneo.partido_modificar @m, @sl, '2026-08-10 15:00:00 -03:00', 'grupos', @a3, @a4, 'cancelado'; --> Estado inexistente
--- EXEC torneo.partido_modificar @fin, @sb, '2026-06-25 15:00:00 -03:00', 'octavos', @a1, @a3; --> Partido finalizado: no se puede reprogramar
--- EXEC torneo.partido_modificar @all, @sb, '2026-07-25 15:00:00 -03:00', 'dieciseisavos', @a1, @a3; --> 2 errores: finalizado y formaciones (1 si no hay formaciones cargadas)
--- EXEC torneo.partido_modificar NULL, @sl, '2026-08-10 15:00:00 -03:00', 'amistoso', @a3, @a4, NULL; --> 3 errores: id obligatorio, fase y estado
--- EXEC torneo.partido_modificar NULL, NULL, NULL, NULL, NULL, NULL, NULL; --> 7 errores: id, sede, fecha, fase, local, visitante y estado
--- EXEC torneo.partido_modificar @all, @sb, '2026-06-15 20:00:00 -05:00', 'amistoso', 999999, 999999, 'cancelado', '2026-06-15 17:00:00 -02:00'; --> 11 errores (maximo): huso local, UTC con desplazamiento, distinto instante, fase, local, visitante, iguales, sede ocupada, estado, finalizado y formaciones (10 si no hay formaciones cargadas)
+-- E-3.5.05 Valido: cambia sede y fecha => se acepta
+BEGIN TRY EXEC torneo.partido_modificar @m, @sl, '2026-06-22 15:00:00 -03:00', 'grupos', @a3, @a4; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.5.05', 'torneo.partido_modificar: Valido: cambia sede y fecha', 0;
+-- E-3.5.06 Valido: sin cambios => se acepta
+BEGIN TRY EXEC torneo.partido_modificar @m, @sm, '2026-06-20 15:00:00 -03:00', 'grupos', @a3, @a4; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.5.06', 'torneo.partido_modificar: Valido: sin cambios', 0;
+-- E-3.5.07 Valido: se invierten local y visitante => se acepta
+BEGIN TRY EXEC torneo.partido_modificar @m, @sm, '2026-06-20 15:00:00 -03:00', 'grupos', @a4, @a3; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.5.07', 'torneo.partido_modificar: Valido: se invierten local y visitante', 0;
+-- E-3.5.08 Valido: pasa a suspendido => se acepta
+BEGIN TRY EXEC torneo.partido_modificar @m, @sm, '2026-06-20 15:00:00 -03:00', 'grupos', @a3, @a4, 'suspendido'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.5.08', 'torneo.partido_modificar: Valido: pasa a suspendido', 0;
+-- E-3.5.09 Valido: se reprograma un partido con formaciones sin cambiar las selecciones => se acepta
+BEGIN TRY EXEC torneo.partido_modificar @form, @sb, '2026-07-01 15:00:00 -03:00', 'cuartos', @a1, @a4; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.5.09', 'torneo.partido_modificar: Valido: se reprograma un partido con formaciones sin cambiar las selecciones', 0;
 GO
 
--- Verificacion torneo.partido_eliminar
+PRINT '--- E-3.5.10 torneo.partido_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @a1 INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZPA'),
         @a2 INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZPB'),
         @a3 INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZPC'),
@@ -1486,74 +2561,66 @@ DECLARE @elim INT = (SELECT partido_id FROM torneo.partido WHERE fase = 'diecise
         @pub  INT = (SELECT partido_id FROM torneo.partido WHERE fase = 'final'         AND seleccion_local_id IN (@a1, @a2) AND seleccion_visitante_id IN (@a1, @a2)),
         @all  INT = (SELECT partido_id FROM torneo.partido WHERE fase = 'dieciseisavos' AND seleccion_local_id IN (@a1, @a2) AND seleccion_visitante_id IN (@a1, @a2));
 
-EXEC torneo.partido_eliminar @elim; --> Baja valida 
--- EXEC torneo.partido_eliminar 999999; --> Partido inexistente
--- EXEC torneo.partido_eliminar NULL; --> Id nulo (el mensaje dice "(nulo)")
--- EXEC torneo.partido_eliminar @fin; --> Partido finalizado
--- EXEC torneo.partido_eliminar @form; --> Tiene formaciones cargadas (requiere formaciones en la preparacion)
--- EXEC torneo.partido_eliminar @tarj; --> Tiene tarjetas registradas (requiere tarjetas en la preparacion)
--- EXEC torneo.partido_eliminar @susp; --> Es el partido afectado por suspensiones vigentes (requiere suspensiones en la preparacion)
--- EXEC torneo.partido_eliminar @arb; --> Tiene arbitros designados (requiere designaciones en la preparacion)
--- EXEC torneo.partido_eliminar @pub; --> Tiene espacios publicitarios asignados (requiere espacios en la preparacion)
--- EXEC torneo.partido_eliminar @all; --> 6 errores (maximo): finalizado, formaciones, tarjetas, suspensiones, arbitros y publicidad (menos si falta cargar alguna dependencia)
+-- E-3.5.10 Baja valida => se acepta
+BEGIN TRY EXEC torneo.partido_eliminar @elim; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.5.10', 'torneo.partido_eliminar: Baja valida', 0;
 GO
 
+-- ============================================================
+-- 3.6 plantel.persona, plantel.cuerpo_tecnico y plantel.jugador
+-- ============================================================
 
--- ============================================================
--- 1.6 plantel.persona, plantel.cuerpo_tecnico y plantel.jugador
--- ============================================================
--- Verificacion plantel.persona_insertar (el SP solo valida el tipo: maximo 1 error)
+PRINT '--- E-3.6.01 a E-3.6.02 plantel.persona_insertar (el SP solo valida el tipo: maximo 1 error)';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @id INT;
 
-EXEC plantel.persona_insertar 'jugador', @id OUTPUT; --> Valido: jugador
--- EXEC plantel.persona_insertar 'cuerpo_tecnico', @id OUTPUT; --> Valido
--- EXEC plantel.persona_insertar NULL, @id OUTPUT; --> Tipo nulo
--- EXEC plantel.persona_insertar '', @id OUTPUT; --> Tipo vacio
--- EXEC plantel.persona_insertar '   ', @id OUTPUT; --> Tipo solo espacios
--- EXEC plantel.persona_insertar 'arbitro', @id OUTPUT; --> Tipo inexistente
--- EXEC plantel.persona_insertar 'jugadores', @id OUTPUT; --> Tipo parecido pero incorrecto
--- EXEC plantel.persona_insertar 'cuerpo tecnico', @id OUTPUT; --> Tipo sin guion bajo
--- EXEC plantel.persona_insertar 'jugador_con_un_nombre_demasiado_largo', @id OUTPUT; --> Tipo demasiado largo (se trunca al pasar el parametro VARCHAR(20) y queda invalido)
+-- E-3.6.01 Valido: jugador => se acepta
+BEGIN TRY EXEC plantel.persona_insertar 'jugador', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.01', 'plantel.persona_insertar (el SP solo valida el tipo: maximo 1 error): Valido: jugador', 0;
+-- E-3.6.02 Valido => se acepta
+BEGIN TRY EXEC plantel.persona_insertar 'cuerpo_tecnico', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.02', 'plantel.persona_insertar (el SP solo valida el tipo: maximo 1 error): Valido', 0;
+GO
 
--- Verificacion plantel.persona_modificar
+PRINT '--- E-3.6.03 a E-3.6.06 plantel.persona_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @mod  INT = (SELECT persona_id FROM ##test_persona WHERE clave = 'mod'),
         @jug  INT = (SELECT persona_id FROM ##test_persona WHERE clave = 'jug'),
         @ct   INT = (SELECT persona_id FROM ##test_persona WHERE clave = 'ct'),
         @todo INT = (SELECT persona_id FROM ##test_persona WHERE clave = 'todo');
 
--- EXEC plantel.persona_modificar @mod, 'cuerpo_tecnico'; --> Valido
--- EXEC plantel.persona_modificar @mod, 'jugador'; --> Valido: vuelve a jugador
--- EXEC plantel.persona_modificar @mod, 'jugador'; --> Valido: sin cambios (mismo tipo)
--- EXEC plantel.persona_modificar @jug, 'jugador'; --> Valido: jugador registrado, mismo tipo
--- EXEC plantel.persona_modificar 999999, 'jugador'; --> Persona inexistente
--- EXEC plantel.persona_modificar NULL, 'jugador'; --> Id nulo (el mensaje dice "(nulo)")
--- EXEC plantel.persona_modificar @mod, NULL; --> Tipo nulo
--- EXEC plantel.persona_modificar @mod, ''; --> Tipo vacio
--- EXEC plantel.persona_modificar @mod, '   '; --> Tipo solo espacios
--- EXEC plantel.persona_modificar @mod, 'arbitro'; --> Tipo inexistente
--- EXEC plantel.persona_modificar 999999, 'arbitro'; --> 2 errores (maximo): persona inexistente y tipo invalido
--- EXEC plantel.persona_modificar 999999, 'cuerpo_tecnico'; --> 1 error: inexistente (los controles de registros no aplican a un id que no existe)
+-- E-3.6.03 Valido => se acepta
+BEGIN TRY EXEC plantel.persona_modificar @mod, 'cuerpo_tecnico'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.03', 'plantel.persona_modificar: Valido', 0;
+-- E-3.6.04 Valido: vuelve a jugador => se acepta
+BEGIN TRY EXEC plantel.persona_modificar @mod, 'jugador'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.04', 'plantel.persona_modificar: Valido: vuelve a jugador', 0;
+-- E-3.6.05 Valido: sin cambios (mismo tipo) => se acepta
+BEGIN TRY EXEC plantel.persona_modificar @mod, 'jugador'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.05', 'plantel.persona_modificar: Valido: sin cambios (mismo tipo)', 0;
+-- E-3.6.06 Valido: jugador registrado, mismo tipo => se acepta
+BEGIN TRY EXEC plantel.persona_modificar @jug, 'jugador'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.06', 'plantel.persona_modificar: Valido: jugador registrado, mismo tipo', 0;
 GO
 
--- Verificacion plantel.persona_eliminar
+PRINT '--- E-3.6.07 a E-3.6.08 plantel.persona_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @elim    INT = (SELECT persona_id FROM ##test_persona WHERE clave = 'elim'),
         @elim_ct INT = (SELECT persona_id FROM ##test_persona WHERE clave = 'elim_ct'),
-        @jug     INT = (SELECT persona_id FROM ##test_persona WHERE clave = 'jug'),
-        @ct      INT = (SELECT persona_id FROM ##test_persona WHERE clave = 'ct'),
-        @tarj    INT = (SELECT persona_id FROM ##test_persona WHERE clave = 'tarj'),
+        @jug     INT = (SELECT persona_id FROM plantel.jugador WHERE nombre = 'ARG' AND apellido = 'Jugador 27'),   -- jugador sin tarjetas
+        @ct      INT = (SELECT persona_id FROM plantel.cuerpo_tecnico WHERE nombre = 'Test CT' AND apellido = 'Ayudante'),   -- cuerpo técnico sin tarjetas
+        @tarj    INT = (SELECT persona_id FROM plantel.jugador WHERE nombre = 'ARG' AND apellido = 'Jugador 05'),   -- jugador con amarillas
         @todo    INT = (SELECT persona_id FROM ##test_persona WHERE clave = 'todo');
 
-EXEC plantel.persona_eliminar @elim; --> Baja valida 
--- EXEC plantel.persona_eliminar @elim_ct; --> Baja valida (tipo cuerpo tecnico, sin registros)
--- EXEC plantel.persona_eliminar @elim; --> Ejecutar de nuevo tras la baja valida: ya no existe
--- EXEC plantel.persona_eliminar 999999; --> Persona inexistente
--- EXEC plantel.persona_eliminar NULL; --> Id nulo (el mensaje dice "(nulo)")
--- EXEC plantel.persona_eliminar @jug; --> Registrada como jugador (requiere plantel.jugador cargado)
--- EXEC plantel.persona_eliminar @ct; --> Registrada como cuerpo tecnico (requiere plantel.cuerpo_tecnico cargado)
--- EXEC plantel.persona_eliminar @tarj; --> Tiene tarjetas registradas (requiere evento.tarjeta cargado)
+-- E-3.6.07 Baja valida => se acepta
+BEGIN TRY EXEC plantel.persona_eliminar @elim; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.07', 'plantel.persona_eliminar: Baja valida', 0;
+-- E-3.6.08 Baja valida (tipo cuerpo tecnico, sin registros) => se acepta
+BEGIN TRY EXEC plantel.persona_eliminar @elim_ct; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.08', 'plantel.persona_eliminar: Baja valida (tipo cuerpo tecnico, sin registros)', 0;
 GO
 
--- Verificacion plantel.cuerpo_tecnico_insertar
+PRINT '--- E-3.6.09 a E-3.6.15 plantel.cuerpo_tecnico_insertar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @id INT, @pid INT,
         @antes INT = (SELECT COUNT(*) FROM plantel.persona),
         @s1 INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZCA'),
@@ -1561,33 +2628,26 @@ DECLARE @id INT, @pid INT,
         @s3 INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZCC'),
         @n100 VARCHAR(100) = 'Test CT' + REPLICATE('N', 93);
 
--- EXEC plantel.cuerpo_tecnico_insertar @s1, 'Test CT', 'Alta', 'ayudante_tecnico', @id OUTPUT, @pid OUTPUT;   --> Valido
--- EXEC plantel.cuerpo_tecnico_insertar @s1, '  Test CT  ', '  Recortado  ', 'otro', @id OUTPUT, @pid OUTPUT;   --> Valido: se guarda recortado
--- EXEC plantel.cuerpo_tecnico_insertar @s3, 'Test CT', 'Alta DT', 'director_tecnico', @id OUTPUT, @pid OUTPUT;   --> Valido: DT en seleccion sin DT
--- EXEC plantel.cuerpo_tecnico_insertar @s1, 'Test CT', 'Alta', 'preparador_fisico', @id OUTPUT, @pid OUTPUT;   --> Valido: misma persona con otro rol en la misma seleccion
--- EXEC plantel.cuerpo_tecnico_insertar @s2, 'Test CT', 'Alta', 'ayudante_tecnico', @id OUTPUT, @pid OUTPUT;   --> Valido: misma persona y rol en otra seleccion
--- EXEC plantel.cuerpo_tecnico_insertar @s1, 'Test CT', 'Rol Otro', 'otro', @id OUTPUT, @pid OUTPUT;   --> Valido: rol "otro"
--- EXEC plantel.cuerpo_tecnico_insertar @s1, @n100, 'Largo', 'otro', @id OUTPUT, @pid OUTPUT;   --> Valido: nombre de 100 caracteres (borde; ajustar si la columna es mas corta)
--- EXEC plantel.cuerpo_tecnico_insertar 999999, 'Test CT', 'X', 'otro', @id OUTPUT, @pid OUTPUT; --> Seleccion inexistente
--- EXEC plantel.cuerpo_tecnico_insertar NULL, 'Test CT', 'X', 'otro', @id OUTPUT, @pid OUTPUT; --> Seleccion nula
--- EXEC plantel.cuerpo_tecnico_insertar @s1, NULL, 'X', 'otro', @id OUTPUT, @pid OUTPUT; --> Nombre nulo
--- EXEC plantel.cuerpo_tecnico_insertar @s1, '', 'X', 'otro', @id OUTPUT, @pid OUTPUT; --> Nombre vacio
--- EXEC plantel.cuerpo_tecnico_insertar @s1, '   ', 'X', 'otro', @id OUTPUT, @pid OUTPUT; --> Nombre solo espacios
--- EXEC plantel.cuerpo_tecnico_insertar @s1, 'Test CT', NULL, 'otro', @id OUTPUT, @pid OUTPUT; --> Apellido nulo
--- EXEC plantel.cuerpo_tecnico_insertar @s1, 'Test CT', '', 'otro', @id OUTPUT, @pid OUTPUT; --> Apellido vacio
--- EXEC plantel.cuerpo_tecnico_insertar @s1, 'Test CT', '   ', 'otro', @id OUTPUT, @pid OUTPUT; --> Apellido solo espacios
--- EXEC plantel.cuerpo_tecnico_insertar @s1, 'Test CT', 'X', NULL, @id OUTPUT, @pid OUTPUT; --> Rol nulo
--- EXEC plantel.cuerpo_tecnico_insertar @s1, 'Test CT', 'X', '', @id OUTPUT, @pid OUTPUT; --> Rol vacio
--- EXEC plantel.cuerpo_tecnico_insertar @s1, 'Test CT', 'X', 'masajista', @id OUTPUT, @pid OUTPUT; --> Rol invalido
--- EXEC plantel.cuerpo_tecnico_insertar @s1, 'Test CT', 'Otro DT', 'director_tecnico', @id OUTPUT, @pid OUTPUT; --> 2do director tecnico en la misma seleccion
--- EXEC plantel.cuerpo_tecnico_insertar @s1, 'Test CT', 'Ayudante', 'ayudante_tecnico', @id OUTPUT, @pid OUTPUT; --> Duplicado: misma seleccion, nombre, apellido y rol
--- EXEC plantel.cuerpo_tecnico_insertar @s1, 'Test CT  ', 'Ayudante  ', 'ayudante_tecnico', @id OUTPUT, @pid OUTPUT; --> Duplicado con espacios al final
-EXEC plantel.cuerpo_tecnico_insertar @s1, '  Test CT', '  Ayudante', 'ayudante_tecnico', @id OUTPUT, @pid OUTPUT; --> Espacios al inicio: antes no se detectaba, se modifico el validar para que salte el error
--- EXEC plantel.cuerpo_tecnico_insertar @s1, 'Test CT', 'Director', 'director_tecnico', @id OUTPUT, @pid OUTPUT; --> 2 errores: ya tiene DT y duplicado
--- EXEC plantel.cuerpo_tecnico_insertar 999999, '', '', 'x', @id OUTPUT, @pid OUTPUT; --> 4 errores (maximo): seleccion, nombre, apellido y rol
+-- E-3.6.09 Valido => se acepta
+BEGIN TRY EXEC plantel.cuerpo_tecnico_insertar @s1, 'Test CT', 'Alta', 'ayudante_tecnico', @id OUTPUT, @pid OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.09', 'plantel.cuerpo_tecnico_insertar: Valido', 0;
+-- E-3.6.10 Valido: se guarda recortado => se acepta
+BEGIN TRY EXEC plantel.cuerpo_tecnico_insertar @s1, '  Test CT  ', '  Recortado  ', 'otro', @id OUTPUT, @pid OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.10', 'plantel.cuerpo_tecnico_insertar: Valido: se guarda recortado', 0;
+-- E-3.6.11 Valido: DT en seleccion sin DT => se acepta
+BEGIN TRY EXEC plantel.cuerpo_tecnico_insertar @s3, 'Test CT', 'Alta DT', 'director_tecnico', @id OUTPUT, @pid OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.11', 'plantel.cuerpo_tecnico_insertar: Valido: DT en seleccion sin DT', 0;
+-- E-3.6.12 Valido: misma persona con otro rol en la misma seleccion => se acepta
+BEGIN TRY EXEC plantel.cuerpo_tecnico_insertar @s1, 'Test CT', 'Alta', 'preparador_fisico', @id OUTPUT, @pid OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.12', 'plantel.cuerpo_tecnico_insertar: Valido: misma persona con otro rol en la misma seleccion', 0;
+-- E-3.6.13 Valido: misma persona y rol en otra seleccion => se acepta
+BEGIN TRY EXEC plantel.cuerpo_tecnico_insertar @s2, 'Test CT', 'Alta', 'ayudante_tecnico', @id OUTPUT, @pid OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.13', 'plantel.cuerpo_tecnico_insertar: Valido: misma persona y rol en otra seleccion', 0;
+-- E-3.6.14 Valido: rol "otro" => se acepta
+BEGIN TRY EXEC plantel.cuerpo_tecnico_insertar @s1, 'Test CT', 'Rol Otro', 'otro', @id OUTPUT, @pid OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.14', 'plantel.cuerpo_tecnico_insertar: Valido: rol "otro"', 0;
+-- E-3.6.15 Valido: nombre de 100 caracteres (borde; ajustar si la columna es mas corta) => se acepta
+BEGIN TRY EXEC plantel.cuerpo_tecnico_insertar @s1, @n100, 'Largo', 'otro', @id OUTPUT, @pid OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.15', 'plantel.cuerpo_tecnico_insertar: Valido: nombre de 100 caracteres (borde; ajustar si la columna es mas corta)', 0;
 GO
 
--- Verificacion plantel.cuerpo_tecnico_modificar
+PRINT '--- E-3.6.16 a E-3.6.17 plantel.cuerpo_tecnico_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @m  INT = (SELECT staff_id FROM plantel.cuerpo_tecnico WHERE nombre = 'Test CT' AND apellido IN ('Mod', 'Mod Nuevo')),
         @t  INT = (SELECT staff_id FROM plantel.cuerpo_tecnico WHERE nombre = 'Test CT' AND apellido IN ('Tarjeta', 'Tarjeta Nuevo')),
         @dt INT = (SELECT staff_id FROM plantel.cuerpo_tecnico WHERE nombre = 'Test CT' AND apellido = 'Director'),
@@ -1596,139 +2656,110 @@ DECLARE @m  INT = (SELECT staff_id FROM plantel.cuerpo_tecnico WHERE nombre = 'T
         @s2 INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZCB'),
         @s3 INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZCC');
 
--- EXEC plantel.cuerpo_tecnico_modificar @m, @s2, 'Test CT', 'Mod Nuevo', 'ayudante_tecnico'; --> Valido: cambia seleccion, apellido y rol
--- EXEC plantel.cuerpo_tecnico_modificar @m, @s1, '  Test CT  ', '  Mod  ', 'otro'; --> Valido: se guarda recortado
--- EXEC plantel.cuerpo_tecnico_modificar NULL, @s1, 'Test CT', 'Mod', 'otro'; --> Id nulo
--- EXEC plantel.cuerpo_tecnico_modificar 999999, @s1, 'Test CT', 'Mod', 'otro'; --> Integrante inexistente
--- EXEC plantel.cuerpo_tecnico_modificar @m, 999999, 'Test CT', 'Mod', 'otro'; --> Seleccion inexistente
--- EXEC plantel.cuerpo_tecnico_modificar @m, NULL, 'Test CT', 'Mod', 'otro'; --> Seleccion nula
--- EXEC plantel.cuerpo_tecnico_modificar @m, @s1, NULL, 'Mod', 'otro'; --> Nombre nulo
--- EXEC plantel.cuerpo_tecnico_modificar @m, @s1, '', 'Mod', 'otro'; --> Nombre vacio
--- EXEC plantel.cuerpo_tecnico_modificar @m, @s1, '   ', 'Mod', 'otro'; --> Nombre solo espacios
--- EXEC plantel.cuerpo_tecnico_modificar @m, @s1, 'Test CT', NULL, 'otro'; --> Apellido nulo
--- EXEC plantel.cuerpo_tecnico_modificar @m, @s1, 'Test CT', '', 'otro'; --> Apellido vacio
--- EXEC plantel.cuerpo_tecnico_modificar @m, @s1, 'Test CT', '   ', 'otro'; --> Apellido solo espacios
--- EXEC plantel.cuerpo_tecnico_modificar @m, @s1, 'Test CT', 'Mod', NULL; --> Rol nulo
--- EXEC plantel.cuerpo_tecnico_modificar @m, @s1, 'Test CT', 'Mod', ''; --> Rol vacio
--- EXEC plantel.cuerpo_tecnico_modificar @m, @s1, 'Test CT', 'Mod', 'masajista'; --> Rol invalido
--- EXEC plantel.cuerpo_tecnico_modificar @m, @s1, 'Test CT', 'Mod', 'director_tecnico'; --> Selecciona un DT en seleccion que ya tiene otro DT
--- EXEC plantel.cuerpo_tecnico_modificar @m, @s1, 'Test CT', 'Otra', 'preparador_fisico'; --> Duplicado: coincide con otro integrante
--- EXEC plantel.cuerpo_tecnico_modificar @m, @s1, 'TEST CT', 'OTRA', 'preparador_fisico'; --> Duplicado con otra capitalizacion (CI)
--- EXEC plantel.cuerpo_tecnico_modificar @m, @s1, 'Test CT  ', 'Otra  ', 'preparador_fisico'; --> Duplicado con espacios al final
--- EXEC plantel.cuerpo_tecnico_modificar @m, @s1, '  Test CT', '  Otra', 'preparador_fisico'; --> Espacios al inicio
--- EXEC plantel.cuerpo_tecnico_modificar 999999, @s1, 'Test CT', 'Otra', 'preparador_fisico'; --> 2 errores: integrante inexistente y duplicado
--- EXEC plantel.cuerpo_tecnico_modificar @t, @s1, 'Test CT', 'Director', 'director_tecnico'; --> 3 errores: ya tiene DT, duplicado y cambio de seleccion con tarjetas 
--- EXEC plantel.cuerpo_tecnico_modificar @t, 999999, '', '', 'x'; --> 4 errores (maximo): seleccion, nombre, apellido, rol y cambio de seleccion con tarjetas
+-- E-3.6.16 Valido: cambia seleccion, apellido y rol => se acepta
+BEGIN TRY EXEC plantel.cuerpo_tecnico_modificar @m, @s2, 'Test CT', 'Mod Nuevo', 'ayudante_tecnico'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.16', 'plantel.cuerpo_tecnico_modificar: Valido: cambia seleccion, apellido y rol', 0;
+-- E-3.6.17 Valido: se guarda recortado => se acepta
+BEGIN TRY EXEC plantel.cuerpo_tecnico_modificar @m, @s1, '  Test CT  ', '  Mod  ', 'otro'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.17', 'plantel.cuerpo_tecnico_modificar: Valido: se guarda recortado', 0;
 GO
 
--- Verificacion plantel.cuerpo_tecnico_eliminar
+PRINT '--- E-3.6.18 plantel.cuerpo_tecnico_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @e  INT = (SELECT staff_id FROM plantel.cuerpo_tecnico WHERE nombre = 'Test CT' AND apellido = 'Elim'),
         @et INT = (SELECT staff_id FROM plantel.cuerpo_tecnico WHERE nombre = 'Test CT' AND apellido = 'Elim Tran'),
         @t  INT = (SELECT staff_id FROM plantel.cuerpo_tecnico WHERE nombre = 'Test CT' AND apellido IN ('Tarjeta', 'Tarjeta Nuevo')),
         @pe INT = (SELECT persona_id FROM plantel.cuerpo_tecnico WHERE nombre = 'Test CT' AND apellido = 'Elim');
 
--- EXEC plantel.cuerpo_tecnico_eliminar @e; --> Baja valida (sin tarjetas): ambos 0
--- EXEC plantel.cuerpo_tecnico_eliminar @e; --> Ya eliminado: integrante inexistente (ejecutar despues de la baja valida)
--- EXEC plantel.cuerpo_tecnico_eliminar 999999; --> Integrante inexistente
--- EXEC plantel.cuerpo_tecnico_eliminar NULL; --> Id nulo (el mensaje dice "(nulo)")
--- EXEC plantel.cuerpo_tecnico_eliminar @t; --> Tiene tarjetas registradas --> tiene que ejecutarse junto con el test de tarjetas usando las fk
-   
+-- E-3.6.18 Baja valida (sin tarjetas): ambos 0 => se acepta
+BEGIN TRY EXEC plantel.cuerpo_tecnico_eliminar @e; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.18', 'plantel.cuerpo_tecnico_eliminar: Baja valida (sin tarjetas): ambos 0', 0;
+GO
 
-
--- Verificacion plantel.jugador_insertar
+PRINT '--- E-3.6.19 a E-3.6.31 plantel.jugador_insertar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @id INT, @pid INT, @antes INT,
         @f15 DATE = DATEADD(YEAR, -15, CAST(SYSDATETIME() AS DATE)),
         @f50 DATE = DATEADD(YEAR, -50, CAST(SYSDATETIME() AS DATE)),
+        @f15_menos DATE = DATEADD(DAY, 1, DATEADD(YEAR, -15, CAST(SYSDATETIME() AS DATE))),
+        @f50_mas DATE = DATEADD(DAY, -1, DATEADD(YEAR, -50, CAST(SYSDATETIME() AS DATE))),
         @n100 VARCHAR(100) = 'Test JU' + REPLICATE('N', 93),
         @c120 VARCHAR(120) = REPLICATE('C', 120);
-EXEC plantel.jugador_insertar 'Test JU', 'Alta', '1995-03-15', 'delantero', 'Club Alta', @id OUTPUT, @pid OUTPUT; --> Valido
--- EXEC plantel.jugador_insertar '  Test JU  ', '  Recortado  ', '1995-03-15', 'defensor', '  Club Recortado  ', @id OUTPUT, @pid OUTPUT; --> Valido: se guarda recortado
--- EXEC plantel.jugador_insertar 'Test JU', 'Sin Club', '1995-03-15', 'arquero', NULL, @id OUTPUT, @pid OUTPUT; --> Valido: club nulo
--- EXEC plantel.jugador_insertar 'Test JU', 'Club Vacio', '1995-03-15', 'arquero', '', @id OUTPUT, @pid OUTPUT; --> Valido: club vacio se guarda como NULL
--- EXEC plantel.jugador_insertar 'Test JU', 'Club Espacios', '1995-03-15', 'arquero', '   ', @id OUTPUT, @pid OUTPUT; --> Valido: club solo espacios se guarda como NULL
--- EXEC plantel.jugador_insertar 'Test JU', 'Sin Param Club', '1995-03-15', 'mediocampista', @jugador_id = @id OUTPUT, @persona_id = @pid OUTPUT; --> Valido: sin pasar club (valor por defecto)
--- EXEC plantel.jugador_insertar 'Test JU', 'Club Largo', '1995-03-15', 'delantero', @c120, @id OUTPUT, @pid OUTPUT; --> Valido: club de 120 caracteres (borde)
--- EXEC plantel.jugador_insertar @n100, 'Nombre Largo', '1995-03-15', 'delantero', NULL, @id OUTPUT, @pid OUTPUT; --> Valido: nombre de 100 caracteres (borde)
--- EXEC plantel.jugador_insertar 'Test JU', 'Mediocampista', '1995-03-15', 'mediocampista', NULL, @id OUTPUT, @pid OUTPUT; --> Valido: posicion mediocampista
--- EXEC plantel.jugador_insertar 'Test JU', 'Borde 15', @f15, 'delantero', NULL, @id OUTPUT, @pid OUTPUT; --> Valido: justo 15 anios (borde)
--- EXEC plantel.jugador_insertar 'Test JU', 'Borde 50', @f50, 'delantero', NULL, @id OUTPUT, @pid OUTPUT; --> Valido: justo 50 anios (borde)
--- EXEC plantel.jugador_insertar 'Test JU', 'Base', '1996-03-15', 'delantero', NULL, @id OUTPUT, @pid OUTPUT; --> Valido: mismo nombre y apellido con otra fecha
--- EXEC plantel.jugador_insertar 'Test JU', 'Otra Fecha Igual', '1995-03-15', 'delantero', NULL, @id OUTPUT, @pid OUTPUT; --> Valido: misma fecha que otros jugadores con otro apellido
--- EXEC plantel.jugador_insertar NULL, 'Alta X', '1995-03-15', 'delantero', NULL, @id OUTPUT, @pid OUTPUT; --> Nombre nulo
--- EXEC plantel.jugador_insertar '', 'Alta X', '1995-03-15', 'delantero', NULL, @id OUTPUT, @pid OUTPUT; --> Nombre vacio
--- EXEC plantel.jugador_insertar '   ', 'Alta X', '1995-03-15', 'delantero', NULL, @id OUTPUT, @pid OUTPUT; --> Nombre solo espacios
--- EXEC plantel.jugador_insertar 'Test JU', NULL, '1995-03-15', 'delantero', NULL, @id OUTPUT, @pid OUTPUT; --> Apellido nulo
--- EXEC plantel.jugador_insertar 'Test JU', '', '1995-03-15', 'delantero', NULL, @id OUTPUT, @pid OUTPUT; --> Apellido vacio
--- EXEC plantel.jugador_insertar 'Test JU', '   ', '1995-03-15', 'delantero', NULL, @id OUTPUT, @pid OUTPUT; --> Apellido solo espacios
--- EXEC plantel.jugador_insertar 'Test JU', 'Alta X', NULL, 'delantero', NULL, @id OUTPUT, @pid OUTPUT; --> Fecha de nacimiento nula
--- EXEC plantel.jugador_insertar 'Test JU', 'Alta X', DATEADD(DAY, 1, @f15), 'delantero', NULL, @id OUTPUT, @pid OUTPUT; --> Menor de 15 anios (borde: un dia menos)
--- EXEC plantel.jugador_insertar 'Test JU', 'Alta X', DATEADD(DAY, -1, @f50), 'delantero', NULL, @id OUTPUT, @pid OUTPUT; --> Mayor de 50 anios (borde: un dia mas)
--- EXEC plantel.jugador_insertar 'Test JU', 'Alta X', '2999-01-01', 'delantero', NULL, @id OUTPUT, @pid OUTPUT; --> Fecha futura
--- EXEC plantel.jugador_insertar 'Test JU', 'Alta X', '1900-01-01', 'delantero', NULL, @id OUTPUT, @pid OUTPUT; --> Fecha muy antigua
--- EXEC plantel.jugador_insertar 'Test JU', 'Alta X', '1995-03-15', NULL, NULL, @id OUTPUT, @pid OUTPUT; --> Posicion nula
--- EXEC plantel.jugador_insertar 'Test JU', 'Alta X', '1995-03-15', '', NULL, @id OUTPUT, @pid OUTPUT; --> Posicion vacia
--- EXEC plantel.jugador_insertar 'Test JU', 'Alta X', '1995-03-15', 'portero', NULL, @id OUTPUT, @pid OUTPUT; --> Posicion invalida
--- EXEC plantel.jugador_insertar 'Test JU', 'Base', '1995-03-15', 'delantero', NULL, @id OUTPUT, @pid OUTPUT; --> Duplicado: mismo nombre, apellido y fecha que la base
--- EXEC plantel.jugador_insertar 'Test JU  ', 'Base  ', '1995-03-15', 'delantero', NULL, @id OUTPUT, @pid OUTPUT; --> Duplicado con espacios al final
--- EXEC plantel.jugador_insertar '  Test JU', '  Base', '1995-03-15', 'delantero', NULL, @id OUTPUT, @pid OUTPUT; --> Espacios al inicio: ya se detecta
--- EXEC plantel.jugador_insertar '', '', '1995-03-15', 'delantero', NULL, @id OUTPUT, @pid OUTPUT; --> 2 errores: nombre y apellido
--- EXEC plantel.jugador_insertar NULL, NULL, NULL, NULL, NULL, @id OUTPUT, @pid OUTPUT; --> 4 errores: nombre, apellido, fecha y posicion (todos nulos)
+
+-- E-3.6.19 Valido => se acepta
+BEGIN TRY EXEC plantel.jugador_insertar 'Test JU', 'Alta', '1995-03-15', 'delantero', 'Club Alta', @id OUTPUT, @pid OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.19', 'plantel.jugador_insertar: Valido', 0;
+-- E-3.6.20 Valido: se guarda recortado => se acepta
+BEGIN TRY EXEC plantel.jugador_insertar '  Test JU  ', '  Recortado  ', '1995-03-15', 'defensor', '  Club Recortado  ', @id OUTPUT, @pid OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.20', 'plantel.jugador_insertar: Valido: se guarda recortado', 0;
+-- E-3.6.21 Valido: club nulo => se acepta
+BEGIN TRY EXEC plantel.jugador_insertar 'Test JU', 'Sin Club', '1995-03-15', 'arquero', NULL, @id OUTPUT, @pid OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.21', 'plantel.jugador_insertar: Valido: club nulo', 0;
+-- E-3.6.22 Valido: club vacio se guarda como NULL => se acepta
+BEGIN TRY EXEC plantel.jugador_insertar 'Test JU', 'Club Vacio', '1995-03-15', 'arquero', '', @id OUTPUT, @pid OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.22', 'plantel.jugador_insertar: Valido: club vacio se guarda como NULL', 0;
+-- E-3.6.23 Valido: club solo espacios se guarda como NULL => se acepta
+BEGIN TRY EXEC plantel.jugador_insertar 'Test JU', 'Club Espacios', '1995-03-15', 'arquero', '   ', @id OUTPUT, @pid OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.23', 'plantel.jugador_insertar: Valido: club solo espacios se guarda como NULL', 0;
+-- E-3.6.24 Valido: sin pasar club (valor por defecto) => se acepta
+BEGIN TRY EXEC plantel.jugador_insertar 'Test JU', 'Sin Param Club', '1995-03-15', 'mediocampista', @jugador_id = @id OUTPUT, @persona_id = @pid OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.24', 'plantel.jugador_insertar: Valido: sin pasar club (valor por defecto)', 0;
+-- E-3.6.25 Valido: club de 120 caracteres (borde) => se acepta
+BEGIN TRY EXEC plantel.jugador_insertar 'Test JU', 'Club Largo', '1995-03-15', 'delantero', @c120, @id OUTPUT, @pid OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.25', 'plantel.jugador_insertar: Valido: club de 120 caracteres (borde)', 0;
+-- E-3.6.26 Valido: nombre de 100 caracteres (borde) => se acepta
+BEGIN TRY EXEC plantel.jugador_insertar @n100, 'Nombre Largo', '1995-03-15', 'delantero', NULL, @id OUTPUT, @pid OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.26', 'plantel.jugador_insertar: Valido: nombre de 100 caracteres (borde)', 0;
+-- E-3.6.27 Valido: posicion mediocampista => se acepta
+BEGIN TRY EXEC plantel.jugador_insertar 'Test JU', 'Mediocampista', '1995-03-15', 'mediocampista', NULL, @id OUTPUT, @pid OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.27', 'plantel.jugador_insertar: Valido: posicion mediocampista', 0;
+-- E-3.6.28 Valido: justo 15 anios (borde) => se acepta
+BEGIN TRY EXEC plantel.jugador_insertar 'Test JU', 'Borde 15', @f15, 'delantero', NULL, @id OUTPUT, @pid OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.28', 'plantel.jugador_insertar: Valido: justo 15 anios (borde)', 0;
+-- E-3.6.29 Valido: justo 50 anios (borde) => se acepta
+BEGIN TRY EXEC plantel.jugador_insertar 'Test JU', 'Borde 50', @f50, 'delantero', NULL, @id OUTPUT, @pid OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.29', 'plantel.jugador_insertar: Valido: justo 50 anios (borde)', 0;
+-- E-3.6.30 Valido: mismo nombre y apellido con otra fecha => se acepta
+BEGIN TRY EXEC plantel.jugador_insertar 'Test JU', 'Base', '1996-03-15', 'delantero', NULL, @id OUTPUT, @pid OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.30', 'plantel.jugador_insertar: Valido: mismo nombre y apellido con otra fecha', 0;
+-- E-3.6.31 Valido: misma fecha que otros jugadores con otro apellido => se acepta
+BEGIN TRY EXEC plantel.jugador_insertar 'Test JU', 'Otra Fecha Igual', '1995-03-15', 'delantero', NULL, @id OUTPUT, @pid OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.31', 'plantel.jugador_insertar: Valido: misma fecha que otros jugadores con otro apellido', 0;
 GO
 
--- Verificacion plantel.jugador_modificar
+PRINT '--- E-3.6.32 a E-3.6.36 plantel.jugador_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @m INT = (SELECT jugador_id FROM plantel.jugador WHERE nombre = 'Test JU' AND apellido IN ('Mod', 'Mod Nuevo')),
-        @base INT = (SELECT jugador_id FROM plantel.jugador WHERE nombre = 'Test JU' AND apellido = 'Base'),
+        @base INT = (SELECT jugador_id FROM plantel.jugador WHERE nombre = 'Test JU' AND apellido = 'Base' AND fecha_nacimiento = '1995-03-15'),
         @f15 DATE = DATEADD(YEAR, -15, CAST(SYSDATETIME() AS DATE)),
-        @f50 DATE = DATEADD(YEAR, -50, CAST(SYSDATETIME() AS DATE));
+        @f50 DATE = DATEADD(YEAR, -50, CAST(SYSDATETIME() AS DATE)),
+        @f15_menos DATE = DATEADD(DAY, 1, DATEADD(YEAR, -15, CAST(SYSDATETIME() AS DATE))),
+        @f50_mas DATE = DATEADD(DAY, -1, DATEADD(YEAR, -50, CAST(SYSDATETIME() AS DATE)));
 
-EXEC plantel.jugador_modificar @m, 'Test JU', 'Mod Nuevo', '1996-06-20', 'delantero', 'Club Nuevo'; --> Valido: cambia apellido, fecha, posicion y club
--- EXEC plantel.jugador_modificar @m, 'Test JU', 'Mod', '1995-03-15', 'defensor', ''; --> Valido: club vacio se guarda como NULL
--- EXEC plantel.jugador_modificar @m, 'Test JU', 'Mod', '1995-03-15', 'defensor', '   '; --> Valido: club solo espacios se guarda como NULL
--- EXEC plantel.jugador_modificar @m, 'Test JU', 'Mod', '1995-03-15', 'defensor'; --> Valido: sin pasar club (valor por defecto)
--- EXEC plantel.jugador_modificar @m, 'Test JU', 'Mod', '1995-03-15', 'mediocampista', 'Club Mod'; --> Valido: posicion mediocampista
--- EXEC plantel.jugador_modificar NULL, 'Test JU', 'Mod', '1995-03-15', 'defensor', NULL; --> Id nulo
--- EXEC plantel.jugador_modificar 999999, 'Test JU', 'Mod', '1995-03-15', 'defensor', NULL; --> Jugador inexistente
--- EXEC plantel.jugador_modificar @m, NULL, 'Mod', '1995-03-15', 'defensor', NULL; --> Nombre nulo
--- EXEC plantel.jugador_modificar @m, '', 'Mod', '1995-03-15', 'defensor', NULL; --> Nombre vacio
--- EXEC plantel.jugador_modificar @m, '   ', 'Mod', '1995-03-15', 'defensor', NULL; --> Nombre solo espacios
--- EXEC plantel.jugador_modificar @m, 'Test JU', NULL, '1995-03-15', 'defensor', NULL; --> Apellido nulo
--- EXEC plantel.jugador_modificar @m, 'Test JU', '', '1995-03-15', 'defensor', NULL; --> Apellido vacio
--- EXEC plantel.jugador_modificar @m, 'Test JU', '   ', '1995-03-15', 'defensor', NULL; --> Apellido solo espacios
--- EXEC plantel.jugador_modificar @m, 'Test JU', 'Mod', NULL, 'defensor', NULL; --> Fecha de nacimiento nula
--- EXEC plantel.jugador_modificar @m, 'Test JU', 'Mod', DATEADD(DAY, 1, @f15), 'defensor', NULL; --> Menor de 15 anios (borde: un dia menos)
--- EXEC plantel.jugador_modificar @m, 'Test JU', 'Mod', DATEADD(DAY, -1, @f50), 'defensor', NULL; --> Mayor de 50 anios (borde: un dia mas)
--- EXEC plantel.jugador_modificar @m, 'Test JU', 'Mod', '2999-01-01', 'defensor', NULL; --> Fecha futura
--- EXEC plantel.jugador_modificar @m, 'Test JU', 'Mod', '1900-01-01', 'defensor', NULL; --> Fecha muy antigua
--- EXEC plantel.jugador_modificar @m, 'Test JU', 'Mod', '1995-03-15', NULL, NULL; --> Posicion nula
--- EXEC plantel.jugador_modificar @m, 'Test JU', 'Mod', '1995-03-15', '', NULL; --> Posicion vacia
--- EXEC plantel.jugador_modificar @m, 'Test JU', 'Mod', '1995-03-15', 'portero', NULL; --> Posicion invalida
--- EXEC plantel.jugador_modificar @m, 'Test JU', 'Otro', '1995-03-15', 'defensor', NULL; --> Duplicado: coincide con otro jugador (nombre, apellido y fecha)
--- EXEC plantel.jugador_modificar @m, 'Test JU  ', 'Otro  ', '1995-03-15', 'defensor', NULL; --> Duplicado con espacios al final
--- EXEC plantel.jugador_modificar @m, '  Test JU', '  Otro', '1995-03-15', 'defensor', NULL; --> Espacios al inicio: antes no se detectaba, ahora si
--- EXEC plantel.jugador_modificar 999999, 'Test JU', 'Otro', '1995-03-15', 'defensor', NULL; --> 2 errores: jugador inexistente y duplicado
--- EXEC plantel.jugador_modificar 999999, 'Test JU', 'Otro', '1995-03-15', 'portero', NULL; --> 3 errores: jugador inexistente, posicion y duplicado
--- EXEC plantel.jugador_modificar NULL, NULL, NULL, NULL, NULL, NULL; --> 5 errores: id obligatorio, nombre, apellido, fecha y posicion
+-- E-3.6.32 Valido: cambia apellido, fecha, posicion y club => se acepta
+BEGIN TRY EXEC plantel.jugador_modificar @m, 'Test JU', 'Mod Nuevo', '1996-06-20', 'delantero', 'Club Nuevo'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.32', 'plantel.jugador_modificar: Valido: cambia apellido, fecha, posicion y club', 0;
+-- E-3.6.33 Valido: club vacio se guarda como NULL => se acepta
+BEGIN TRY EXEC plantel.jugador_modificar @m, 'Test JU', 'Mod', '1995-03-15', 'defensor', ''; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.33', 'plantel.jugador_modificar: Valido: club vacio se guarda como NULL', 0;
+-- E-3.6.34 Valido: club solo espacios se guarda como NULL => se acepta
+BEGIN TRY EXEC plantel.jugador_modificar @m, 'Test JU', 'Mod', '1995-03-15', 'defensor', '   '; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.34', 'plantel.jugador_modificar: Valido: club solo espacios se guarda como NULL', 0;
+-- E-3.6.35 Valido: sin pasar club (valor por defecto) => se acepta
+BEGIN TRY EXEC plantel.jugador_modificar @m, 'Test JU', 'Mod', '1995-03-15', 'defensor'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.35', 'plantel.jugador_modificar: Valido: sin pasar club (valor por defecto)', 0;
+-- E-3.6.36 Valido: posicion mediocampista => se acepta
+BEGIN TRY EXEC plantel.jugador_modificar @m, 'Test JU', 'Mod', '1995-03-15', 'mediocampista', 'Club Mod'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.36', 'plantel.jugador_modificar: Valido: posicion mediocampista', 0;
 GO
 
--- Verificacion plantel.jugador_eliminar
+PRINT '--- E-3.6.37 plantel.jugador_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @e INT = (SELECT jugador_id FROM plantel.jugador WHERE nombre = 'Test JU' AND apellido = 'Elim'),
         @et INT = (SELECT jugador_id FROM plantel.jugador WHERE nombre = 'Test JU' AND apellido = 'Elim Tran'),
-        @conv INT = (SELECT jugador_id FROM plantel.jugador WHERE nombre = 'Test JU' AND apellido = 'Convocado'),
-        @form INT = (SELECT jugador_id FROM plantel.jugador WHERE nombre = 'Test JU' AND apellido = 'Formacion'),
+        @conv INT = (SELECT jugador_id FROM plantel.jugador WHERE nombre = 'Test JU' AND apellido = 'Conv Otro'),
+        @form INT = (SELECT jugador_id FROM plantel.jugador WHERE nombre = 'Test JU' AND apellido = 'Convocado'),
         @tar INT = (SELECT jugador_id FROM plantel.jugador WHERE nombre = 'Test JU' AND apellido = 'Tarjeta');
 
-EXEC plantel.jugador_eliminar @e; --> Baja valida (sin convocatorias, formaciones ni tarjetas)
--- EXEC plantel.jugador_eliminar @e; --> Ya eliminado: jugador inexistente (ejecutar despues de la baja valida)
--- EXEC plantel.jugador_eliminar 999999; --> Jugador inexistente
--- EXEC plantel.jugador_eliminar NULL; --> Id nulo (el mensaje dice "(nulo)")
--- EXEC plantel.jugador_eliminar @conv; --> Tiene convocatorias registradas (pendiente: requiere convocatoria preparada)
--- EXEC plantel.jugador_eliminar @form; --> Integra formaciones de partidos (pendiente: requiere formacion_jugador preparada)
--- EXEC plantel.jugador_eliminar @tar; --> Tiene tarjetas registradas (pendiente: requiere tarjeta preparada)
+-- E-3.6.37 Baja valida (sin convocatorias, formaciones ni tarjetas) => se acepta
+BEGIN TRY EXEC plantel.jugador_eliminar @e; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.6.37', 'plantel.jugador_eliminar: Baja valida (sin convocatorias, formaciones ni tarjetas)', 0;
+GO
 
 -- ============================================================
--- 1.7 plantel.convocatoria
+-- 3.7 plantel.convocatoria
 -- ============================================================
--- Verificacion plantel.convocatoria_insertar
+
+PRINT '--- E-3.7.01 a E-3.7.12 plantel.convocatoria_insertar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @id INT,
         @s1 INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZCA'),
         @s2 INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZCB'),
@@ -1748,174 +2779,156 @@ DECLARE @id INT,
         @l9  INT = (SELECT jugador_id FROM plantel.jugador WHERE nombre = 'Test JU' AND apellido = 'Conv Libre 9'),
         @l10 INT = (SELECT jugador_id FROM plantel.jugador WHERE nombre = 'Test JU' AND apellido = 'Conv Libre 10');
 
-EXEC plantel.convocatoria_insertar @s3, @l1, 1, '2026-06-01', 'Convocatoria inicial', @id OUTPUT; --> Valido
--- EXEC plantel.convocatoria_insertar @s3, @l2, 2, '2026-06-01', '  Motivo con espacios  ', @id OUTPUT; --> Valido: motivo se guarda recortado
--- EXEC plantel.convocatoria_insertar @s3, @l3, 3, '2026-06-01', NULL, @id OUTPUT; --> Valido: motivo nulo
--- EXEC plantel.convocatoria_insertar @s3, @l4, 4, '2026-06-01', '', @id OUTPUT; --> Valido: motivo vacio se guarda como NULL
--- EXEC plantel.convocatoria_insertar @s3, @l5, 5, '2026-06-01', '   ', @id OUTPUT; --> Valido: motivo solo espacios se guarda como NULL
--- EXEC plantel.convocatoria_insertar @s3, @l6, 6, '2026-06-01', @convocatoria_id = @id OUTPUT; --> Valido: sin pasar motivo (valor por defecto)
--- EXEC plantel.convocatoria_insertar @s2, @l7, 1, '2026-06-01', NULL, @id OUTPUT; --> Valido: dorsal minimo (borde)
--- EXEC plantel.convocatoria_insertar @s2, @l8, 99, '2026-06-01', NULL, @id OUTPUT; --> Valido: dorsal maximo (borde)
--- EXEC plantel.convocatoria_insertar @s1, @l9, 5, '2026-06-01', NULL, @id OUTPUT; --> Valido: dorsal 5 usado solo por una convocatoria historica
--- EXEC plantel.convocatoria_insertar @s3, @l10, 7, '2026-06-01', NULL, @id OUTPUT; --> Valido: mismo dorsal que usa s1, pero en otra seleccion
--- EXEC plantel.convocatoria_insertar @s1, @jb, 6, '2026-06-01', NULL, @id OUTPUT; --> Valido: jugador con convocatoria historica vuelve a ser convocado en la misma seleccion
--- EXEC plantel.convocatoria_insertar @s2, @jb2, 6, '2026-06-01', NULL, @id OUTPUT; --> Valido: jugador con convocatoria historica convocado por otra seleccion
--- EXEC plantel.convocatoria_insertar 999999, @jl, 60, '2026-06-01', NULL, @id OUTPUT; --> Seleccion inexistente
--- EXEC plantel.convocatoria_insertar NULL, @jl, 60, '2026-06-01', NULL, @id OUTPUT; --> Seleccion nula
--- EXEC plantel.convocatoria_insertar @s3, 999999, 60, '2026-06-01', NULL, @id OUTPUT; --> Jugador inexistente
--- EXEC plantel.convocatoria_insertar @s3, NULL, 60, '2026-06-01', NULL, @id OUTPUT; --> Jugador nulo
--- EXEC plantel.convocatoria_insertar @s3, @jl, NULL, '2026-06-01', NULL, @id OUTPUT; --> Dorsal nulo
--- EXEC plantel.convocatoria_insertar @s3, @jl, 0, '2026-06-01', NULL, @id OUTPUT; --> Dorsal 0 (borde)
--- EXEC plantel.convocatoria_insertar @s3, @jl, -1, '2026-06-01', NULL, @id OUTPUT; --> Dorsal negativo
--- EXEC plantel.convocatoria_insertar @s3, @jl, 100, '2026-06-01', NULL, @id OUTPUT; --> Dorsal 100 (borde)
--- EXEC plantel.convocatoria_insertar @s3, @jl, 60, NULL, NULL, @id OUTPUT; --> Fecha de alta nula
--- EXEC plantel.convocatoria_insertar @s1, @jl, 8, '2026-06-01', NULL, @id OUTPUT; --> Dorsal en uso por una convocatoria vigente de la seleccion
--- EXEC plantel.convocatoria_insertar @s1, @jm, 20, '2026-06-01', NULL, @id OUTPUT; --> El jugador ya integra la convocatoria vigente de la seleccion
--- EXEC plantel.convocatoria_insertar @s3, @jm, 20, '2026-06-01', NULL, @id OUTPUT; --> El jugador esta convocado por otra seleccion
--- EXEC plantel.convocatoria_insertar @s1, @jm, 7, '2026-06-01', NULL, @id OUTPUT; --> 2 errores: dorsal en uso y jugador ya integra la convocatoria
--- EXEC plantel.convocatoria_insertar NULL, NULL, NULL, NULL, NULL, @id OUTPUT; --> 4 errores: seleccion, jugador, dorsal y fecha de alta (todo nulo)
+-- E-3.7.01 Valido => se acepta
+BEGIN TRY EXEC plantel.convocatoria_insertar @s3, @l1, 1, '2026-06-01', 'Convocatoria inicial', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.01', 'plantel.convocatoria_insertar: Valido', 0;
+-- E-3.7.02 Valido: motivo se guarda recortado => se acepta
+BEGIN TRY EXEC plantel.convocatoria_insertar @s3, @l2, 2, '2026-06-01', '  Motivo con espacios  ', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.02', 'plantel.convocatoria_insertar: Valido: motivo se guarda recortado', 0;
+-- E-3.7.03 Valido: motivo nulo => se acepta
+BEGIN TRY EXEC plantel.convocatoria_insertar @s3, @l3, 3, '2026-06-01', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.03', 'plantel.convocatoria_insertar: Valido: motivo nulo', 0;
+-- E-3.7.04 Valido: motivo vacio se guarda como NULL => se acepta
+BEGIN TRY EXEC plantel.convocatoria_insertar @s3, @l4, 4, '2026-06-01', '', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.04', 'plantel.convocatoria_insertar: Valido: motivo vacio se guarda como NULL', 0;
+-- E-3.7.05 Valido: motivo solo espacios se guarda como NULL => se acepta
+BEGIN TRY EXEC plantel.convocatoria_insertar @s3, @l5, 5, '2026-06-01', '   ', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.05', 'plantel.convocatoria_insertar: Valido: motivo solo espacios se guarda como NULL', 0;
+-- E-3.7.06 Valido: sin pasar motivo (valor por defecto) => se acepta
+BEGIN TRY EXEC plantel.convocatoria_insertar @s3, @l6, 6, '2026-06-01', @convocatoria_id = @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.06', 'plantel.convocatoria_insertar: Valido: sin pasar motivo (valor por defecto)', 0;
+-- E-3.7.07 Valido: dorsal minimo (borde) => se acepta
+BEGIN TRY EXEC plantel.convocatoria_insertar @s2, @l7, 1, '2026-06-01', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.07', 'plantel.convocatoria_insertar: Valido: dorsal minimo (borde)', 0;
+-- E-3.7.08 Valido: dorsal maximo (borde) => se acepta
+BEGIN TRY EXEC plantel.convocatoria_insertar @s2, @l8, 99, '2026-06-01', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.08', 'plantel.convocatoria_insertar: Valido: dorsal maximo (borde)', 0;
+-- E-3.7.09 Valido: dorsal 5 usado solo por una convocatoria historica => se acepta
+BEGIN TRY EXEC plantel.convocatoria_insertar @s1, @l9, 5, '2026-06-01', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.09', 'plantel.convocatoria_insertar: Valido: dorsal 5 usado solo por una convocatoria historica', 0;
+-- E-3.7.10 Valido: mismo dorsal que usa s1, pero en otra seleccion => se acepta
+BEGIN TRY EXEC plantel.convocatoria_insertar @s3, @l10, 7, '2026-06-01', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.10', 'plantel.convocatoria_insertar: Valido: mismo dorsal que usa s1, pero en otra seleccion', 0;
+-- E-3.7.11 Valido: jugador con convocatoria historica vuelve a ser convocado en la misma seleccion => se acepta
+BEGIN TRY EXEC plantel.convocatoria_insertar @s1, @jb, 6, '2026-06-01', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.11', 'plantel.convocatoria_insertar: Valido: jugador con convocatoria historica vuelve a ser convocado en la misma seleccion', 0;
+-- E-3.7.12 Valido: jugador con convocatoria historica convocado por otra seleccion => se acepta
+BEGIN TRY EXEC plantel.convocatoria_insertar @s2, @jb2, 6, '2026-06-01', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.12', 'plantel.convocatoria_insertar: Valido: jugador con convocatoria historica convocado por otra seleccion', 0;
 GO
 
--- Verificacion plantel.convocatoria_modificar
+PRINT '--- E-3.7.13 a E-3.7.26 plantel.convocatoria_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @cm INT, @cbm INT, @cb INT, @cb2 INT,
         @s1 INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZCA');
 SET @cm  = (SELECT c.convocatoria_id FROM plantel.convocatoria c JOIN plantel.jugador j ON j.jugador_id = c.jugador_id WHERE j.nombre = 'Test JU' AND j.apellido = 'Conv Mod'      AND c.seleccion_id = @s1);
 SET @cbm = (SELECT c.convocatoria_id FROM plantel.convocatoria c JOIN plantel.jugador j ON j.jugador_id = c.jugador_id WHERE j.nombre = 'Test JU' AND j.apellido = 'Conv Baja Mod' AND c.seleccion_id = @s1);
-SET @cb  = (SELECT c.convocatoria_id FROM plantel.convocatoria c JOIN plantel.jugador j ON j.jugador_id = c.jugador_id WHERE j.nombre = 'Test JU' AND j.apellido = 'Conv Baja'     AND c.seleccion_id = @s1);
+SET @cb  = (SELECT c.convocatoria_id FROM plantel.convocatoria c JOIN plantel.jugador j ON j.jugador_id = c.jugador_id WHERE j.nombre = 'Test JU' AND j.apellido = 'Conv Baja'     AND c.seleccion_id = @s1 AND c.fecha_baja IS NOT NULL);
 SET @cb2 = (SELECT c.convocatoria_id FROM plantel.convocatoria c JOIN plantel.jugador j ON j.jugador_id = c.jugador_id WHERE j.nombre = 'Test JU' AND j.apellido = 'Conv Baja 2'   AND c.seleccion_id = @s1);
 
--- EXEC plantel.convocatoria_modificar @cm, 12, '2026-06-02', 'Motivo nuevo', NULL, NULL; --> Valido: cambia dorsal, fecha y motivo de alta
--- EXEC plantel.convocatoria_modificar @cm, 7, '2026-06-01', 'Motivo inicial', NULL, NULL; --> Valido: sin cambios (no choca consigo misma)
--- EXEC plantel.convocatoria_modificar @cm, 7, '2026-06-01', '  Motivo  ', NULL, NULL; --> Valido: motivo de alta se guarda recortado
--- EXEC plantel.convocatoria_modificar @cm, 7, '2026-06-01', NULL, NULL, NULL; --> Valido: motivo de alta nulo
--- EXEC plantel.convocatoria_modificar @cm, 7, '2026-06-01', '', NULL, NULL; --> Valido: motivo de alta vacio se guarda como NULL
--- EXEC plantel.convocatoria_modificar @cm, 7, '2026-06-01', '   ', NULL, NULL; --> Valido: motivo de alta solo espacios se guarda como NULL
--- EXEC plantel.convocatoria_modificar @cm, 7, '2026-06-01'; --> Valido: sin pasar motivo ni baja (valores por defecto)
--- EXEC plantel.convocatoria_modificar @cm, 1, '2026-06-01', NULL, NULL, NULL; --> Valido: dorsal minimo (borde)
--- EXEC plantel.convocatoria_modificar @cm, 99, '2026-06-01', NULL, NULL, NULL; --> Valido: dorsal maximo (borde)
--- EXEC plantel.convocatoria_modificar @cm, 5, '2026-06-01', NULL, NULL, NULL; --> Valido: dorsal 5 usado solo por una convocatoria historica
--- EXEC plantel.convocatoria_modificar @cbm, 9, '2026-06-01', NULL, '2026-06-20', 'Lesion'; --> Valido: registrar la baja (queda historica)
--- EXEC plantel.convocatoria_modificar @cbm, 9, '2026-06-01', NULL, '2026-06-01', 'Reemplazo'; --> Valido: baja el mismo dia del alta (borde)
--- EXEC plantel.convocatoria_modificar @cbm, 9, '2026-06-01', NULL, NULL, NULL; --> Valido: reactivar la baja (vuelve a ser vigente; ejecutar despues de registrar la baja)
--- EXEC plantel.convocatoria_modificar @cb, 5, '2026-05-01', NULL, '2026-05-25', 'Reemplazo'; --> Valido: corregir fecha y motivo de baja de una historica
--- EXEC plantel.convocatoria_modificar NULL, 7, '2026-06-01'; --> Id nulo (el mensaje dice "(nulo)")
--- EXEC plantel.convocatoria_modificar 999999, 7, '2026-06-01'; --> Convocatoria inexistente
--- EXEC plantel.convocatoria_modificar @cm, NULL, '2026-06-01', NULL, NULL, NULL; --> Dorsal nulo
--- EXEC plantel.convocatoria_modificar @cm, 0, '2026-06-01', NULL, NULL, NULL; --> Dorsal 0 (borde)
--- EXEC plantel.convocatoria_modificar @cm, -1, '2026-06-01', NULL, NULL, NULL; --> Dorsal negativo
--- EXEC plantel.convocatoria_modificar @cm, 100, '2026-06-01', NULL, NULL, NULL; --> Dorsal 100 (borde)
--- EXEC plantel.convocatoria_modificar @cm, 7, NULL, NULL, NULL, NULL; --> Fecha de alta nula
--- EXEC plantel.convocatoria_modificar @cm, 7, '2026-06-01', NULL, '2026-05-31', 'Lesion'; --> Baja anterior al alta (borde: un dia antes)
--- EXEC plantel.convocatoria_modificar @cm, 7, '2026-06-01', NULL, NULL, 'Lesion'; --> Motivo de baja sin fecha de baja
--- EXEC plantel.convocatoria_modificar @cm, 7, '2026-06-01', NULL, NULL, ''; --> Motivo de baja vacio sin fecha de baja (vacio no es NULL)
--- EXEC plantel.convocatoria_modificar @cm, 7, '2026-06-01', NULL, '2026-06-10', NULL; --> Baja sin motivo (nulo)
--- EXEC plantel.convocatoria_modificar @cm, 7, '2026-06-01', NULL, '2026-06-10', ''; --> Baja con motivo vacio
--- EXEC plantel.convocatoria_modificar @cm, 7, '2026-06-01', NULL, '2026-06-10', '   '; --> Baja con motivo solo espacios
--- EXEC plantel.convocatoria_modificar @cm, 8, '2026-06-01', NULL, NULL, NULL; --> Dorsal en uso: lo tiene otra convocatoria vigente de la seleccion
--- EXEC plantel.convocatoria_modificar @cb, 8, '2026-05-01', NULL, NULL, NULL; --> Reactivar una baja con un dorsal que usa otra vigente
--- EXEC plantel.convocatoria_modificar @cm, 8, '2026-06-01', NULL, NULL, 'Lesion'; --> 2 errores: motivo sin fecha de baja y dorsal en uso
--- EXEC plantel.convocatoria_modificar @cm, 0, '2026-06-01', NULL, '2026-05-01', NULL; --> 3 errores: dorsal, baja anterior al alta y baja sin motivo
+-- E-3.7.13 Valido: cambia dorsal, fecha y motivo de alta => se acepta
+BEGIN TRY EXEC plantel.convocatoria_modificar @cm, 12, '2026-06-02', 'Motivo nuevo', NULL, NULL; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.13', 'plantel.convocatoria_modificar: Valido: cambia dorsal, fecha y motivo de alta', 0;
+-- E-3.7.14 Valido: sin cambios (no choca consigo misma) => se acepta
+BEGIN TRY EXEC plantel.convocatoria_modificar @cm, 7, '2026-06-01', 'Motivo inicial', NULL, NULL; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.14', 'plantel.convocatoria_modificar: Valido: sin cambios (no choca consigo misma)', 0;
+-- E-3.7.15 Valido: motivo de alta se guarda recortado => se acepta
+BEGIN TRY EXEC plantel.convocatoria_modificar @cm, 7, '2026-06-01', '  Motivo  ', NULL, NULL; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.15', 'plantel.convocatoria_modificar: Valido: motivo de alta se guarda recortado', 0;
+-- E-3.7.16 Valido: motivo de alta nulo => se acepta
+BEGIN TRY EXEC plantel.convocatoria_modificar @cm, 7, '2026-06-01', NULL, NULL, NULL; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.16', 'plantel.convocatoria_modificar: Valido: motivo de alta nulo', 0;
+-- E-3.7.17 Valido: motivo de alta vacio se guarda como NULL => se acepta
+BEGIN TRY EXEC plantel.convocatoria_modificar @cm, 7, '2026-06-01', '', NULL, NULL; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.17', 'plantel.convocatoria_modificar: Valido: motivo de alta vacio se guarda como NULL', 0;
+-- E-3.7.18 Valido: motivo de alta solo espacios se guarda como NULL => se acepta
+BEGIN TRY EXEC plantel.convocatoria_modificar @cm, 7, '2026-06-01', '   ', NULL, NULL; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.18', 'plantel.convocatoria_modificar: Valido: motivo de alta solo espacios se guarda como NULL', 0;
+-- E-3.7.19 Valido: sin pasar motivo ni baja (valores por defecto) => se acepta
+BEGIN TRY EXEC plantel.convocatoria_modificar @cm, 7, '2026-06-01'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.19', 'plantel.convocatoria_modificar: Valido: sin pasar motivo ni baja (valores por defecto)', 0;
+-- E-3.7.20 Valido: dorsal minimo (borde) => se acepta
+BEGIN TRY EXEC plantel.convocatoria_modificar @cm, 1, '2026-06-01', NULL, NULL, NULL; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.20', 'plantel.convocatoria_modificar: Valido: dorsal minimo (borde)', 0;
+-- E-3.7.21 Valido: dorsal maximo (borde) => se acepta
+BEGIN TRY EXEC plantel.convocatoria_modificar @cm, 99, '2026-06-01', NULL, NULL, NULL; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.21', 'plantel.convocatoria_modificar: Valido: dorsal maximo (borde)', 0;
+-- E-3.7.22 Valido: dorsal 4 usado solo por una convocatoria historica => se acepta
+BEGIN TRY EXEC plantel.convocatoria_modificar @cm, 4, '2026-06-01', NULL, NULL, NULL; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.22', 'plantel.convocatoria_modificar: Valido: dorsal 4 usado solo por una convocatoria historica', 0;
+-- E-3.7.23 Valido: registrar la baja (queda historica) => se acepta
+BEGIN TRY EXEC plantel.convocatoria_modificar @cbm, 9, '2026-06-01', NULL, '2026-06-20', 'Lesion'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.23', 'plantel.convocatoria_modificar: Valido: registrar la baja (queda historica)', 0;
+-- E-3.7.24 Valido: baja el mismo dia del alta (borde) => se acepta
+BEGIN TRY EXEC plantel.convocatoria_modificar @cbm, 9, '2026-06-01', NULL, '2026-06-01', 'Reemplazo'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.24', 'plantel.convocatoria_modificar: Valido: baja el mismo dia del alta (borde)', 0;
+-- E-3.7.25 Valido: reactivar la baja (vuelve a ser vigente; ejecutar despues de registrar la baja) => se acepta
+BEGIN TRY EXEC plantel.convocatoria_modificar @cbm, 9, '2026-06-01', NULL, NULL, NULL; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.25', 'plantel.convocatoria_modificar: Valido: reactivar la baja (vuelve a ser vigente; ejecutar despues de registrar la baja)', 0;
+-- E-3.7.26 Valido: corregir fecha y motivo de baja de una historica => se acepta
+BEGIN TRY EXEC plantel.convocatoria_modificar @cb, 5, '2026-05-01', NULL, '2026-05-25', 'Reemplazo'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.26', 'plantel.convocatoria_modificar: Valido: corregir fecha y motivo de baja de una historica', 0;
 GO
 
--- Verificacion plantel.convocatoria_eliminar
+PRINT '--- E-3.7.27 a E-3.7.28 plantel.convocatoria_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @ce INT, @ceb INT, @cf INT,
         @s1 INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZCA');
 SET @ce  = (SELECT c.convocatoria_id FROM plantel.convocatoria c JOIN plantel.jugador j ON j.jugador_id = c.jugador_id WHERE j.nombre = 'Test JU' AND j.apellido = 'Conv Elim'      AND c.seleccion_id = @s1);
 SET @ceb = (SELECT c.convocatoria_id FROM plantel.convocatoria c JOIN plantel.jugador j ON j.jugador_id = c.jugador_id WHERE j.nombre = 'Test JU' AND j.apellido = 'Conv Elim Baja' AND c.seleccion_id = @s1);
 SET @cf  = (SELECT c.convocatoria_id FROM plantel.convocatoria c JOIN plantel.jugador j ON j.jugador_id = c.jugador_id WHERE j.nombre = 'Test JU' AND j.apellido = 'Formacion'     AND c.seleccion_id = @s1);
 
-EXEC plantel.convocatoria_eliminar @ce; --> Baja valida: convocatoria vigente sin formaciones
--- EXEC plantel.convocatoria_eliminar @ceb; --> Baja valida: convocatoria historica (con baja) sin formaciones
--- EXEC plantel.convocatoria_eliminar 999999; --> Convocatoria inexistente
--- EXEC plantel.convocatoria_eliminar NULL; --> Id nulo (el mensaje dice "(nulo)")
+-- E-3.7.27 Baja valida: convocatoria vigente sin formaciones => se acepta
+BEGIN TRY EXEC plantel.convocatoria_eliminar @ce; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.27', 'plantel.convocatoria_eliminar: Baja valida: convocatoria vigente sin formaciones', 0;
+-- E-3.7.28 Baja valida: convocatoria historica (con baja) sin formaciones => se acepta
+BEGIN TRY EXEC plantel.convocatoria_eliminar @ceb; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.7.28', 'plantel.convocatoria_eliminar: Baja valida: convocatoria historica (con baja) sin formaciones', 0;
 GO
 
 -- ============================================================
--- 1.8 plantel.formacion y plantel.formacion_jugador (carga de a un jugador)
+-- 3.8 plantel.formacion y plantel.formacion_jugador (carga de a un jugador)
 -- ============================================================
--- Verificacion plantel.formacion_insertar
+
+PRINT '--- E-3.8.01 a E-3.8.06 plantel.formacion_insertar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @id INT,
         @pa INT = (SELECT partido_id FROM ##test_formacion WHERE clave = 'ins_a'),
         @pb INT = (SELECT partido_id FROM ##test_formacion WHERE clave = 'ins_b'),
         @pc INT = (SELECT partido_id FROM ##test_formacion WHERE clave = 'ins_c'),
         @pm INT = (SELECT partido_id FROM ##test_formacion WHERE clave = 'mod'),
         @pf INT = (SELECT partido_id FROM ##test_formacion WHERE clave = 'fin');
-EXEC plantel.formacion_insertar @pa, 'local', '4-3-3', @id OUTPUT; --> Valido
--- EXEC plantel.formacion_insertar @pa, 'visitante', '4-4-2', @id OUTPUT; --> Valido: mismo partido, la otra condicion
--- EXEC plantel.formacion_insertar @pb, 'local', '3-5-2', @id OUTPUT; --> Valido: otro esquema de 3 lineas
--- EXEC plantel.formacion_insertar @pb, 'visitante', '4-2-3-1', @id OUTPUT; --> Valido: esquema de 4 lineas
--- EXEC plantel.formacion_insertar @pc, 'local', '1-1-1-1-6', @id OUTPUT; --> Valido: 5 lineas y 9 caracteres (borde maximo)
--- EXEC plantel.formacion_insertar @pc, 'visitante', '1-1-8', @id OUTPUT; --> Valido: 3 lineas (borde minimo)
--- EXEC plantel.formacion_insertar @pc, 'visitante', '4-3-3', @formacion_id = @id OUTPUT; --> Duplicado si se ejecuto el caso anterior (visitante de @pc ya cargado)
--- EXEC plantel.formacion_insertar 999999, 'local', '4-3-3', @id OUTPUT; --> Partido inexistente
--- EXEC plantel.formacion_insertar NULL, 'local', '4-3-3', @id OUTPUT; --> Partido nulo
--- EXEC plantel.formacion_insertar @pf, 'visitante', '4-3-3', @id OUTPUT; --> Partido finalizado
--- EXEC plantel.formacion_insertar @pa, NULL, '4-3-3', @id OUTPUT; --> Condicion nula
--- EXEC plantel.formacion_insertar @pa, '', '4-3-3', @id OUTPUT; --> Condicion vacia
--- EXEC plantel.formacion_insertar @pa, 'otro', '4-3-3', @id OUTPUT; --> Condicion invalida
--- EXEC plantel.formacion_insertar @pm, 'local', '4-3-3', @id OUTPUT; --> El equipo local ya tiene formacion cargada
--- EXEC plantel.formacion_insertar @pm, 'visitante', '4-3-3', @id OUTPUT; --> El equipo visitante ya tiene formacion cargada
--- EXEC plantel.formacion_insertar @pc, 'local', NULL, @id OUTPUT; --> Esquema nulo
--- EXEC plantel.formacion_insertar @pc, 'local', '', @id OUTPUT; --> Esquema vacio
--- EXEC plantel.formacion_insertar @pc, 'local', '433', @id OUTPUT; --> Esquema sin guiones (1 linea)
--- EXEC plantel.formacion_insertar @pc, 'local', '5-5', @id OUTPUT; --> Esquema con 2 lineas (borde: una menos que el minimo)
--- EXEC plantel.formacion_insertar @pc, 'local', '1-1-1-1-1-5', @id OUTPUT; --> Esquema con 6 lineas y mas de 9 caracteres
--- EXEC plantel.formacion_insertar @pc, 'local', '4-3-2', @id OUTPUT; --> Suma 9 (borde: uno menos)
--- EXEC plantel.formacion_insertar @pc, 'local', '4-4-3', @id OUTPUT; --> Suma 11 (borde: uno mas)
--- EXEC plantel.formacion_insertar @pc, 'local', '4-0-6', @id OUTPUT; --> Linea con 0 jugadores
--- EXEC plantel.formacion_insertar @pc, 'local', '10-0-0', @id OUTPUT; --> Linea de 2 digitos
--- EXEC plantel.formacion_insertar @pc, 'local', '4-3-3-', @id OUTPUT; --> Guion final (linea vacia)
--- EXEC plantel.formacion_insertar @pc, 'local', '-4-3-3', @id OUTPUT; --> Guion inicial (linea vacia)
--- EXEC plantel.formacion_insertar @pc, 'local', '4--3-3', @id OUTPUT; --> Guiones consecutivos (linea vacia)
--- EXEC plantel.formacion_insertar @pc, 'local', '4-a-6', @id OUTPUT; --> Linea no numerica
--- EXEC plantel.formacion_insertar @pc, 'local', '4 -3-3', @id OUTPUT; --> Esquema con espacios
--- EXEC plantel.formacion_insertar @pc, 'local', '4-3-3-0', @id OUTPUT; --> 4 lineas pero una en 0
--- EXEC plantel.formacion_insertar 999999, 'otro', '433', @id OUTPUT; --> 3 errores: partido inexistente, condicion y esquema
--- EXEC plantel.formacion_insertar @pf, 'local', '4-4-3', @id OUTPUT; --> 3 errores: partido finalizado, formacion duplicada y esquema
+
+-- E-3.8.01 Valido => se acepta
+BEGIN TRY EXEC plantel.formacion_insertar @pa, 'local', '4-3-3', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.8.01', 'plantel.formacion_insertar: Valido', 0;
+-- E-3.8.02 Valido: mismo partido, la otra condicion => se acepta
+BEGIN TRY EXEC plantel.formacion_insertar @pa, 'visitante', '4-4-2', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.8.02', 'plantel.formacion_insertar: Valido: mismo partido, la otra condicion', 0;
+-- E-3.8.03 Valido: otro esquema de 3 lineas => se acepta
+BEGIN TRY EXEC plantel.formacion_insertar @pb, 'local', '3-5-2', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.8.03', 'plantel.formacion_insertar: Valido: otro esquema de 3 lineas', 0;
+-- E-3.8.04 Valido: esquema de 4 lineas => se acepta
+BEGIN TRY EXEC plantel.formacion_insertar @pb, 'visitante', '4-2-3-1', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.8.04', 'plantel.formacion_insertar: Valido: esquema de 4 lineas', 0;
+-- E-3.8.05 Valido: 5 lineas y 9 caracteres (borde maximo) => se acepta
+BEGIN TRY EXEC plantel.formacion_insertar @pc, 'local', '1-1-1-1-6', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.8.05', 'plantel.formacion_insertar: Valido: 5 lineas y 9 caracteres (borde maximo)', 0;
+-- E-3.8.06 Valido: 3 lineas (borde minimo) => se acepta
+BEGIN TRY EXEC plantel.formacion_insertar @pc, 'visitante', '1-1-8', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.8.06', 'plantel.formacion_insertar: Valido: 3 lineas (borde minimo)', 0;
 GO
 
--- Verificacion plantel.formacion_modificar
+PRINT '--- E-3.8.07 a E-3.8.11 plantel.formacion_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @fm INT = (SELECT formacion_id FROM ##test_formacion WHERE clave = 'mod'),
         @ff INT = (SELECT formacion_id FROM ##test_formacion WHERE clave = 'fin');
-EXEC plantel.formacion_modificar @fm, '4-3-3'; --> Valido: cambia el esquema
--- EXEC plantel.formacion_modificar @fm, '3-5-2'; --> Valido: otro esquema de 3 lineas
--- EXEC plantel.formacion_modificar @fm, '1-1-1-1-6'; --> Valido: 5 lineas y 9 caracteres (borde maximo)
--- EXEC plantel.formacion_modificar @fm, '1-1-8'; --> Valido: 3 lineas (borde minimo)
--- EXEC plantel.formacion_modificar @fm, '4-4-2'; --> Valido: deja la formacion como en la preparacion
--- EXEC plantel.formacion_modificar NULL, '4-3-3'; --> Id nulo (el mensaje dice "(nulo)")
--- EXEC plantel.formacion_modificar 999999, '4-3-3'; --> Formacion inexistente
--- EXEC plantel.formacion_modificar @ff, '4-3-3'; --> Partido finalizado
--- EXEC plantel.formacion_modificar @fm, NULL; --> Esquema nulo
--- EXEC plantel.formacion_modificar @fm, ''; --> Esquema vacio
--- EXEC plantel.formacion_modificar @fm, '433'; --> Esquema sin guiones (1 linea)
--- EXEC plantel.formacion_modificar @fm, '5-5'; --> Esquema con 2 lineas (borde: una menos que el minimo)
--- EXEC plantel.formacion_modificar @fm, '1-1-1-1-1-5'; --> Esquema con 6 lineas y mas de 9 caracteres
--- EXEC plantel.formacion_modificar @fm, '4-3-2'; --> Suma 9 (borde: uno menos)
--- EXEC plantel.formacion_modificar @fm, '4-4-3'; --> Suma 11 (borde: uno mas)
--- EXEC plantel.formacion_modificar @fm, '4-0-6'; --> Linea con 0 jugadores
--- EXEC plantel.formacion_modificar @fm, '10-0-0'; --> Linea de 2 digitos
--- EXEC plantel.formacion_modificar @fm, '4-3-3-'; --> Guion final (linea vacia)
--- EXEC plantel.formacion_modificar @fm, '4-a-6'; --> Linea no numerica
--- EXEC plantel.formacion_modificar @fm, '4 -3-3'; --> Esquema con espacios
--- EXEC plantel.formacion_modificar 999999, NULL; --> 2 errores: formacion inexistente y esquema nulo
--- EXEC plantel.formacion_modificar NULL, '433'; --> 2 errores: id nulo y esquema invalido
--- EXEC plantel.formacion_modificar @ff, '4-4-3'; --> 2 errores: partido finalizado y esquema invalido
--- EXEC plantel.formacion_modificar @ff, NULL; --> 2 errores: partido finalizado y esquema nulo
+
+-- E-3.8.07 Valido: cambia el esquema => se acepta
+BEGIN TRY EXEC plantel.formacion_modificar @fm, '4-3-3'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.8.07', 'plantel.formacion_modificar: Valido: cambia el esquema', 0;
+-- E-3.8.08 Valido: otro esquema de 3 lineas => se acepta
+BEGIN TRY EXEC plantel.formacion_modificar @fm, '3-5-2'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.8.08', 'plantel.formacion_modificar: Valido: otro esquema de 3 lineas', 0;
+-- E-3.8.09 Valido: 5 lineas y 9 caracteres (borde maximo) => se acepta
+BEGIN TRY EXEC plantel.formacion_modificar @fm, '1-1-1-1-6'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.8.09', 'plantel.formacion_modificar: Valido: 5 lineas y 9 caracteres (borde maximo)', 0;
+-- E-3.8.10 Valido: 3 lineas (borde minimo) => se acepta
+BEGIN TRY EXEC plantel.formacion_modificar @fm, '1-1-8'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.8.10', 'plantel.formacion_modificar: Valido: 3 lineas (borde minimo)', 0;
+-- E-3.8.11 Valido: deja la formacion como en la preparacion => se acepta
+BEGIN TRY EXEC plantel.formacion_modificar @fm, '4-4-2'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.8.11', 'plantel.formacion_modificar: Valido: deja la formacion como en la preparacion', 0;
 GO
 
--- Verificacion plantel.formacion_eliminar
+PRINT '--- E-3.8.12 a E-3.8.13 plantel.formacion_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @fe  INT = (SELECT formacion_id FROM ##test_formacion WHERE clave = 'elim'),
         @fe2 INT = (SELECT formacion_id FROM ##test_formacion WHERE clave = 'elim2'),
         @ff  INT = (SELECT formacion_id FROM ##test_formacion WHERE clave = 'fin'),
         @fj  INT = (SELECT formacion_id FROM ##test_formacion WHERE clave = 'jug');
-EXEC plantel.formacion_eliminar @fe; --> Baja valida: formacion sin jugadores de partido no finalizado
--- EXEC plantel.formacion_eliminar @fe2; --> Baja valida: la otra condicion del mismo partido
--- EXEC plantel.formacion_eliminar 999999; --> Formacion inexistente
--- EXEC plantel.formacion_eliminar NULL; --> Id nulo (el mensaje dice "(nulo)")
--- EXEC plantel.formacion_eliminar @ff; --> Partido finalizado
+
+-- E-3.8.12 Baja valida: formacion sin jugadores de partido no finalizado => se acepta
+BEGIN TRY EXEC plantel.formacion_eliminar @fe; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.8.12', 'plantel.formacion_eliminar: Baja valida: formacion sin jugadores de partido no finalizado', 0;
+-- E-3.8.13 Baja valida: la otra condicion del mismo partido => se acepta
+BEGIN TRY EXEC plantel.formacion_eliminar @fe2; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.8.13', 'plantel.formacion_eliminar: Baja valida: la otra condicion del mismo partido', 0;
 GO
 
--- Verificacion plantel.formacion_jugador_insertar
+PRINT '--- E-3.8.14 a E-3.8.18 plantel.formacion_jugador_insertar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @fj INT = (SELECT formacion_id FROM ##test_formacion WHERE clave = 'jug'),
         @fl INT = (SELECT formacion_id FROM ##test_formacion WHERE clave = 'fl_tit'),
         @fs INT = (SELECT formacion_id FROM ##test_formacion WHERE clave = 'fl_sup'),
@@ -1937,36 +2950,23 @@ DECLARE @fj INT = (SELECT formacion_id FROM ##test_formacion WHERE clave = 'jug'
         @sx   INT = (SELECT jugador_id FROM ##test_fjugador WHERE clave = 'sup_extra'),
         @sn   INT = (SELECT jugador_id FROM ##test_fjugador WHERE clave = 'sup_nuevo'),
         @susp INT = (SELECT jugador_id FROM ##test_fjugador WHERE clave = 'susp');
--- EXEC plantel.formacion_jugador_insertar @fj, @ins, 'Delantero', 1; --> Valido: titular (toma el dorsal 3 de su convocatoria)
--- EXEC plantel.formacion_jugador_insertar @fl, @l1, 'Lateral', 0; --> Valido: suplente en una formacion con los titulares completos
--- EXEC plantel.formacion_jugador_insertar @fl, @l2, '  Lateral  ', 0; --> Valido: la posicion se guarda recortada
--- EXEC plantel.formacion_jugador_insertar @fl, @adia, 'Lateral', 0; --> Valido: convocatoria con alta el mismo dia del partido (borde)
--- EXEC plantel.formacion_jugador_insertar @fs, @sn, 'Delantero', 1; --> Valido: titular en una formacion con el banco de suplentes completo
--- EXEC plantel.formacion_jugador_insertar 999999, @ins, 'Delantero', 1; --> Formacion inexistente
--- EXEC plantel.formacion_jugador_insertar NULL, @ins, 'Delantero', 1; --> Formacion nula
--- EXEC plantel.formacion_jugador_insertar @ff, @ins, 'Delantero', 1; --> Partido finalizado
--- EXEC plantel.formacion_jugador_insertar @fj, 999999, 'Delantero', 1; --> Jugador inexistente
--- EXEC plantel.formacion_jugador_insertar @fj, NULL, 'Delantero', 1; --> Jugador nulo
--- EXEC plantel.formacion_jugador_insertar @fj, @base, 'Delantero', 1; --> El jugador ya integra esa formacion
--- EXEC plantel.formacion_jugador_insertar @fl, @l3, NULL, 0; --> Posicion nula
--- EXEC plantel.formacion_jugador_insertar @fl, @l3, '', 0; --> Posicion vacia
--- EXEC plantel.formacion_jugador_insertar @fl, @l3, '   ', 0; --> Posicion solo espacios
--- EXEC plantel.formacion_jugador_insertar @fl, @l3, 'Defensor', NULL; --> Titular nulo
--- EXEC plantel.formacion_jugador_insertar @fj, @sc, 'Delantero', 1; --> Jugador sin convocatoria
--- EXEC plantel.formacion_jugador_insertar @fj, @t1, 'Delantero', 1; --> Jugador convocado solo por otra seleccion (ZCB)
--- EXEC plantel.formacion_jugador_insertar @fl, @hist, 'Defensor', 0; --> Convocatoria historica: baja anterior al partido
--- EXEC plantel.formacion_jugador_insertar @fl, @fut, 'Defensor', 0; --> Convocatoria con alta un dia despues del partido (borde)
--- EXEC plantel.formacion_jugador_insertar @fj, @p, 'Delantero', 1; --> Dorsal 40 ya usado en la formacion (lo conserva q1 aunque su convocatoria ahora tiene el 50)
--- EXEC plantel.formacion_jugador_insertar @fl, @tx, 'Delantero', 1; --> La formacion ya tiene el maximo de titulares (borde)
--- EXEC plantel.formacion_jugador_insertar @fs, @sx, 'Delantero', 0; --> El banco ya tiene el maximo de suplentes (borde)
--- EXEC plantel.formacion_jugador_insertar @fj, @susp, 'Delantero', 1; --> Jugador suspendido (ejecutar DESPUES de la preparacion de evento.suspension*)
--- EXEC plantel.formacion_jugador_insertar NULL, NULL, NULL, NULL; --> 4 errores: formacion, jugador, posicion y titular (todo nulo)
--- EXEC plantel.formacion_jugador_insertar @ff, @sc, '', 1; --> 3 errores: partido finalizado, posicion vacia y sin convocatoria
--- EXEC plantel.formacion_jugador_insertar @fj, @base, NULL, NULL; --> 3 errores: ya integra, posicion y titular
--- EXEC plantel.formacion_jugador_insertar @fj, @p, '', 1; --> 2 errores: posicion vacia y dorsal en uso
+
+-- E-3.8.14 Valido: titular (toma el dorsal 3 de su convocatoria) => se acepta
+BEGIN TRY EXEC plantel.formacion_jugador_insertar @fj, @ins, 'Delantero', 1; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.8.14', 'plantel.formacion_jugador_insertar: Valido: titular (toma el dorsal 3 de su convocatoria)', 0;
+-- E-3.8.15 Valido: suplente en una formacion con los titulares completos => se acepta
+BEGIN TRY EXEC plantel.formacion_jugador_insertar @fl, @l1, 'Lateral', 0; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.8.15', 'plantel.formacion_jugador_insertar: Valido: suplente en una formacion con los titulares completos', 0;
+-- E-3.8.16 Valido: la posicion se guarda recortada => se acepta
+BEGIN TRY EXEC plantel.formacion_jugador_insertar @fl, @l2, '  Lateral  ', 0; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.8.16', 'plantel.formacion_jugador_insertar: Valido: la posicion se guarda recortada', 0;
+-- E-3.8.17 Valido: convocatoria con alta el mismo dia del partido (borde) => se acepta
+BEGIN TRY EXEC plantel.formacion_jugador_insertar @fl, @adia, 'Lateral', 0; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.8.17', 'plantel.formacion_jugador_insertar: Valido: convocatoria con alta el mismo dia del partido (borde)', 0;
+-- E-3.8.18 Valido: titular en una formacion con el banco de suplentes completo => se acepta
+BEGIN TRY EXEC plantel.formacion_jugador_insertar @fs, @sn, 'Delantero', 1; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.8.18', 'plantel.formacion_jugador_insertar: Valido: titular en una formacion con el banco de suplentes completo', 0;
 GO
 
--- Verificacion plantel.formacion_jugador_modificar
+PRINT '--- E-3.8.19 a E-3.8.23 plantel.formacion_jugador_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @fj INT = (SELECT formacion_id FROM ##test_formacion WHERE clave = 'jug'),
         @fl INT = (SELECT formacion_id FROM ##test_formacion WHERE clave = 'fl_tit'),
         @fs INT = (SELECT formacion_id FROM ##test_formacion WHERE clave = 'fl_sup'),
@@ -1984,28 +2984,23 @@ DECLARE @fj INT = (SELECT formacion_id FROM ##test_formacion WHERE clave = 'jug'
         @supt INT = (SELECT jugador_id FROM ##test_fjugador WHERE clave = 'sup_tit'),
         @ssale INT = (SELECT jugador_id FROM ##test_fjugador WHERE clave = 'sust_sale'),
         @sent  INT = (SELECT jugador_id FROM ##test_fjugador WHERE clave = 'sust_entra');
-EXEC plantel.formacion_jugador_modificar @fj, @base, 'Extremo', 1; --> Valido: cambia la posicion
--- EXEC plantel.formacion_jugador_modificar @fj, @base, 'Delantero', 1; --> Valido: sin cambios (deja al jugador como en la preparacion)
--- EXEC plantel.formacion_jugador_modificar @fj, @base, '  Extremo  ', 1; --> Valido: la posicion se guarda recortada
--- EXEC plantel.formacion_jugador_modificar @fj, @base, 'Delantero', 0; --> Valido: titular pasa a suplente (sin sustituciones); restaurar con el caso siguiente
--- EXEC plantel.formacion_jugador_modificar @fj, @base, 'Delantero', 1; --> Valido: suplente vuelve a titular
--- EXEC plantel.formacion_jugador_modificar NULL, @base, 'Delantero', 1; --> Formacion nula
--- EXEC plantel.formacion_jugador_modificar 999999, @base, 'Delantero', 1; --> Formacion inexistente
--- EXEC plantel.formacion_jugador_modificar @ff, @fin, 'Delantero', 1; --> Partido finalizado
--- EXEC plantel.formacion_jugador_modificar @fj, 999999, 'Delantero', 1; --> 2 errores: jugador inexistente y no integra la formacion
--- EXEC plantel.formacion_jugador_modificar @fj, NULL, 'Delantero', 1; --> 2 errores: jugador nulo y no integra la formacion
--- EXEC plantel.formacion_jugador_modificar @fl, @l3, 'Defensor', 0; --> El jugador no integra esa formacion
--- EXEC plantel.formacion_jugador_modificar @fj, @base, NULL, 1; --> Posicion nula
--- EXEC plantel.formacion_jugador_modificar @fj, @base, '', 1; --> Posicion vacia
--- EXEC plantel.formacion_jugador_modificar @fj, @base, '   ', 1; --> Posicion solo espacios
--- EXEC plantel.formacion_jugador_modificar @fj, @base, 'Delantero', NULL; --> Titular nulo
--- EXEC plantel.formacion_jugador_modificar @fj, @zb, 'Defensor', 0; --> Su convocatoria ya no esta vigente a la fecha del partido (tiene baja)
--- EXEC plantel.formacion_jugador_modificar NULL, NULL, NULL, NULL; --> 4 errores: formacion, jugador, posicion y titular (todo nulo)
--- EXEC plantel.formacion_jugador_modificar @ff, @sc, 'Delantero', 1; --> 3 errores: partido finalizado, no integra la formacion y sin convocatoria vigente
--- EXEC plantel.formacion_jugador_modificar @fj, @r, NULL, NULL; --> 3 errores: posicion, titular y dorsal en uso
+
+-- E-3.8.19 Valido: cambia la posicion => se acepta
+BEGIN TRY EXEC plantel.formacion_jugador_modificar @fj, @base, 'Extremo', 1; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.8.19', 'plantel.formacion_jugador_modificar: Valido: cambia la posicion', 0;
+-- E-3.8.20 Valido: sin cambios (deja al jugador como en la preparacion) => se acepta
+BEGIN TRY EXEC plantel.formacion_jugador_modificar @fj, @base, 'Delantero', 1; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.8.20', 'plantel.formacion_jugador_modificar: Valido: sin cambios (deja al jugador como en la preparacion)', 0;
+-- E-3.8.21 Valido: la posicion se guarda recortada => se acepta
+BEGIN TRY EXEC plantel.formacion_jugador_modificar @fj, @base, '  Extremo  ', 1; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.8.21', 'plantel.formacion_jugador_modificar: Valido: la posicion se guarda recortada', 0;
+-- E-3.8.22 Valido: titular pasa a suplente (sin sustituciones); restaurar con el caso siguiente => se acepta
+BEGIN TRY EXEC plantel.formacion_jugador_modificar @fj, @base, 'Delantero', 0; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.8.22', 'plantel.formacion_jugador_modificar: Valido: titular pasa a suplente (sin sustituciones); restaurar con el caso siguiente', 0;
+-- E-3.8.23 Valido: suplente vuelve a titular => se acepta
+BEGIN TRY EXEC plantel.formacion_jugador_modificar @fj, @base, 'Delantero', 1; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.8.23', 'plantel.formacion_jugador_modificar: Valido: suplente vuelve a titular', 0;
 GO
 
--- Verificacion plantel.formacion_jugador_eliminar
+PRINT '--- E-3.8.24 a E-3.8.25 plantel.formacion_jugador_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @fj INT = (SELECT formacion_id FROM ##test_formacion WHERE clave = 'jug'),
         @fl INT = (SELECT formacion_id FROM ##test_formacion WHERE clave = 'fl_tit'),
         @ff INT = (SELECT formacion_id FROM ##test_formacion WHERE clave = 'fj_fin'),
@@ -2020,26 +3015,21 @@ DECLARE @fj INT = (SELECT formacion_id FROM ##test_formacion WHERE clave = 'jug'
         @gol   INT = (SELECT jugador_id FROM ##test_fjugador WHERE clave = 'gol'),
         @asis  INT = (SELECT jugador_id FROM ##test_fjugador WHERE clave = 'asis'),
         @tarj  INT = (SELECT jugador_id FROM ##test_fjugador WHERE clave = 'tarj');
-EXEC plantel.formacion_jugador_eliminar @fj, @elim; --> Baja valida: jugador sin sustituciones, goles ni tarjetas
--- EXEC plantel.formacion_jugador_eliminar @fj, @zb; --> Baja valida: jugador cuya convocatoria ya no esta vigente
--- EXEC plantel.formacion_jugador_eliminar @fl, @l3; --> El jugador no integra esa formacion
--- EXEC plantel.formacion_jugador_eliminar 999999, @base; --> Formacion inexistente 
--- EXEC plantel.formacion_jugador_eliminar NULL, @base; --> Formacion nula (idem)
--- EXEC plantel.formacion_jugador_eliminar @fj, 999999; --> Jugador inexistente 
--- EXEC plantel.formacion_jugador_eliminar @fj, NULL; --> Jugador nulo (idem)
--- EXEC plantel.formacion_jugador_eliminar @ff, @fin; --> Partido finalizado
--- EXEC plantel.formacion_jugador_eliminar @ff, @sc; --> 2 errores: no integra la formacion y partido finalizado
--- EXEC plantel.formacion_jugador_eliminar @fj, @ssale; --> Participa de sustituciones, como el que sale (ejecutar DESPUES de la preparacion de evento.sustitucion_*)
--- EXEC plantel.formacion_jugador_eliminar @fj, @sent; --> Participa de sustituciones, como el que entra (ejecutar DESPUES de la preparacion de evento.sustitucion_*)
--- EXEC plantel.formacion_jugador_eliminar @fj, @gol; --> Tiene goles registrados (ejecutar DESPUES de la preparacion de evento.gol_*)
--- EXEC plantel.formacion_jugador_eliminar @fj, @asis; --> Tiene asistencias registradas (ejecutar DESPUES de la preparacion de evento.gol_*)
--- EXEC plantel.formacion_jugador_eliminar @fj, @tarj; --> Tiene tarjetas registradas en el partido (ejecutar DESPUES de la preparacion de evento.tarjeta_*)
+
+-- E-3.8.24 Baja valida: jugador sin sustituciones, goles ni tarjetas => se acepta
+BEGIN TRY EXEC plantel.formacion_jugador_eliminar @fj, @elim; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.8.24', 'plantel.formacion_jugador_eliminar: Baja valida: jugador sin sustituciones, goles ni tarjetas', 0;
+-- E-3.8.25 Baja valida: jugador cuya convocatoria ya no esta vigente => se acepta
+BEGIN TRY EXEC plantel.formacion_jugador_eliminar @fj, @zb; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.8.25', 'plantel.formacion_jugador_eliminar: Baja valida: jugador cuya convocatoria ya no esta vigente', 0;
 GO
 
 -- ============================================================
--- 1.9 evento.sustitucion
+-- 3.9 evento.sustitucion
 -- ============================================================
--- Verificacion evento.sustitucion_insertar
+
+PRINT '--- E-3.9.01 a E-3.9.05 evento.sustitucion_insertar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @id INT,
         @C INT = (SELECT valor FROM torneo.parametro WHERE clave = 'cambios_max_reglamentarios'),
         @V INT = (SELECT valor FROM torneo.parametro WHERE clave = 'ventanas_max_reglamentarias'),
@@ -2081,67 +3071,22 @@ SET @V2  = @V + 2;
 SET @VW1 = @V + @W + 1;
 SET @ul  = (SELECT MAX(numero_ventana) FROM evento.sustitucion WHERE formacion_id = @fl);   -- última ventana usada en lim (la del alargue)
 
-
--- EXEC evento.sustitucion_insertar @fo, @ot1, @os1, 1,   'PT', 1, 'tactico',    @id OUTPUT; --> Valido: minuto minimo de PT (borde), primera ventana
--- EXEC evento.sustitucion_insertar @fo, @ot2, @os2, 60,  'PT', 1, 'lesion',     @id OUTPUT; --> Valido: minuto maximo de PT (borde), misma ventana que el cambio anterior
--- EXEC evento.sustitucion_insertar @fo, @os1, @os3, 45,  'ST', 2, 'precaucion', @id OUTPUT; --> Valido: reemplaza a quien ingresó antes (ejecutar despues del primero), minuto minimo de ST, ventana siguiente
--- EXEC evento.sustitucion_insertar @fo, @ot3, @os4, 110, 'ST', 2, 'tactico',    @id OUTPUT; --> Valido: minuto maximo de ST (borde), misma ventana
-
--- EXEC evento.sustitucion_insertar @fo, @otl, @osl, 70, 'PT', 1, 'tactico', @id OUTPUT; --> Minuto de ST en PT
--- EXEC evento.sustitucion_insertar @fo, NULL, @osl, 30, 'PT', 1, 'tactico', @id OUTPUT; --> Jugador que sale nulo (no integra la formación)
--- EXEC evento.sustitucion_insertar @fo, @otl, NULL, 30, 'PT', 1, 'tactico', @id OUTPUT; --> Jugador que entra nulo (no integra la formación)
--- EXEC evento.sustitucion_insertar @fo, @fu, @osl, 30, 'PT', 1, 'tactico', @id OUTPUT; --> El que sale no integra la formación (convocado pero no cargado)
--- EXEC evento.sustitucion_insertar @fo, @osl, @os1, 30, 'PT', 1, 'tactico', @id OUTPUT; --> El que sale es suplente y todavía no ingresó (no está en cancha)
--- EXEC evento.sustitucion_insertar @fo, @ot1, @ot2, 30, 'PT', 1, 'tactico', @id OUTPUT; --> El que entra es titular (no está disponible en el banco)
-
--- f_ok errores DESPUES de los válidos
--- EXEC evento.sustitucion_insertar @fo, @ot1, @osl, 80, 'ST', 2, 'tactico', @id OUTPUT; --> El que sale ya había sido reemplazado (no está en cancha)
--- EXEC evento.sustitucion_insertar @fo, @os1, @osl, 80, 'ST', 2, 'tactico', @id OUTPUT; --> El que sale ingresó y después fue reemplazado (no está en cancha)
--- EXEC evento.sustitucion_insertar @fo, @otl, @os2, 80, 'ST', 2, 'tactico', @id OUTPUT; --> El que entra ya había ingresado (no disponible en el banco)
--- EXEC evento.sustitucion_insertar @fo, @otl, @ot1, 80, 'ST', 2, 'tactico', @id OUTPUT; --> El que entra es un titular que ya salió (no disponible en el banco)
--- EXEC evento.sustitucion_insertar @fo, @otl, @osl, 30, 'PT', 2, 'tactico', @id OUTPUT; --> Ventana 2 ya usada en otro período (ST)
--- EXEC evento.sustitucion_insertar @fo, @otl, @osl, 50, 'ST', 1, 'tactico', @id OUTPUT; --> 2 errores: ventana anterior a la última y ventana 1 ya usada en otro período (PT)
-
--- f_gen: ventana V = última usada, V cambios (menos que el máximo). Todos estos casos son estables (no registran nada)
--- EXEC evento.sustitucion_insertar NULL, @gtl, @gsl, 80, 'ST', @V, 'tactico', @id OUTPUT; --> Formación nula (el mensaje dice "(nulo)")
--- EXEC evento.sustitucion_insertar 999999, @gtl, @gsl, 80, 'ST', @V, 'tactico', @id OUTPUT; --> Formación inexistente
---  EXEC evento.sustitucion_insertar @ff, @xtl, @xsl, 70, 'ST', 2, 'tactico', @id OUTPUT; --> El partido ya está finalizado
--- EXEC evento.sustitucion_insertar @fg, @gtl, @gsl, 80, 'ST', @V, NULL, @id OUTPUT; --> Motivo nulo
--- EXEC evento.sustitucion_insertar @fg, @gtl, @gsl, 80, 'ST', @V, 'otro', @id OUTPUT; --> Motivo inválido
--- EXEC evento.sustitucion_insertar @fg, @gtl, @gsl, 80, 'ST', @V, '', @id OUTPUT; --> Motivo vacio
--- EXEC evento.sustitucion_insertar @fg, @gtl, @gsl, 80, NULL, @V, 'tactico', @id OUTPUT; --> Período nulo
--- EXEC evento.sustitucion_insertar @fg, @gtl, @gsl, 80, 'XX', @V, 'tactico', @id OUTPUT; --> Período inválido
--- EXEC evento.sustitucion_insertar @fg, @gtl, @gsl, NULL, 'ST', @V, 'tactico', @id OUTPUT; --> Minuto nulo (el mensaje dice "(nulo)")
--- EXEC evento.sustitucion_insertar @fg, @gtl, @gsl, 44,  'ST', @V, 'tactico', @id OUTPUT; --> Minuto 44 en ST (borde)
--- EXEC evento.sustitucion_insertar @fg, @gtl, @gsl, 111, 'ST', @V, 'tactico', @id OUTPUT; --> Minuto 111 en ST (borde)
--- EXEC evento.sustitucion_insertar @fg, @gtl, @gsl, 89,  'alargue_1', @V1, 'tactico', @id OUTPUT; --> Minuto 89 en alargue_1 (borde)
--- EXEC evento.sustitucion_insertar @fg, @gtl, @gsl, 116, 'alargue_1', @V1, 'tactico', @id OUTPUT; --> Minuto 116 en alargue_1 (borde)
--- EXEC evento.sustitucion_insertar @fg, @gtl, @gsl, 104, 'alargue_2', @V1, 'tactico', @id OUTPUT; --> Minuto 104 en alargue_2 (borde)
--- EXEC evento.sustitucion_insertar @fg, @gtl, @gsl, 136, 'alargue_2', @V1, 'tactico', @id OUTPUT; --> Minuto 136 en alargue_2 (borde)
--- EXEC evento.sustitucion_insertar @fg, @gtl, @gsl, 80, 'ST', NULL, 'tactico', @id OUTPUT; --> Ventana nula
--- EXEC evento.sustitucion_insertar @fg, @gtl, @gsl, 80, 'ST', 0, 'tactico', @id OUTPUT; --> 2 errores: ventana 0 y orden de ventanas (anterior a la última)
--- EXEC evento.sustitucion_insertar @fg, @gtl, @gsl, 80, 'ST', @V1, 'tactico', @id OUTPUT; --> Se superan las ventanas reglamentarias (la siguiente a la última, pero fuera de las permitidas)
--- EXEC evento.sustitucion_insertar @fg, @gtl, @gsl, 80, 'ST', @V2, 'tactico', @id OUTPUT; --> 2 errores: salto de ventana y se superan las reglamentarias
--- EXEC evento.sustitucion_insertar @fg, @gtl, @gsl, 30, 'PT', 1, 'tactico', @id OUTPUT; --> Ventana anterior a la última (el mensaje dice "corresponde la V o la V+1")
--- EXEC evento.sustitucion_insertar @fg, @gtl, @gsl, 30, 'PT', @V, 'tactico', @id OUTPUT; --> Ventana V ya usada en otro período (ST)
--- EXEC evento.sustitucion_insertar @fg, @gt1, @gsl, 80, 'ST', @V, 'tactico', @id OUTPUT; --> El que sale ya había sido reemplazado (no está en cancha)
--- EXEC evento.sustitucion_insertar @fg, @gsl, @gsl2, 80, 'ST', @V, 'tactico', @id OUTPUT; --> El que sale es suplente y no ingresó (no está en cancha)
--- EXEC evento.sustitucion_insertar @fg, @gtl, @gtl2, 80, 'ST', @V, 'tactico', @id OUTPUT; --> El que entra es titular (no está disponible en el banco)
--- EXEC evento.sustitucion_insertar @fg, @gtl, @gs1, 80, 'ST', @V, 'tactico', @id OUTPUT; --> El que entra ya había ingresado (no disponible en el banco)
--- EXEC evento.sustitucion_insertar @fg, @gt1, @gs1, 44, 'ST', @V, 'otro', @id OUTPUT; --> 4 errores: motivo, minuto, sale ya reemplazado y entra ya ingresado
-
--- f_alg: máximo de cambios reglamentarios cargado, sin alargue
--- EXEC evento.sustitucion_insertar @fa, @atl, @asl, 80, 'ST', @V, 'tactico', @id OUTPUT; --> Se alcanzó el máximo de cambios en tiempo reglamentario
--- EXEC evento.sustitucion_insertar @fa, @atl, @asl, 100, 'alargue_1', @VW1, 'tactico', @id OUTPUT; --> 2 errores: se superan las ventanas con el adicional del alargue y salto de ventana
--- EXEC evento.sustitucion_insertar @fa, @atl, @asl, 90, 'alargue_1', @V1, 'tactico', @id OUTPUT; --> Valido: primer cambio adicional del alargue, primera ventana adicional, minuto minimo de alargue_1 (borde)
-
--- f_lim: máximo de cambios reglamentarios + todos los del alargue
--- EXEC evento.sustitucion_insertar @fl, @ltl, @lsl, 100, 'alargue_1', @ul, 'tactico', @id OUTPUT; --> Se alcanzó el máximo de cambios incluyendo el adicional del alargue
--- EXEC evento.sustitucion_insertar @fl, @ltl, @lsl, 110, 'alargue_2', @ul, 'tactico', @id OUTPUT; --> 2 errores: máximo de cambios con alargue y ventana ya usada en otro período (alargue_1)
--- EXEC evento.sustitucion_insertar @fl, @ltl, @lsl, 80, 'ST', @V, 'tactico', @id OUTPUT; --> 2 errores: máximo de cambios reglamentarios y ventana anterior a la última
+-- E-3.9.01 Valido: minuto minimo de PT (borde), primera ventana => se acepta
+BEGIN TRY EXEC evento.sustitucion_insertar @fo, @ot1, @os1, 1,   'PT', 1, 'tactico',    @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.9.01', 'evento.sustitucion_insertar: Valido: minuto minimo de PT (borde), primera ventana', 0;
+-- E-3.9.02 Valido: minuto maximo de PT (borde), misma ventana que el cambio anterior => se acepta
+BEGIN TRY EXEC evento.sustitucion_insertar @fo, @ot2, @os2, 60,  'PT', 1, 'lesion',     @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.9.02', 'evento.sustitucion_insertar: Valido: minuto maximo de PT (borde), misma ventana que el cambio anterior', 0;
+-- E-3.9.03 Valido: reemplaza a quien ingresó antes (ejecutar despues del primero), minuto minimo de ST, ventana siguiente => se acepta
+BEGIN TRY EXEC evento.sustitucion_insertar @fo, @os1, @os3, 45,  'ST', 2, 'precaucion', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.9.03', 'evento.sustitucion_insertar: Valido: reemplaza a quien ingresó antes (ejecutar despues del primero), minuto minimo de ST, ventana siguiente', 0;
+-- E-3.9.04 Valido: minuto maximo de ST (borde), misma ventana => se acepta
+BEGIN TRY EXEC evento.sustitucion_insertar @fo, @ot3, @os4, 110, 'ST', 2, 'tactico',    @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.9.04', 'evento.sustitucion_insertar: Valido: minuto maximo de ST (borde), misma ventana', 0;
+-- E-3.9.05 Valido: primer cambio adicional del alargue, primera ventana adicional, minuto minimo de alargue_1 (borde) => se acepta
+BEGIN TRY EXEC evento.sustitucion_insertar @fa, @atl, @asl, 90, 'alargue_1', @V1, 'tactico', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.9.05', 'evento.sustitucion_insertar: Valido: primer cambio adicional del alargue, primera ventana adicional, minuto minimo de alargue_1 (borde)', 0;
 GO
 
--- Verificacion evento.sustitucion_modificar
+PRINT '--- E-3.9.06 a E-3.9.10 evento.sustitucion_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @C INT = (SELECT valor FROM torneo.parametro WHERE clave = 'cambios_max_reglamentarios'),
         @V INT = (SELECT valor FROM torneo.parametro WHERE clave = 'ventanas_max_reglamentarias'),
         @W INT = (SELECT valor FROM torneo.parametro WHERE clave = 'ventanas_extra_alargue'),
@@ -2159,66 +3104,44 @@ SET @ul  = (SELECT MAX(numero_ventana) FROM evento.sustitucion WHERE formacion_i
 SET @mA  = (SELECT sustitucion_id FROM ##test_sustitucion WHERE clave = 'lim_x' + CAST(@C + 1 AS VARCHAR(3)));   -- el cambio de alargue de lim
 SET @mg  = (SELECT sustitucion_id FROM evento.sustitucion WHERE formacion_id = @fj AND jugador_sale_id = @ss);  -- NULL hasta registrar el cambio en la formación jug (ver más abajo)
 
-EXEC evento.sustitucion_modificar @m1, 25, 'PT', 1, 'lesion'; --> Valido: cambia minuto y motivo
-
--- EXEC evento.sustitucion_modificar @m1, 1,  'PT', 1, 'tactico'; --> Valido: minuto minimo de PT (borde)
--- EXEC evento.sustitucion_modificar @m1, 60, 'PT', 1, 'precaucion'; --> Valido: minuto maximo de PT (borde)
--- EXEC evento.sustitucion_modificar @m2, 45,  'ST', 2, 'tactico'; --> Valido: minuto minimo de ST (borde)
--- EXEC evento.sustitucion_modificar @m2, 110, 'ST', 2, 'lesion'; --> Valido: minuto maximo de ST (borde)
--- EXEC evento.sustitucion_modificar NULL, 30, 'PT', 1, 'tactico'; --> Id nulo (el mensaje dice "(nulo)")
--- EXEC evento.sustitucion_modificar 999999, 30, 'PT', 1, 'tactico'; --> Sustitución inexistente
--- EXEC evento.sustitucion_modificar @mf, 30, 'PT', 1, 'tactico'; --> El partido ya está finalizado
--- EXEC evento.sustitucion_modificar @m1, 20, 'PT', 1, NULL; --> Motivo nulo
--- EXEC evento.sustitucion_modificar @m1, 20, 'PT', 1, 'otro'; --> Motivo inválido
--- EXEC evento.sustitucion_modificar @m1, 20, 'PT', 1, ''; --> Motivo vacio
--- EXEC evento.sustitucion_modificar @m1, 20, NULL, 1, 'tactico'; --> Período nulo
--- EXEC evento.sustitucion_modificar @m1, 20, 'XX', 1, 'tactico'; --> Período inválido
--- EXEC evento.sustitucion_modificar @m1, NULL, 'PT', 1, 'tactico'; --> Minuto nulo (el mensaje dice "(nulo)")
--- EXEC evento.sustitucion_modificar @m1, 0,   'PT', 1, 'tactico'; --> Minuto 0 en PT (borde)
--- EXEC evento.sustitucion_modificar @m1, 61,  'PT', 1, 'tactico'; --> Minuto 61 en PT (borde)
--- EXEC evento.sustitucion_modificar @m1, 44,  'ST', 1, 'tactico'; --> Minuto 44 en ST (borde)
--- EXEC evento.sustitucion_modificar @m1, 111, 'ST', 1, 'tactico'; --> Minuto 111 en ST (borde)
--- EXEC evento.sustitucion_modificar @m1, 89,  'alargue_1', 1, 'tactico'; --> Minuto 89 en alargue_1 (borde)
--- EXEC evento.sustitucion_modificar @m1, 116, 'alargue_1', 1, 'tactico'; --> Minuto 116 en alargue_1 (borde)
--- EXEC evento.sustitucion_modificar @m1, 104, 'alargue_2', 1, 'tactico'; --> Minuto 104 en alargue_2 (borde)
--- EXEC evento.sustitucion_modificar @m1, 136, 'alargue_2', 1, 'tactico'; --> Minuto 136 en alargue_2 (borde)
--- EXEC evento.sustitucion_modificar @m1, 20, 'PT', NULL, 'tactico'; --> Ventana nula
--- EXEC evento.sustitucion_modificar @m1, 20, 'PT', 0, 'tactico'; --> Ventana 0 (borde)
--- EXEC evento.sustitucion_modificar @m1, 20, 'PT', -1, 'tactico'; --> Ventana negativa
--- EXEC evento.sustitucion_modificar @m2, 60, 'ST', @V1, 'tactico'; --> Se superan las ventanas reglamentarias
--- EXEC evento.sustitucion_modificar @m1, 100, 'alargue_1', @VW1, 'tactico'; --> Se superan las ventanas incluyendo la adicional del alargue
--- EXEC evento.sustitucion_modificar @m1, 20, 'PT', 2, 'tactico'; --> Ventana 2 ya usada en otro período (ST)
--- EXEC evento.sustitucion_modificar @m2, 60, 'ST', 1, 'tactico'; --> Ventana 1 ya usada en otro período (PT)
--- EXEC evento.sustitucion_modificar @mA, 80, 'ST', @V, 'tactico'; --> Pasar un cambio de alargue a reglamentario cuando ya está el máximo reglamentario
--- EXEC evento.sustitucion_modificar @m1, 0, 'PT', 1, 'otro'; --> 2 errores: minuto y motivo
--- EXEC evento.sustitucion_modificar @m1, 0, 'PT', 0, 'otro'; --> 3 errores: minuto, motivo y ventana
--- Fase de grupos: primero registrar un cambio en la formación jug (queda registrado; volver a calcular @mg al ejecutar de nuevo el bloque)
--- EXEC evento.sustitucion_modificar @mg, 95, 'alargue_1', 1, 'tactico'; --> En fase de grupos no hay tiempo suplementario
+-- E-3.9.06 Valido: cambia minuto y motivo => se acepta
+BEGIN TRY EXEC evento.sustitucion_modificar @m1, 25, 'PT', 1, 'lesion'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.9.06', 'evento.sustitucion_modificar: Valido: cambia minuto y motivo', 0;
+-- E-3.9.07 Valido: minuto minimo de PT (borde) => se acepta
+BEGIN TRY EXEC evento.sustitucion_modificar @m1, 1,  'PT', 1, 'tactico'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.9.07', 'evento.sustitucion_modificar: Valido: minuto minimo de PT (borde)', 0;
+-- E-3.9.08 Valido: minuto maximo de PT (borde) => se acepta
+BEGIN TRY EXEC evento.sustitucion_modificar @m1, 60, 'PT', 1, 'precaucion'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.9.08', 'evento.sustitucion_modificar: Valido: minuto maximo de PT (borde)', 0;
+-- E-3.9.09 Valido: minuto minimo de ST (borde) => se acepta
+BEGIN TRY EXEC evento.sustitucion_modificar @m2, 45,  'ST', 2, 'tactico'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.9.09', 'evento.sustitucion_modificar: Valido: minuto minimo de ST (borde)', 0;
+-- E-3.9.10 Valido: minuto maximo de ST (borde) => se acepta
+BEGIN TRY EXEC evento.sustitucion_modificar @m2, 110, 'ST', 2, 'lesion'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.9.10', 'evento.sustitucion_modificar: Valido: minuto maximo de ST (borde)', 0;
 GO
 
--- Verificacion evento.sustitucion_eliminar
+PRINT '--- E-3.9.11 a E-3.9.13 evento.sustitucion_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @e1 INT = (SELECT sustitucion_id FROM ##test_sustitucion WHERE clave = 'eli_x1'),
         @e2 INT = (SELECT sustitucion_id FROM ##test_sustitucion WHERE clave = 'eli_x2'),
         @e3 INT = (SELECT sustitucion_id FROM ##test_sustitucion WHERE clave = 'eli_x3'),
         @ef INT = (SELECT sustitucion_id FROM ##test_sustitucion WHERE clave = 'fin_x1'),
         @eg INT = (SELECT sustitucion_id FROM ##test_sustitucion WHERE clave = 'gen_x1');
 
-EXEC evento.sustitucion_eliminar @e1; --> Baja valida: el que ingresó no fue reemplazado ni tiene goles
--- EXEC evento.sustitucion_eliminar @e2; --> El jugador que ingresó fue reemplazado después (x3): ejecutar ANTES de eliminar x3
--- EXEC evento.sustitucion_eliminar @e3; --> Baja valida: cambio posterior sin consecuencias
--- EXEC evento.sustitucion_eliminar @e2; --> Baja valida: ejecutar DESPUES de eliminar x3
--- EXEC evento.sustitucion_eliminar @ef; --> El partido ya está finalizado
--- EXEC evento.sustitucion_eliminar 999999; --> Sustitución inexistente
--- EXEC evento.sustitucion_eliminar NULL; --> Id nulo (el mensaje dice "(nulo)")
--- EXEC evento.sustitucion_eliminar @eg; --> El jugador que ingresó tiene goles o asistencias en el partido
-
-
+-- E-3.9.11 Baja valida: el que ingresó no fue reemplazado ni tiene goles => se acepta
+BEGIN TRY EXEC evento.sustitucion_eliminar @e1; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.9.11', 'evento.sustitucion_eliminar: Baja valida: el que ingresó no fue reemplazado ni tiene goles', 0;
+-- E-3.9.12 Baja valida: cambio posterior sin consecuencias => se acepta
+BEGIN TRY EXEC evento.sustitucion_eliminar @e3; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.9.12', 'evento.sustitucion_eliminar: Baja valida: cambio posterior sin consecuencias', 0;
+-- E-3.9.13 Baja valida: ejecutar DESPUES de eliminar x3 => se acepta
+BEGIN TRY EXEC evento.sustitucion_eliminar @e2; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.9.13', 'evento.sustitucion_eliminar: Baja valida: ejecutar DESPUES de eliminar x3', 0;
+GO
 
 -- ============================================================
--- 1.10 evento.gol (cada operación actualiza el marcador del partido en la misma transacción)
+-- 3.10 evento.gol (cada operación actualiza el marcador del partido en la misma transacción)
 -- ============================================================
 
--- Verificacion evento.gol_insertar
+PRINT '--- E-3.10.01 a E-3.10.30 evento.gol_insertar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @id INT,
         @fl INT = (SELECT formacion_id FROM ##test_gol WHERE clave = 'f_loc'),
         @fv INT = (SELECT formacion_id FROM ##test_gol WHERE clave = 'f_vis'),
@@ -2235,85 +3158,73 @@ DECLARE @id INT,
         @zt INT = (SELECT jugador_id FROM ##test_gol WHERE clave = 'z_t1'),
         @jg INT = (SELECT jugador_id FROM ##test_gol WHERE clave = 'jug_gol'),
         @ja INT = (SELECT jugador_id FROM ##test_gol WHERE clave = 'jug_asis');
-EXEC evento.gol_insertar @fl, @t1, 15, 'jugada', 'PT', @t2, @id OUTPUT; --> Valido: con asistencia
--- EXEC evento.gol_insertar @fl, @t1, 16, 'jugada', 'PT', NULL, @id OUTPUT; --> Valido: sin asistencia
--- EXEC evento.gol_insertar @fl, @t1, 18, 'penal', 'PT', NULL, @id OUTPUT; --> Valido: tipo penal
--- EXEC evento.gol_insertar @fl, @t1, 19, 'tiro_libre', 'PT', NULL, @id OUTPUT; --> Valido: tipo tiro_libre
--- EXEC evento.gol_insertar @fl, @t1, 20, 'cabezazo', 'PT', @t2, @id OUTPUT; --> Valido: tipo cabezazo
--- EXEC evento.gol_insertar @fl, @t1, 21, 'otro', 'PT', NULL, @id OUTPUT; --> Valido: tipo otro
--- EXEC evento.gol_insertar @fl, @t1, 22, 'en_contra', 'PT', NULL, @id OUTPUT; --> Valido: gol en contra sin asistencia (suma al rival)
--- EXEC evento.gol_insertar @fl, @t1, 1, 'jugada', 'PT', NULL, @id OUTPUT; --> Valido: PT minuto minimo (borde)
--- EXEC evento.gol_insertar @fl, @t1, 45, 'jugada', 'PT', NULL, @id OUTPUT; --> Valido: PT minuto maximo (borde)
--- EXEC evento.gol_insertar @fl, @t1, 46, 'jugada', 'adicional_PT', NULL, @id OUTPUT; --> Valido: adicional_PT minimo (borde)
--- EXEC evento.gol_insertar @fl, @t1, 60, 'jugada', 'adicional_PT', NULL, @id OUTPUT; --> Valido: adicional_PT maximo (borde)
--- EXEC evento.gol_insertar @fl, @t1, 46, 'jugada', 'ST', NULL, @id OUTPUT; --> Valido: ST minimo (borde)
--- EXEC evento.gol_insertar @fl, @t1, 90, 'jugada', 'ST', NULL, @id OUTPUT; --> Valido: ST maximo (borde)
--- EXEC evento.gol_insertar @fl, @t1, 91, 'jugada', 'adicional_ST', NULL, @id OUTPUT; --> Valido: adicional_ST minimo (borde)
--- EXEC evento.gol_insertar @fl, @t1, 110, 'jugada', 'adicional_ST', NULL, @id OUTPUT; --> Valido: adicional_ST maximo (borde)
--- EXEC evento.gol_insertar @fl, @t1, 91, 'jugada', 'alargue_1', NULL, @id OUTPUT; --> Valido: alargue_1 minimo (borde; partido de fase final)
--- EXEC evento.gol_insertar @fl, @t1, 105, 'jugada', 'alargue_1', NULL, @id OUTPUT; --> Valido: alargue_1 maximo (borde)
--- EXEC evento.gol_insertar @fl, @t1, 106, 'jugada', 'alargue_2', NULL, @id OUTPUT; --> Valido: alargue_2 minimo (borde)
--- EXEC evento.gol_insertar @fl, @t1, 120, 'jugada', 'alargue_2', NULL, @id OUTPUT; --> Valido: alargue_2 maximo (borde)
--- EXEC evento.gol_insertar @fl, @t1, 106, 'jugada', 'adicional_alargue', NULL, @id OUTPUT; --> Valido: adicional_alargue minimo (borde)
--- EXEC evento.gol_insertar @fl, @t1, 135, 'jugada', 'adicional_alargue', NULL, @id OUTPUT; --> Valido: adicional_alargue maximo (borde)
--- EXEC evento.gol_insertar @fl, @t1, 120, 'penal', 'penales', NULL, @id OUTPUT; --> Valido: tanda de penales minimo (borde)
--- EXEC evento.gol_insertar @fl, @t1, 135, 'penal', 'penales', NULL, @id OUTPUT; --> Valido: tanda de penales maximo (borde)
--- EXEC evento.gol_insertar @fv, @v1, 30, 'jugada', 'PT', @v2, @id OUTPUT; --> Valido: gol del visitante con asistencia
--- EXEC evento.gol_insertar @fv, @v1, 125, 'penal', 'penales', NULL, @id OUTPUT; --> Valido: penal del visitante en la tanda
--- EXEC evento.gol_insertar @fl, @si, 75, 'jugada', 'ST', NULL, @id OUTPUT; --> Valido: autor suplente que ingreso por sustitucion
--- EXEC evento.gol_insertar @fl, @t1, 76, 'jugada', 'ST', @si, @id OUTPUT; --> Valido: asistente suplente que ingreso
--- EXEC evento.gol_insertar @fl, @t5, 12, 'jugada', 'PT', @t2, @id OUTPUT; --> Valido: autor titular (que luego sale por sustitucion)
--- EXEC evento.gol_insertar @fl, @t1, 13, 'jugada', 'PT', @t5, @id OUTPUT; --> Valido: asistente titular que sale por sustitucion
--- EXEC evento.gol_insertar @fj, @jg, 40, 'jugada', 'ST', @ja, @id OUTPUT; --> Valido: partido de fase de grupos con periodo regular
--- EXEC evento.gol_insertar 999999, @t1, 15, 'jugada', 'PT', NULL, @id OUTPUT; --> Formacion inexistente
--- EXEC evento.gol_insertar NULL, @t1, 15, 'jugada', 'PT', NULL, @id OUTPUT; --> Formacion nula
--- EXEC evento.gol_insertar @fz, @zt, 15, 'jugada', 'PT', NULL, @id OUTPUT; --> Partido finalizado
--- EXEC evento.gol_insertar @fl, 999999, 15, 'jugada', 'PT', NULL, @id OUTPUT; --> Jugador inexistente (el autor no integra la formacion)
--- EXEC evento.gol_insertar @fl, NULL, 15, 'jugada', 'PT', NULL, @id OUTPUT; --> Jugador nulo (el autor no integra la formacion)
--- EXEC evento.gol_insertar @fl, @lf, 15, 'jugada', 'PT', NULL, @id OUTPUT; --> Autor convocado pero que no integra la formacion
--- EXEC evento.gol_insertar @fl, @v1, 15, 'jugada', 'PT', NULL, @id OUTPUT; --> Autor que integra la formacion del rival
--- EXEC evento.gol_insertar @fl, @so, 15, 'jugada', 'PT', NULL, @id OUTPUT; --> Autor suplente sin sustitucion registrada (no ingreso)
--- EXEC evento.gol_insertar @fl, @t1, 15, NULL, 'PT', NULL, @id OUTPUT; --> Tipo de gol nulo
--- EXEC evento.gol_insertar @fl, @t1, 15, '', 'PT', NULL, @id OUTPUT; --> Tipo de gol vacio
--- EXEC evento.gol_insertar @fl, @t1, 15, 'otro_tipo', 'PT', NULL, @id OUTPUT; --> Tipo de gol invalido
--- EXEC evento.gol_insertar @fl, @t1, 15, 'jugada', NULL, NULL, @id OUTPUT; --> Periodo nulo
--- EXEC evento.gol_insertar @fl, @t1, 15, 'jugada', '', NULL, @id OUTPUT; --> Periodo vacio
--- EXEC evento.gol_insertar @fl, @t1, 15, 'jugada', 'PT2', NULL, @id OUTPUT; --> Periodo invalido (no se valida el minuto)
--- EXEC evento.gol_insertar @fl, @t1, NULL, 'jugada', 'PT', NULL, @id OUTPUT; --> Minuto nulo
--- EXEC evento.gol_insertar @fl, @t1, -1, 'jugada', 'PT', NULL, @id OUTPUT; --> Minuto negativo
--- EXEC evento.gol_insertar @fl, @t1, 0, 'jugada', 'PT', NULL, @id OUTPUT; --> PT minuto 0 (borde)
--- EXEC evento.gol_insertar @fl, @t1, 46, 'jugada', 'PT', NULL, @id OUTPUT; --> PT minuto 46 (borde)
--- EXEC evento.gol_insertar @fl, @t1, 45, 'jugada', 'adicional_PT', NULL, @id OUTPUT; --> adicional_PT minuto 45 (borde)
--- EXEC evento.gol_insertar @fl, @t1, 61, 'jugada', 'adicional_PT', NULL, @id OUTPUT; --> adicional_PT minuto 61 (borde)
--- EXEC evento.gol_insertar @fl, @t1, 45, 'jugada', 'ST', NULL, @id OUTPUT; --> ST minuto 45 (borde)
--- EXEC evento.gol_insertar @fl, @t1, 91, 'jugada', 'ST', NULL, @id OUTPUT; --> ST minuto 91 (borde)
--- EXEC evento.gol_insertar @fl, @t1, 90, 'jugada', 'adicional_ST', NULL, @id OUTPUT; --> adicional_ST minuto 90 (borde)
--- EXEC evento.gol_insertar @fl, @t1, 111, 'jugada', 'adicional_ST', NULL, @id OUTPUT; --> adicional_ST minuto 111 (borde)
--- EXEC evento.gol_insertar @fl, @t1, 90, 'jugada', 'alargue_1', NULL, @id OUTPUT; --> alargue_1 minuto 90 (borde)
--- EXEC evento.gol_insertar @fl, @t1, 106, 'jugada', 'alargue_1', NULL, @id OUTPUT; --> alargue_1 minuto 106 (borde)
--- EXEC evento.gol_insertar @fl, @t1, 105, 'jugada', 'alargue_2', NULL, @id OUTPUT; --> alargue_2 minuto 105 (borde)
--- EXEC evento.gol_insertar @fl, @t1, 121, 'jugada', 'alargue_2', NULL, @id OUTPUT; --> alargue_2 minuto 121 (borde)
--- EXEC evento.gol_insertar @fl, @t1, 105, 'jugada', 'adicional_alargue', NULL, @id OUTPUT; --> adicional_alargue minuto 105 (borde)
--- EXEC evento.gol_insertar @fl, @t1, 136, 'jugada', 'adicional_alargue', NULL, @id OUTPUT; --> adicional_alargue minuto 136 (borde)
--- EXEC evento.gol_insertar @fl, @t1, 119, 'penal', 'penales', NULL, @id OUTPUT; --> penales minuto 119 (borde)
--- EXEC evento.gol_insertar @fl, @t1, 136, 'penal', 'penales', NULL, @id OUTPUT; --> penales minuto 136 (borde)
--- EXEC evento.gol_insertar @fl, @t1, 15, 'jugada', 'PT', @t1, @id OUTPUT; --> El asistente es el mismo autor
--- EXEC evento.gol_insertar @fl, @t1, 15, 'jugada', 'PT', 999999, @id OUTPUT; --> Asistente inexistente (no integra la formacion)
--- EXEC evento.gol_insertar @fl, @t1, 15, 'jugada', 'PT', @lf, @id OUTPUT; --> Asistente que no integra la formacion
--- EXEC evento.gol_insertar @fl, @t1, 15, 'jugada', 'PT', @v1, @id OUTPUT; --> Asistente de la formacion rival
--- EXEC evento.gol_insertar @fl, @t1, 15, 'jugada', 'PT', @so, @id OUTPUT; --> Asistente suplente que no ingreso
--- EXEC evento.gol_insertar @fl, @t1, 15, 'en_contra', 'PT', @t2, @id OUTPUT; --> Gol en contra con asistencia
--- EXEC evento.gol_insertar @fl, @t1, 120, 'penal', 'penales', @t2, @id OUTPUT; --> Gol de la tanda de penales con asistencia
--- EXEC evento.gol_insertar @fl, @t1, 120, 'jugada', 'penales', NULL, @id OUTPUT; --> Tanda de penales con tipo distinto de penal
--- EXEC evento.gol_insertar @fl, @t1, 120, 'en_contra', 'penales', NULL, @id OUTPUT; --> Tanda de penales con gol en contra
--- EXEC evento.gol_insertar @fj, @jg, 120, 'penal', 'penales', NULL, @id OUTPUT; --> Fase de grupos: tanda de penales
--- EXEC evento.gol_insertar @fl, @t1, 15, 'otro_tipo', 'PT2', NULL, @id OUTPUT; --> 2 errores: tipo de gol y periodo invalidos
--- EXEC evento.gol_insertar @fj, @jg, 100, 'jugada', 'penales', NULL, @id OUTPUT; --> 3 errores: fase de grupos con penales, minuto y tipo distinto de penal
--- EXEC evento.gol_insertar @fl, @so, 20, 'en_contra', 'PT', @so, @id OUTPUT; --> 4 errores: autor sin ingresar, asistente = autor, asistente sin ingresar y gol en contra con asistencia
- EXEC evento.gol_insertar @fz, @lf, 0, 'otro_tipo', 'PT', @lf, @id OUTPUT; --> 6 errores: finalizado, tipo, minuto, autor no integra, asistente = autor y asistente no integra
+
+-- E-3.10.01 Valido: con asistencia => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t1, 15, 'jugada', 'PT', @t2, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.01', 'evento.gol_insertar: Valido: con asistencia', 0;
+-- E-3.10.02 Valido: sin asistencia => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t1, 16, 'jugada', 'PT', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.02', 'evento.gol_insertar: Valido: sin asistencia', 0;
+-- E-3.10.03 Valido: tipo penal => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t1, 18, 'penal', 'PT', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.03', 'evento.gol_insertar: Valido: tipo penal', 0;
+-- E-3.10.04 Valido: tipo tiro_libre => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t1, 19, 'tiro_libre', 'PT', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.04', 'evento.gol_insertar: Valido: tipo tiro_libre', 0;
+-- E-3.10.05 Valido: tipo cabezazo => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t1, 20, 'cabezazo', 'PT', @t2, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.05', 'evento.gol_insertar: Valido: tipo cabezazo', 0;
+-- E-3.10.06 Valido: tipo otro => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t1, 21, 'otro', 'PT', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.06', 'evento.gol_insertar: Valido: tipo otro', 0;
+-- E-3.10.07 Valido: gol en contra sin asistencia (suma al rival) => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t1, 22, 'en_contra', 'PT', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.07', 'evento.gol_insertar: Valido: gol en contra sin asistencia (suma al rival)', 0;
+-- E-3.10.08 Valido: PT minuto minimo (borde) => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t1, 1, 'jugada', 'PT', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.08', 'evento.gol_insertar: Valido: PT minuto minimo (borde)', 0;
+-- E-3.10.09 Valido: PT minuto maximo (borde) => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t1, 45, 'jugada', 'PT', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.09', 'evento.gol_insertar: Valido: PT minuto maximo (borde)', 0;
+-- E-3.10.10 Valido: adicional_PT minimo (borde) => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t1, 46, 'jugada', 'adicional_PT', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.10', 'evento.gol_insertar: Valido: adicional_PT minimo (borde)', 0;
+-- E-3.10.11 Valido: adicional_PT maximo (borde) => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t1, 60, 'jugada', 'adicional_PT', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.11', 'evento.gol_insertar: Valido: adicional_PT maximo (borde)', 0;
+-- E-3.10.12 Valido: ST minimo (borde) => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t1, 46, 'jugada', 'ST', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.12', 'evento.gol_insertar: Valido: ST minimo (borde)', 0;
+-- E-3.10.13 Valido: ST maximo (borde) => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t1, 90, 'jugada', 'ST', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.13', 'evento.gol_insertar: Valido: ST maximo (borde)', 0;
+-- E-3.10.14 Valido: adicional_ST minimo (borde) => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t1, 91, 'jugada', 'adicional_ST', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.14', 'evento.gol_insertar: Valido: adicional_ST minimo (borde)', 0;
+-- E-3.10.15 Valido: adicional_ST maximo (borde) => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t1, 110, 'jugada', 'adicional_ST', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.15', 'evento.gol_insertar: Valido: adicional_ST maximo (borde)', 0;
+-- E-3.10.16 Valido: alargue_1 minimo (borde; partido de fase final) => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t1, 91, 'jugada', 'alargue_1', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.16', 'evento.gol_insertar: Valido: alargue_1 minimo (borde; partido de fase final)', 0;
+-- E-3.10.17 Valido: alargue_1 maximo (borde) => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t1, 105, 'jugada', 'alargue_1', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.17', 'evento.gol_insertar: Valido: alargue_1 maximo (borde)', 0;
+-- E-3.10.18 Valido: alargue_2 minimo (borde) => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t1, 106, 'jugada', 'alargue_2', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.18', 'evento.gol_insertar: Valido: alargue_2 minimo (borde)', 0;
+-- E-3.10.19 Valido: alargue_2 maximo (borde) => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t1, 120, 'jugada', 'alargue_2', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.19', 'evento.gol_insertar: Valido: alargue_2 maximo (borde)', 0;
+-- E-3.10.20 Valido: adicional_alargue minimo (borde) => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t1, 106, 'jugada', 'adicional_alargue', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.20', 'evento.gol_insertar: Valido: adicional_alargue minimo (borde)', 0;
+-- E-3.10.21 Valido: adicional_alargue maximo (borde) => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t1, 135, 'jugada', 'adicional_alargue', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.21', 'evento.gol_insertar: Valido: adicional_alargue maximo (borde)', 0;
+-- E-3.10.22 Valido: tanda de penales minimo (borde) => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t1, 120, 'penal', 'penales', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.22', 'evento.gol_insertar: Valido: tanda de penales minimo (borde)', 0;
+-- E-3.10.23 Valido: tanda de penales maximo (borde) => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t1, 135, 'penal', 'penales', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.23', 'evento.gol_insertar: Valido: tanda de penales maximo (borde)', 0;
+-- E-3.10.24 Valido: gol del visitante con asistencia => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fv, @v1, 30, 'jugada', 'PT', @v2, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.24', 'evento.gol_insertar: Valido: gol del visitante con asistencia', 0;
+-- E-3.10.25 Valido: penal del visitante en la tanda => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fv, @v1, 125, 'penal', 'penales', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.25', 'evento.gol_insertar: Valido: penal del visitante en la tanda', 0;
+-- E-3.10.26 Valido: autor suplente que ingreso por sustitucion => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @si, 75, 'jugada', 'ST', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.26', 'evento.gol_insertar: Valido: autor suplente que ingreso por sustitucion', 0;
+-- E-3.10.27 Valido: asistente suplente que ingreso => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t1, 76, 'jugada', 'ST', @si, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.27', 'evento.gol_insertar: Valido: asistente suplente que ingreso', 0;
+-- E-3.10.28 Valido: autor titular (que luego sale por sustitucion) => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t5, 12, 'jugada', 'PT', @t2, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.28', 'evento.gol_insertar: Valido: autor titular (que luego sale por sustitucion)', 0;
+-- E-3.10.29 Valido: asistente titular que sale por sustitucion => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fl, @t1, 13, 'jugada', 'PT', @t5, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.29', 'evento.gol_insertar: Valido: asistente titular que sale por sustitucion', 0;
+-- E-3.10.30 Valido: partido de fase de grupos con periodo regular => se acepta
+BEGIN TRY EXEC evento.gol_insertar @fj, @jg, 40, 'jugada', 'PT', @ja, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.30', 'evento.gol_insertar: Valido: partido de fase de grupos con periodo regular', 0;
 GO
 
--- Verificacion evento.gol_modificar
+PRINT '--- E-3.10.31 a E-3.10.35 evento.gol_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @gm INT = (SELECT gol_id FROM ##test_gol WHERE clave = 'g_mod'),
         @gs INT = (SELECT gol_id FROM ##test_gol WHERE clave = 'g_sup'),
         @gp INT = (SELECT gol_id FROM ##test_gol WHERE clave = 'g_pen'),
@@ -2331,77 +3242,47 @@ DECLARE @gm INT = (SELECT gol_id FROM ##test_gol WHERE clave = 'g_mod'),
         @v1 INT = (SELECT jugador_id FROM ##test_gol WHERE clave = 'vis_t1'),
         @v2 INT = (SELECT jugador_id FROM ##test_gol WHERE clave = 'vis_t2'),
         @ja INT = (SELECT jugador_id FROM ##test_gol WHERE clave = 'jug_asis');
-EXEC evento.gol_modificar @gm, 12, 'cabezazo', 'PT', @t2; --> Valido: cambia minuto y tipo 
--- EXEC evento.gol_modificar @gm, 10, 'jugada', 'PT', @t3; --> Valido: cambia el asistente
--- EXEC evento.gol_modificar @gm, 10, 'jugada', 'PT', @si; --> Valido: asistente suplente que ingreso por sustitucion
--- EXEC evento.gol_modificar @gm, 10, 'jugada', 'PT', @t5; --> Valido: asistente titular que sale por sustitucion
--- EXEC evento.gol_modificar @gm, 10, 'jugada', 'PT', NULL; --> Valido: quita la asistencia
--- EXEC evento.gol_modificar NULL, 10, 'jugada', 'PT'; --> Id nulo (el mensaje dice "(nulo)")
--- EXEC evento.gol_modificar 999999, 10, 'jugada', 'PT'; --> Gol inexistente
--- EXEC evento.gol_modificar @gf, 12, 'jugada', 'PT'; --> Partido finalizado
--- EXEC evento.gol_modificar @gm, 10, NULL, 'PT'; --> Tipo de gol nulo
--- EXEC evento.gol_modificar @gm, 10, '', 'PT'; --> Tipo de gol vacio
--- EXEC evento.gol_modificar @gm, 10, 'otro_tipo', 'PT'; --> Tipo de gol invalido
--- EXEC evento.gol_modificar @gm, 10, 'jugada', NULL; --> Periodo nulo
--- EXEC evento.gol_modificar @gm, 10, 'jugada', ''; --> Periodo vacio
--- EXEC evento.gol_modificar @gm, 10, 'jugada', 'PT2'; --> Periodo invalido (no se valida el minuto)
--- EXEC evento.gol_modificar @gm, NULL, 'jugada', 'PT'; --> Minuto nulo
--- EXEC evento.gol_modificar @gm, -1, 'jugada', 'PT'; --> Minuto negativo
--- EXEC evento.gol_modificar @gm, 0, 'jugada', 'PT'; --> PT minuto 0 (borde)
--- EXEC evento.gol_modificar @gm, 46, 'jugada', 'PT'; --> PT minuto 46 (borde)
--- EXEC evento.gol_modificar @gm, 45, 'jugada', 'adicional_PT'; --> adicional_PT minuto 45 (borde)
--- EXEC evento.gol_modificar @gm, 61, 'jugada', 'adicional_PT'; --> adicional_PT minuto 61 (borde)
--- EXEC evento.gol_modificar @gm, 45, 'jugada', 'ST'; --> ST minuto 45 (borde)
--- EXEC evento.gol_modificar @gm, 91, 'jugada', 'ST'; --> ST minuto 91 (borde)
--- EXEC evento.gol_modificar @gm, 90, 'jugada', 'adicional_ST'; --> adicional_ST minuto 90 (borde)
--- EXEC evento.gol_modificar @gm, 111, 'jugada', 'adicional_ST'; --> adicional_ST minuto 111 (borde)
--- EXEC evento.gol_modificar @gm, 90, 'jugada', 'alargue_1'; --> alargue_1 minuto 90 (borde)
--- EXEC evento.gol_modificar @gm, 106, 'jugada', 'alargue_1'; --> alargue_1 minuto 106 (borde)
--- EXEC evento.gol_modificar @gm, 105, 'jugada', 'alargue_2'; --> alargue_2 minuto 105 (borde)
--- EXEC evento.gol_modificar @gm, 121, 'jugada', 'alargue_2'; --> alargue_2 minuto 121 (borde)
--- EXEC evento.gol_modificar @gm, 105, 'jugada', 'adicional_alargue'; --> adicional_alargue minuto 105 (borde)
--- EXEC evento.gol_modificar @gm, 136, 'jugada', 'adicional_alargue'; --> adicional_alargue minuto 136 (borde)
--- EXEC evento.gol_modificar @gp, 119, 'penal', 'penales'; --> penales minuto 119 (borde)
--- EXEC evento.gol_modificar @gp, 136, 'penal', 'penales'; --> penales minuto 136 (borde)
--- EXEC evento.gol_modificar @gm, 10, 'jugada', 'PT', @t1; --> El asistente es el mismo autor
--- EXEC evento.gol_modificar @gm, 10, 'jugada', 'PT', 999999; --> Asistente inexistente (no integra la formacion)
--- EXEC evento.gol_modificar @gm, 10, 'jugada', 'PT', @lf; --> Asistente que no integra la formacion
--- EXEC evento.gol_modificar @gm, 10, 'jugada', 'PT', @v1; --> Asistente de la formacion rival
--- EXEC evento.gol_modificar @gm, 10, 'jugada', 'PT', @so; --> Asistente suplente que no ingreso
--- EXEC evento.gol_modificar @gm, 10, 'en_contra', 'PT', @t2; --> Gol en contra con asistencia
--- EXEC evento.gol_modificar @gp, 125, 'penal', 'penales', @t1; --> Gol de la tanda de penales con asistencia
--- EXEC evento.gol_modificar @gp, 125, 'jugada', 'penales'; --> Tanda de penales con tipo distinto de penal
--- EXEC evento.gol_modificar @gp, 125, 'en_contra', 'penales'; --> Tanda de penales con gol en contra
--- EXEC evento.gol_modificar @gj, 100, 'jugada', 'alargue_1'; --> Fase de grupos: alargue_1
--- EXEC evento.gol_modificar @gj, 110, 'jugada', 'alargue_2'; --> Fase de grupos: alargue_2
--- EXEC evento.gol_modificar @gj, 110, 'jugada', 'adicional_alargue'; --> Fase de grupos: adicional_alargue
--- EXEC evento.gol_modificar @gj, 120, 'penal', 'penales'; --> Fase de grupos: tanda de penales
--- EXEC evento.gol_modificar @gm, NULL, NULL, NULL; --> 2 errores: tipo de gol y periodo (el minuto no se valida sin periodo)
--- EXEC evento.gol_modificar @gm, 0, 'otro_tipo', 'PT', @t1; --> 3 errores: tipo, minuto y asistente = autor
--- EXEC evento.gol_modificar @gj, 100, 'jugada', 'penales'; --> 3 errores: fase de grupos con penales, minuto y tipo distinto de penal
--- EXEC evento.gol_modificar @gm, 50, 'en_contra', 'penales', @t1; --> 5 errores: minuto, asistente = autor, gol en contra con asistencia, penales con asistencia y tipo distinto de penal
+
+-- E-3.10.31 Valido: cambia minuto y tipo => se acepta
+BEGIN TRY EXEC evento.gol_modificar @gm, 12, 'cabezazo', 'PT', @t2; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.31', 'evento.gol_modificar: Valido: cambia minuto y tipo', 0;
+-- E-3.10.32 Valido: cambia el asistente => se acepta
+BEGIN TRY EXEC evento.gol_modificar @gm, 10, 'jugada', 'PT', @t3; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.32', 'evento.gol_modificar: Valido: cambia el asistente', 0;
+-- E-3.10.33 Valido: asistente suplente que ingreso por sustitucion => se acepta
+BEGIN TRY EXEC evento.gol_modificar @gm, 10, 'jugada', 'PT', @si; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.33', 'evento.gol_modificar: Valido: asistente suplente que ingreso por sustitucion', 0;
+-- E-3.10.34 Valido: asistente titular que sale por sustitucion => se acepta
+BEGIN TRY EXEC evento.gol_modificar @gm, 10, 'jugada', 'PT', @t5; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.34', 'evento.gol_modificar: Valido: asistente titular que sale por sustitucion', 0;
+-- E-3.10.35 Valido: quita la asistencia => se acepta
+BEGIN TRY EXEC evento.gol_modificar @gm, 10, 'jugada', 'PT', NULL; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.35', 'evento.gol_modificar: Valido: quita la asistencia', 0;
 GO
 
--- Verificacion evento.gol_eliminar
+PRINT '--- E-3.10.36 a E-3.10.39 evento.gol_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @ge1 INT = (SELECT gol_id FROM ##test_gol WHERE clave = 'g_elim'),
         @ge2 INT = (SELECT gol_id FROM ##test_gol WHERE clave = 'g_elim2'),
         @ge3 INT = (SELECT gol_id FROM ##test_gol WHERE clave = 'g_elim3'),
         @ge4 INT = (SELECT gol_id FROM ##test_gol WHERE clave = 'g_elim4'),
         @gf  INT = (SELECT gol_id FROM ##test_gol WHERE clave = 'g_fin');
-EXEC evento.gol_eliminar @ge1; --> Baja valida: gol con asistencia de un partido no finalizado (baja el marcador local)
--- EXEC evento.gol_eliminar @ge2; --> Baja valida: gol sin asistencia (cabezazo)
--- EXEC evento.gol_eliminar @ge3; --> Baja valida: gol en contra (baja el marcador del rival)
--- EXEC evento.gol_eliminar @ge4; --> Baja valida: gol de la tanda de penales (baja los penales del visitante)
--- EXEC evento.gol_eliminar 999999; --> Gol inexistente
--- EXEC evento.gol_eliminar NULL; --> Id nulo (el mensaje dice "(nulo)")
--- EXEC evento.gol_eliminar @gf; --> Partido finalizado
+
+-- E-3.10.36 Baja valida: gol con asistencia de un partido no finalizado (baja el marcador local) => se acepta
+BEGIN TRY EXEC evento.gol_eliminar @ge1; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.36', 'evento.gol_eliminar: Baja valida: gol con asistencia de un partido no finalizado (baja el marcador local)', 0;
+-- E-3.10.37 Baja valida: gol sin asistencia (cabezazo) => se acepta
+BEGIN TRY EXEC evento.gol_eliminar @ge2; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.37', 'evento.gol_eliminar: Baja valida: gol sin asistencia (cabezazo)', 0;
+-- E-3.10.38 Baja valida: gol en contra (baja el marcador del rival) => se acepta
+BEGIN TRY EXEC evento.gol_eliminar @ge3; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.38', 'evento.gol_eliminar: Baja valida: gol en contra (baja el marcador del rival)', 0;
+-- E-3.10.39 Baja valida: gol de la tanda de penales (baja los penales del visitante) => se acepta
+BEGIN TRY EXEC evento.gol_eliminar @ge4; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.10.39', 'evento.gol_eliminar: Baja valida: gol de la tanda de penales (baja los penales del visitante)', 0;
 GO
 
+-- ============================================================
+-- 3.11 evento.tarjeta, evento.criterio_suspension y evento.suspension
+-- ============================================================
 
--- ============================================================
--- 1.11 evento.tarjeta, evento.criterio_suspension y evento.suspension
--- ============================================================
--- Verificacion evento.tarjeta_insertar
+PRINT '--- E-3.11.01 a E-3.11.12 evento.tarjeta_insertar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @id INT,
         @pt INT = (SELECT partido_id FROM ##test_tarjeta WHERE clave = 'pt_tar'),
         @pz INT = (SELECT partido_id FROM ##test_tarjeta WHERE clave = 'pt_z'),
@@ -2446,307 +3327,571 @@ DECLARE @id INT,
         @l24 INT = (SELECT persona_id FROM ##test_tarjeta WHERE clave = 'l_24'),
         @l25 INT = (SELECT persona_id FROM ##test_tarjeta WHERE clave = 'l_25'),
         @l26 INT = (SELECT persona_id FROM ##test_tarjeta WHERE clave = 'l_26');
-EXEC evento.tarjeta_insertar @pt, @l1, 15, 'PT', 'amarilla', 'Falta', NULL, @id OUTPUT; --> Valido: amarilla con motivo
--- EXEC evento.tarjeta_insertar @pt, @l2, 16, 'PT', 'amarilla', '  Motivo con espacios  ', NULL, @id OUTPUT; --> Valido: motivo se guarda recortado
--- EXEC evento.tarjeta_insertar @pt, @l3, 17, 'PT', 'amarilla', NULL, NULL, @id OUTPUT; --> Valido: motivo nulo
--- EXEC evento.tarjeta_insertar @pt, @l4, 18, 'PT', 'amarilla', '', NULL, @id OUTPUT; --> Valido: motivo vacio se guarda como NULL
--- EXEC evento.tarjeta_insertar @pt, @l5, 19, 'PT', 'amarilla', '   ', NULL, @id OUTPUT; --> Valido: motivo solo espacios se guarda como NULL
--- EXEC evento.tarjeta_insertar @pt, @l6, 20, 'PT', 'amarilla', @tarjeta_id = @id OUTPUT; --> Valido: sin pasar motivo ni tipo de expulsion (valores por defecto)
--- EXEC evento.tarjeta_insertar @pt, @l7, 50, 'ST', 'roja', 'Agresion', 'roja_directa', @id OUTPUT; --> Valido: roja directa con motivo
--- EXEC evento.tarjeta_insertar @pt, @l8, 51, 'ST', 'roja', NULL, 'roja_directa', @id OUTPUT; --> Valido: roja directa sin motivo
--- EXEC evento.tarjeta_insertar @pt, @a1, 70, 'ST', 'roja', 'Segunda amarilla', 'doble_amarilla', @id OUTPUT; --> Valido: segunda amarilla registrada como roja (la persona tiene una amarilla previa)
--- EXEC evento.tarjeta_insertar @pt, @a2, 71, 'ST', 'roja', 'Agresion', 'roja_directa', @id OUTPUT; --> Valido: roja directa a quien ya tenia una amarilla
--- EXEC evento.tarjeta_insertar @pt, @l9, 1, 'PT', 'amarilla', NULL, NULL, @id OUTPUT; --> Valido: PT minuto minimo (borde)
--- EXEC evento.tarjeta_insertar @pt, @l10, 45, 'PT', 'amarilla', NULL, NULL, @id OUTPUT; --> Valido: PT minuto maximo (borde)
--- EXEC evento.tarjeta_insertar 999999, @le, 15, 'PT', 'amarilla', NULL, NULL, @id OUTPUT; --> 2 errores: partido inexistente y la persona no participa del partido
--- EXEC evento.tarjeta_insertar NULL, @le, 15, 'PT', 'amarilla', NULL, NULL, @id OUTPUT; --> 2 errores: partido nulo y la persona no participa del partido
--- EXEC evento.tarjeta_insertar @pz, @zl, 15, 'PT', 'amarilla', NULL, NULL, @id OUTPUT; --> Partido finalizado
--- EXEC evento.tarjeta_insertar @pt, 999999, 15, 'PT', 'amarilla', NULL, NULL, @id OUTPUT; --> Persona inexistente
--- EXEC evento.tarjeta_insertar @pt, NULL, 15, 'PT', 'amarilla', NULL, NULL, @id OUTPUT; --> Persona nula
--- EXEC evento.tarjeta_insertar @pt, @np, 15, 'PT', 'amarilla', NULL, NULL, @id OUTPUT; --> Persona que existe pero no participa del partido
--- EXEC evento.tarjeta_insertar @pt, @cn, 15, 'PT', 'amarilla', NULL, NULL, @id OUTPUT; --> Persona que participa de otro partido (formacion jug del partido mod) pero no de este
--- EXEC evento.tarjeta_insertar @pt, @le, 15, 'PT', NULL, NULL, NULL, @id OUTPUT; --> Tipo nulo
--- EXEC evento.tarjeta_insertar @pt, @le, 15, 'PT', '', NULL, NULL, @id OUTPUT; --> Tipo vacio
--- EXEC evento.tarjeta_insertar @pt, @le, 15, 'PT', 'verde', NULL, NULL, @id OUTPUT; --> Tipo invalido
--- EXEC evento.tarjeta_insertar @pt, @le, 15, 'PT', 'amarilla', NULL, 'roja_directa', @id OUTPUT; --> Amarilla con tipo de expulsion
--- EXEC evento.tarjeta_insertar @pt, @le, 15, 'PT', 'amarilla', NULL, 'doble_amarilla', @id OUTPUT; --> Amarilla con tipo de expulsion (doble_amarilla)
--- EXEC evento.tarjeta_insertar @pt, @le, 15, 'PT', 'roja', NULL, NULL, @id OUTPUT; --> Roja sin tipo de expulsion (nulo)
--- EXEC evento.tarjeta_insertar @pt, @le, 15, 'PT', 'roja', NULL, '', @id OUTPUT; --> Roja con tipo de expulsion vacio
--- EXEC evento.tarjeta_insertar @pt, @le, 15, 'PT', 'roja', NULL, 'otra', @id OUTPUT; --> Roja con tipo de expulsion invalido
--- EXEC evento.tarjeta_insertar @pt, @le, 15, 'PT', 'roja', NULL, 'doble_amarilla', @id OUTPUT; --> Doble amarilla sin amarilla previa
--- EXEC evento.tarjeta_insertar @pt, @ea, 15, 'PT', 'amarilla', NULL, NULL, @id OUTPUT; --> La persona ya tiene una amarilla en el partido
--- EXEC evento.tarjeta_insertar @pt, @rj, 15, 'PT', 'amarilla', NULL, NULL, @id OUTPUT; --> La persona ya fue expulsada (roja directa)
--- EXEC evento.tarjeta_insertar @pt, @rj, 15, 'PT', 'roja', NULL, 'roja_directa', @id OUTPUT; --> La persona ya fue expulsada: nueva roja
--- EXEC evento.tarjeta_insertar @pt, @dob, 15, 'PT', 'roja', NULL, 'doble_amarilla', @id OUTPUT; --> La persona ya fue expulsada por doble amarilla (tiene la amarilla previa)
--- EXEC evento.tarjeta_insertar @pt, @dob, 15, 'PT', 'roja', NULL, 'roja_directa', @id OUTPUT; --> La persona ya fue expulsada (tenia amarilla y roja)
--- EXEC evento.tarjeta_insertar @pt, @le, 15, NULL, 'amarilla', NULL, NULL, @id OUTPUT; --> Periodo nulo
--- EXEC evento.tarjeta_insertar @pt, @le, 15, '', 'amarilla', NULL, NULL, @id OUTPUT; --> Periodo vacio
--- EXEC evento.tarjeta_insertar @pt, @le, 15, 'PT2', 'amarilla', NULL, NULL, @id OUTPUT; --> Periodo invalido (no se valida el minuto)
--- EXEC evento.tarjeta_insertar @pt, @le, NULL, 'PT', 'amarilla', NULL, NULL, @id OUTPUT; --> Minuto nulo
--- EXEC evento.tarjeta_insertar @pt, @le, -1, 'PT', 'amarilla', NULL, NULL, @id OUTPUT; --> Minuto negativo
--- EXEC evento.tarjeta_insertar @pt, @le, 0, 'PT', 'amarilla', NULL, NULL, @id OUTPUT; --> PT minuto 0 (borde)
--- EXEC evento.tarjeta_insertar @pt, @le, 46, 'PT', 'amarilla', NULL, NULL, @id OUTPUT; --> PT minuto 46 (borde)
--- EXEC evento.tarjeta_insertar @pt, @le, 45, 'adicional_PT', 'amarilla', NULL, NULL, @id OUTPUT; --> adicional_PT minuto 45 (borde)
--- EXEC evento.tarjeta_insertar @pt, @le, 61, 'adicional_PT', 'amarilla', NULL, NULL, @id OUTPUT; --> adicional_PT minuto 61 (borde)
--- EXEC evento.tarjeta_insertar @pt, @le, 45, 'ST', 'amarilla', NULL, NULL, @id OUTPUT; --> ST minuto 45 (borde)
--- EXEC evento.tarjeta_insertar @pt, @le, 91, 'ST', 'amarilla', NULL, NULL, @id OUTPUT; --> ST minuto 91 (borde)
--- EXEC evento.tarjeta_insertar @pt, @le, 90, 'adicional_ST', 'amarilla', NULL, NULL, @id OUTPUT; --> adicional_ST minuto 90 (borde)
--- EXEC evento.tarjeta_insertar @pt, @le, 111, 'adicional_ST', 'amarilla', NULL, NULL, @id OUTPUT; --> adicional_ST minuto 111 (borde)
--- EXEC evento.tarjeta_insertar @pt, @le, 90, 'alargue_1', 'amarilla', NULL, NULL, @id OUTPUT; --> alargue_1 minuto 90 (borde)
--- EXEC evento.tarjeta_insertar @pt, @le, 106, 'alargue_1', 'amarilla', NULL, NULL, @id OUTPUT; --> alargue_1 minuto 106 (borde)
--- EXEC evento.tarjeta_insertar @pt, @le, 105, 'adicional_alargue_1', 'amarilla', NULL, NULL, @id OUTPUT; --> adicional_alargue_1 minuto 105 (borde)
--- EXEC evento.tarjeta_insertar @pt, @le, 116, 'adicional_alargue_1', 'amarilla', NULL, NULL, @id OUTPUT; --> adicional_alargue_1 minuto 116 (borde)
--- EXEC evento.tarjeta_insertar @pt, @le, 105, 'alargue_2', 'amarilla', NULL, NULL, @id OUTPUT; --> alargue_2 minuto 105 (borde)
--- EXEC evento.tarjeta_insertar @pt, @le, 121, 'alargue_2', 'amarilla', NULL, NULL, @id OUTPUT; --> alargue_2 minuto 121 (borde)
--- EXEC evento.tarjeta_insertar @pt, @le, 120, 'adicional_alargue_2', 'amarilla', NULL, NULL, @id OUTPUT; --> adicional_alargue_2 minuto 120 (borde)
--- EXEC evento.tarjeta_insertar @pt, @le, 136, 'adicional_alargue_2', 'amarilla', NULL, NULL, @id OUTPUT; --> adicional_alargue_2 minuto 136 (borde)
--- EXEC evento.tarjeta_insertar @pt, @le, 119, 'penales', 'amarilla', NULL, NULL, @id OUTPUT; --> penales minuto 119 (borde)
--- EXEC evento.tarjeta_insertar @pt, @le, 136, 'penales', 'amarilla', NULL, NULL, @id OUTPUT; --> penales minuto 136 (borde)
--- EXEC evento.tarjeta_insertar @pm, @cn, 100, 'alargue_1', 'amarilla', NULL, NULL, @id OUTPUT; --> Fase de grupos: alargue_1
--- EXEC evento.tarjeta_insertar @pm, @cn, 110, 'adicional_alargue_1', 'amarilla', NULL, NULL, @id OUTPUT; --> Fase de grupos: adicional_alargue_1
--- EXEC evento.tarjeta_insertar @pm, @cn, 110, 'alargue_2', 'amarilla', NULL, NULL, @id OUTPUT; --> Fase de grupos: alargue_2
--- EXEC evento.tarjeta_insertar @pm, @cn, 125, 'adicional_alargue_2', 'amarilla', NULL, NULL, @id OUTPUT; --> Fase de grupos: adicional_alargue_2
--- EXEC evento.tarjeta_insertar @pm, @cn, 125, 'penales', 'amarilla', NULL, NULL, @id OUTPUT; --> Fase de grupos: tanda de penales
--- EXEC evento.tarjeta_insertar NULL, NULL, NULL, NULL, NULL, NULL, NULL, @id OUTPUT; --> 4 errores: partido, periodo, persona y tipo (todo nulo)
--- EXEC evento.tarjeta_insertar @pz, @zl, 0, 'PT', 'amarilla', NULL, NULL, @id OUTPUT; --> 2 errores: partido finalizado y minuto
--- EXEC evento.tarjeta_insertar @pt, @dob, 15, 'PT', 'amarilla', NULL, 'doble_amarilla', @id OUTPUT; --> 3 errores: amarilla con tipo de expulsion, persona ya expulsada y ya tiene una amarilla
+
+-- E-3.11.01 Valido: amarilla con motivo => se acepta
+BEGIN TRY EXEC evento.tarjeta_insertar @pt, @l1, 15, 'PT', 'amarilla', 'Falta', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.01', 'evento.tarjeta_insertar: Valido: amarilla con motivo', 0;
+-- E-3.11.02 Valido: motivo se guarda recortado => se acepta
+BEGIN TRY EXEC evento.tarjeta_insertar @pt, @l2, 16, 'PT', 'amarilla', '  Motivo con espacios  ', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.02', 'evento.tarjeta_insertar: Valido: motivo se guarda recortado', 0;
+-- E-3.11.03 Valido: motivo nulo => se acepta
+BEGIN TRY EXEC evento.tarjeta_insertar @pt, @l3, 17, 'PT', 'amarilla', NULL, NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.03', 'evento.tarjeta_insertar: Valido: motivo nulo', 0;
+-- E-3.11.04 Valido: motivo vacio se guarda como NULL => se acepta
+BEGIN TRY EXEC evento.tarjeta_insertar @pt, @l4, 18, 'PT', 'amarilla', '', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.04', 'evento.tarjeta_insertar: Valido: motivo vacio se guarda como NULL', 0;
+-- E-3.11.05 Valido: motivo solo espacios se guarda como NULL => se acepta
+BEGIN TRY EXEC evento.tarjeta_insertar @pt, @l5, 19, 'PT', 'amarilla', '   ', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.05', 'evento.tarjeta_insertar: Valido: motivo solo espacios se guarda como NULL', 0;
+-- E-3.11.06 Valido: sin pasar motivo ni tipo de expulsion (valores por defecto) => se acepta
+BEGIN TRY EXEC evento.tarjeta_insertar @pt, @l6, 20, 'PT', 'amarilla', @tarjeta_id = @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.06', 'evento.tarjeta_insertar: Valido: sin pasar motivo ni tipo de expulsion (valores por defecto)', 0;
+-- E-3.11.07 Valido: roja directa con motivo => se acepta
+BEGIN TRY EXEC evento.tarjeta_insertar @pt, @l7, 50, 'ST', 'roja', 'Agresion', 'roja_directa', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.07', 'evento.tarjeta_insertar: Valido: roja directa con motivo', 0;
+-- E-3.11.08 Valido: roja directa sin motivo => se acepta
+BEGIN TRY EXEC evento.tarjeta_insertar @pt, @l8, 51, 'ST', 'roja', NULL, 'roja_directa', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.08', 'evento.tarjeta_insertar: Valido: roja directa sin motivo', 0;
+-- E-3.11.09 Valido: segunda amarilla registrada como roja (la persona tiene una amarilla previa) => se acepta
+BEGIN TRY EXEC evento.tarjeta_insertar @pt, @a1, 70, 'ST', 'roja', 'Segunda amarilla', 'doble_amarilla', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.09', 'evento.tarjeta_insertar: Valido: segunda amarilla registrada como roja (la persona tiene una amarilla previa)', 0;
+-- E-3.11.10 Valido: roja directa a quien ya tenia una amarilla => se acepta
+BEGIN TRY EXEC evento.tarjeta_insertar @pt, @a2, 71, 'ST', 'roja', 'Agresion', 'roja_directa', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.10', 'evento.tarjeta_insertar: Valido: roja directa a quien ya tenia una amarilla', 0;
+-- E-3.11.11 Valido: PT minuto minimo (borde) => se acepta
+BEGIN TRY EXEC evento.tarjeta_insertar @pt, @l9, 1, 'PT', 'amarilla', NULL, NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.11', 'evento.tarjeta_insertar: Valido: PT minuto minimo (borde)', 0;
+-- E-3.11.12 Valido: PT minuto maximo (borde) => se acepta
+BEGIN TRY EXEC evento.tarjeta_insertar @pt, @l10, 45, 'PT', 'amarilla', NULL, NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.12', 'evento.tarjeta_insertar: Valido: PT minuto maximo (borde)', 0;
 GO
 
--- Verificacion evento.tarjeta_modificar
+PRINT '--- E-3.11.13 a E-3.11.16 evento.tarjeta_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @tm  INT = (SELECT tarjeta_id FROM ##test_tarjeta WHERE clave = 't_mod'),
         @tmr INT = (SELECT tarjeta_id FROM ##test_tarjeta WHERE clave = 't_modr'),
         @tj  INT = (SELECT tarjeta_id FROM ##test_tarjeta WHERE clave = 't_jug'),
         @tf  INT = (SELECT tarjeta_id FROM ##test_tarjeta WHERE clave = 't_fin');
-EXEC evento.tarjeta_modificar @tm, 12, 'PT', 'Falta tactica'; --> Valido: cambia minuto y motivo
--- EXEC evento.tarjeta_modificar @tm, 10, 'PT', 'Falta'; --> Valido: sin cambios (deja la tarjeta como en la preparacion)
--- EXEC evento.tarjeta_modificar @tm, 50, 'ST', 'Falta'; --> Valido: cambia el periodo (restaurar con el caso anterior)
--- EXEC evento.tarjeta_modificar @tm, 10, 'PT', '  Motivo  '; --> Valido: motivo se guarda recortado
--- EXEC evento.tarjeta_modificar NULL, 10, 'PT'; --> Id nulo (el mensaje dice "(nulo)")
--- EXEC evento.tarjeta_modificar 999999, 10, 'PT'; --> Tarjeta inexistente
--- EXEC evento.tarjeta_modificar @tf, 12, 'PT'; --> Partido finalizado
--- EXEC evento.tarjeta_modificar @tm, 10, NULL; --> Periodo nulo
--- EXEC evento.tarjeta_modificar @tm, 10, ''; --> Periodo vacio
--- EXEC evento.tarjeta_modificar @tm, 10, 'PT2'; --> Periodo invalido (no se valida el minuto)
--- EXEC evento.tarjeta_modificar @tm, NULL, 'PT'; --> Minuto nulo
--- EXEC evento.tarjeta_modificar @tm, -1, 'PT'; --> Minuto negativo
--- EXEC evento.tarjeta_modificar @tm, 0, 'PT'; --> PT minuto 0 (borde)
--- EXEC evento.tarjeta_modificar @tm, 46, 'PT'; --> PT minuto 46 (borde)
--- EXEC evento.tarjeta_modificar @tm, 45, 'adicional_PT'; --> adicional_PT minuto 45 (borde)
--- EXEC evento.tarjeta_modificar @tm, 61, 'adicional_PT'; --> adicional_PT minuto 61 (borde)
--- EXEC evento.tarjeta_modificar @tm, 45, 'ST'; --> ST minuto 45 (borde)
--- EXEC evento.tarjeta_modificar @tm, 91, 'ST'; --> ST minuto 91 (borde)
--- EXEC evento.tarjeta_modificar @tm, 90, 'adicional_ST'; --> adicional_ST minuto 90 (borde)
--- EXEC evento.tarjeta_modificar @tm, 111, 'adicional_ST'; --> adicional_ST minuto 111 (borde)
--- EXEC evento.tarjeta_modificar @tm, 90, 'alargue_1'; --> alargue_1 minuto 90 (borde)
--- EXEC evento.tarjeta_modificar @tm, 106, 'alargue_1'; --> alargue_1 minuto 106 (borde)
--- EXEC evento.tarjeta_modificar @tm, 105, 'adicional_alargue_1'; --> adicional_alargue_1 minuto 105 (borde)
--- EXEC evento.tarjeta_modificar @tm, 116, 'adicional_alargue_1'; --> adicional_alargue_1 minuto 116 (borde)
--- EXEC evento.tarjeta_modificar @tm, 105, 'alargue_2'; --> alargue_2 minuto 105 (borde)
--- EXEC evento.tarjeta_modificar @tm, 121, 'alargue_2'; --> alargue_2 minuto 121 (borde)
--- EXEC evento.tarjeta_modificar @tm, 120, 'adicional_alargue_2'; --> adicional_alargue_2 minuto 120 (borde)
--- EXEC evento.tarjeta_modificar @tm, 136, 'adicional_alargue_2'; --> adicional_alargue_2 minuto 136 (borde)
--- EXEC evento.tarjeta_modificar @tm, 119, 'penales'; --> penales minuto 119 (borde)
--- EXEC evento.tarjeta_modificar @tm, 136, 'penales'; --> penales minuto 136 (borde)
--- EXEC evento.tarjeta_modificar @tj, 100, 'alargue_1'; --> Fase de grupos: alargue_1
--- EXEC evento.tarjeta_modificar @tj, 110, 'adicional_alargue_1'; --> Fase de grupos: adicional_alargue_1
--- EXEC evento.tarjeta_modificar @tj, 110, 'alargue_2'; --> Fase de grupos: alargue_2
--- EXEC evento.tarjeta_modificar @tj, 125, 'adicional_alargue_2'; --> Fase de grupos: adicional_alargue_2
--- EXEC evento.tarjeta_modificar @tj, 125, 'penales'; --> Fase de grupos: tanda de penales
--- EXEC evento.tarjeta_modificar @tf, 0, 'PT'; --> 2 errores: partido finalizado y minuto
--- EXEC evento.tarjeta_modificar @tf, NULL, NULL; --> 2 errores: partido finalizado y periodo nulo
+
+-- E-3.11.13 Valido: cambia minuto y motivo => se acepta
+BEGIN TRY EXEC evento.tarjeta_modificar @tm, 12, 'PT', 'Falta tactica'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.13', 'evento.tarjeta_modificar: Valido: cambia minuto y motivo', 0;
+-- E-3.11.14 Valido: sin cambios (deja la tarjeta como en la preparacion) => se acepta
+BEGIN TRY EXEC evento.tarjeta_modificar @tm, 10, 'PT', 'Falta'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.14', 'evento.tarjeta_modificar: Valido: sin cambios (deja la tarjeta como en la preparacion)', 0;
+-- E-3.11.15 Valido: cambia el periodo (restaurar con el caso anterior) => se acepta
+BEGIN TRY EXEC evento.tarjeta_modificar @tm, 50, 'ST', 'Falta'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.15', 'evento.tarjeta_modificar: Valido: cambia el periodo (restaurar con el caso anterior)', 0;
+-- E-3.11.16 Valido: motivo se guarda recortado => se acepta
+BEGIN TRY EXEC evento.tarjeta_modificar @tm, 10, 'PT', '  Motivo  '; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.16', 'evento.tarjeta_modificar: Valido: motivo se guarda recortado', 0;
 GO
 
--- Verificacion evento.tarjeta_eliminar
+PRINT '--- E-3.11.17 a E-3.11.20 evento.tarjeta_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @te  INT = (SELECT tarjeta_id FROM ##test_tarjeta WHERE clave = 't_elim'),
         @te2 INT = (SELECT tarjeta_id FROM ##test_tarjeta WHERE clave = 't_elim2'),
         @tda INT = (SELECT tarjeta_id FROM ##test_tarjeta WHERE clave = 't_dob_a'),
         @tdr INT = (SELECT tarjeta_id FROM ##test_tarjeta WHERE clave = 't_dob_r'),
         @tf  INT = (SELECT tarjeta_id FROM ##test_tarjeta WHERE clave = 't_fin'),
         @ts  INT = (SELECT tarjeta_id FROM ##test_tarjeta WHERE clave = 't_susp');
-EXEC evento.tarjeta_eliminar @te; --> Baja valida: amarilla de un partido no finalizado, sin suspensiones
--- EXEC evento.tarjeta_eliminar @te2; --> Baja valida: roja directa sin suspensiones
--- EXEC evento.tarjeta_eliminar @tda; --> Es la primera amarilla de una expulsion por doble amarilla (ejecutar ANTES de dar de baja la roja)
--- EXEC evento.tarjeta_eliminar @tdr; --> Baja valida: roja por doble amarilla
--- EXEC evento.tarjeta_eliminar @tda; --> Baja valida: la amarilla ya no tiene la roja por doble amarilla (ejecutar DESPUES de dar de baja la roja)
--- EXEC evento.tarjeta_eliminar 999999; --> Tarjeta inexistente
--- EXEC evento.tarjeta_eliminar NULL; --> Id nulo (el mensaje dice "(nulo)")
--- EXEC evento.tarjeta_eliminar @tf; --> Partido finalizado
+
+-- E-3.11.17 Baja valida: amarilla de un partido no finalizado, sin suspensiones => se acepta
+BEGIN TRY EXEC evento.tarjeta_eliminar @te; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.17', 'evento.tarjeta_eliminar: Baja valida: amarilla de un partido no finalizado, sin suspensiones', 0;
+-- E-3.11.18 Baja valida: roja directa sin suspensiones => se acepta
+BEGIN TRY EXEC evento.tarjeta_eliminar @te2; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.18', 'evento.tarjeta_eliminar: Baja valida: roja directa sin suspensiones', 0;
+-- E-3.11.19 Baja valida: roja por doble amarilla => se acepta
+BEGIN TRY EXEC evento.tarjeta_eliminar @tdr; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.19', 'evento.tarjeta_eliminar: Baja valida: roja por doble amarilla', 0;
+-- E-3.11.20 Baja valida: la amarilla ya no tiene la roja por doble amarilla (ejecutar DESPUES de dar de baja la roja) => se acepta
+BEGIN TRY EXEC evento.tarjeta_eliminar @tda; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.20', 'evento.tarjeta_eliminar: Baja valida: la amarilla ya no tiene la roja por doble amarilla (ejecutar DESPUES de dar de baja la roja)', 0;
 GO
 
--- Verificacion evento.criterio_suspension_insertar
+PRINT '--- E-3.11.21 a E-3.11.26 evento.criterio_suspension_insertar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @id INT;
-EXEC evento.criterio_suspension_insertar 92, 1, 'grupos', 'jugador', 1, @id OUTPUT; --> Valido: criterio con fase y tipo de persona
--- EXEC evento.criterio_suspension_insertar 95, 1, 'grupos', NULL, 1, @id OUTPUT; --> Valido: fase grupos
--- EXEC evento.criterio_suspension_insertar 95, 1, 'dieciseisavos', NULL, 1, @id OUTPUT; --> Valido: fase dieciseisavos
--- EXEC evento.criterio_suspension_insertar 95, 1, 'semifinal', NULL, 1, @id OUTPUT; --> Valido: fase semifinal
--- EXEC evento.criterio_suspension_insertar 95, 1, 'tercer_puesto', NULL, 1, @id OUTPUT; --> Valido: fase tercer_puesto
--- EXEC evento.criterio_suspension_insertar 95, 1, 'final', NULL, 1, @id OUTPUT; --> Valido: fase final
--- EXEC evento.criterio_suspension_insertar 98, 1, 'preliminar', NULL, 1, @id OUTPUT; --> Fase invalida
--- EXEC evento.criterio_suspension_insertar 98, 1, '', NULL, 1, @id OUTPUT; --> Fase vacia (vacio no es NULL: es invalida)
--- EXEC evento.criterio_suspension_insertar 98, 1, 'grupos', 'arbitro', 1, @id OUTPUT; --> Tipo de persona invalido
--- EXEC evento.criterio_suspension_insertar 98, 1, 'grupos', 'jugadores', 1, @id OUTPUT; --> Tipo de persona invalido (plural)
--- EXEC evento.criterio_suspension_insertar NULL, 1, 'grupos', 'jugador', 1, @id OUTPUT; --> Cantidad de amarillas nula
--- EXEC evento.criterio_suspension_insertar 0, 1, 'grupos', 'jugador', 1, @id OUTPUT; --> Cantidad de amarillas 0 (borde)
--- EXEC evento.criterio_suspension_insertar -1, 1, 'grupos', 'jugador', 1, @id OUTPUT; --> Cantidad de amarillas negativa
--- EXEC evento.criterio_suspension_insertar 98, NULL, 'grupos', 'jugador', 1, @id OUTPUT; --> Partidos de suspension nulos
--- EXEC evento.criterio_suspension_insertar 98, -1, 'grupos', 'jugador', 1, @id OUTPUT; --> Partidos de suspension negativos
--- EXEC evento.criterio_suspension_insertar 90, 1, 'semifinal', 'jugador', 1, @id OUTPUT; --> Duplicado de 'dup'
--- EXEC evento.criterio_suspension_insertar 90, 1, NULL, NULL, 1, @id OUTPUT; --> Duplicado de 'base_null' (fase y tipo NULL)
--- EXEC evento.criterio_suspension_insertar 0, 0, 'preliminar', 'arbitro', 1, @id OUTPUT; --> 4 errores: fase, tipo, cantidad y partidos
--- EXEC evento.criterio_suspension_insertar 90, 0, 'semifinal', 'jugador', 1, @id OUTPUT; --> 2 errores: partidos de suspension y duplicado de 'dup'
--- EXEC evento.criterio_suspension_insertar 90, 0, '', NULL, 1, @id OUTPUT; --> 3 errores: fase invalida, partidos y duplicado de 'base_null'
--- EXEC evento.criterio_suspension_insertar 90, 0, '', '', 1, @id OUTPUT; --> 4 errores: fase, tipo, partidos y duplicado de 'base_null'
+
+-- E-3.11.21 Valido: criterio con fase y tipo de persona => se acepta
+BEGIN TRY EXEC evento.criterio_suspension_insertar 92, 1, 'grupos', 'jugador', 1, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.21', 'evento.criterio_suspension_insertar: Valido: criterio con fase y tipo de persona', 0;
+-- E-3.11.22 Valido: fase grupos => se acepta
+BEGIN TRY EXEC evento.criterio_suspension_insertar 95, 1, 'grupos', NULL, 1, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.22', 'evento.criterio_suspension_insertar: Valido: fase grupos', 0;
+-- E-3.11.23 Valido: fase dieciseisavos => se acepta
+BEGIN TRY EXEC evento.criterio_suspension_insertar 95, 1, 'dieciseisavos', NULL, 1, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.23', 'evento.criterio_suspension_insertar: Valido: fase dieciseisavos', 0;
+-- E-3.11.24 Valido: fase semifinal => se acepta
+BEGIN TRY EXEC evento.criterio_suspension_insertar 95, 1, 'semifinal', NULL, 1, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.24', 'evento.criterio_suspension_insertar: Valido: fase semifinal', 0;
+-- E-3.11.25 Valido: fase tercer_puesto => se acepta
+BEGIN TRY EXEC evento.criterio_suspension_insertar 95, 1, 'tercer_puesto', NULL, 1, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.25', 'evento.criterio_suspension_insertar: Valido: fase tercer_puesto', 0;
+-- E-3.11.26 Valido: fase final => se acepta
+BEGIN TRY EXEC evento.criterio_suspension_insertar 95, 1, 'final', NULL, 1, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.26', 'evento.criterio_suspension_insertar: Valido: fase final', 0;
 GO
 
--- Verificacion evento.criterio_suspension_modificar
+PRINT '--- E-3.11.27 a E-3.11.30 evento.criterio_suspension_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @cm  INT = (SELECT criterio_id FROM ##test_criterio WHERE clave = 'mod'),
         @cu  INT = (SELECT criterio_id FROM ##test_criterio WHERE clave = 'usado');
-EXEC evento.criterio_suspension_modificar @cm, 90, 3, 'grupos', 'jugador', 1; --> Valido: cambia los partidos de suspension
--- EXEC evento.criterio_suspension_modificar @cm, 90, 1, 'grupos', 'jugador', 1; --> Valido: sin cambios (no choca consigo mismo; deja el criterio como en la preparacion)
--- EXEC evento.criterio_suspension_modificar @cm, 80, 1, 'grupos', 'jugador', 1; --> Valido: cambia la cantidad de amarillas
--- EXEC evento.criterio_suspension_modificar @cm, 80, 1, 'octavos', 'jugador', 1; --> Valido: cambia la fase
--- EXEC evento.criterio_suspension_modificar NULL, 85, 1, 'grupos', 'jugador', 1; --> Id nulo
--- EXEC evento.criterio_suspension_modificar 999999, 85, 1, 'grupos', 'jugador', 1; --> Criterio inexistente
--- EXEC evento.criterio_suspension_modificar @cm, 80, 1, 'preliminar', NULL, 1; --> Fase invalida
--- EXEC evento.criterio_suspension_modificar @cm, 80, 1, '', NULL, 1; --> Fase vacia (vacio no es NULL: es invalida)
--- EXEC evento.criterio_suspension_modificar @cm, 80, 1, 'grupos', 'arbitro', 1; --> Tipo de persona invalido
--- EXEC evento.criterio_suspension_modificar @cm, NULL, 1, 'grupos', 'jugador', 1; --> Cantidad de amarillas nula
--- EXEC evento.criterio_suspension_modificar @cm, 0, 1, 'grupos', 'jugador', 1; --> Cantidad de amarillas 0 (borde)
--- EXEC evento.criterio_suspension_modificar @cm, -1, 1, 'grupos', 'jugador', 1; --> Cantidad de amarillas negativa
--- EXEC evento.criterio_suspension_modificar @cm, 80, NULL, 'grupos', 'jugador', 1; --> Partidos de suspension nulos
--- EXEC evento.criterio_suspension_modificar @cm, 80, 0, 'grupos', 'jugador', 1; --> Partidos de suspension 0 (borde)
--- EXEC evento.criterio_suspension_modificar @cm, 80, -1, 'grupos', 'jugador', 1; --> Partidos de suspension negativos
--- EXEC evento.criterio_suspension_modificar @cm, 90, 5, 'semifinal', 'jugador', 0; --> Duplicado de 'dup' (distintos partidos y activo no evitan el duplicado)
--- EXEC evento.criterio_suspension_modificar NULL, NULL, NULL, NULL, NULL, NULL; --> 3 errores: id nulo, cantidad y partidos (todo nulo)
--- EXEC evento.criterio_suspension_modificar 999999, 0, 0, 'preliminar', 'arbitro', 1; --> 5 errores: criterio inexistente, fase, tipo, cantidad y partidos
--- EXEC evento.criterio_suspension_modificar @cm, 90, 0, 'semifinal', 'jugador', 1; --> 2 errores: partidos y duplicado de 'dup'
--- EXEC evento.criterio_suspension_modificar @cm, 90, 0, '', '', 1; --> 4 errores: fase, tipo, partidos y duplicado de 'base_null'
+
+-- E-3.11.27 Valido: cambia los partidos de suspension => se acepta
+BEGIN TRY EXEC evento.criterio_suspension_modificar @cm, 90, 3, 'grupos', 'jugador', 1; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.27', 'evento.criterio_suspension_modificar: Valido: cambia los partidos de suspension', 0;
+-- E-3.11.28 Valido: sin cambios (no choca consigo mismo; deja el criterio como en la preparacion) => se acepta
+BEGIN TRY EXEC evento.criterio_suspension_modificar @cm, 90, 1, 'grupos', 'jugador', 1; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.28', 'evento.criterio_suspension_modificar: Valido: sin cambios (no choca consigo mismo; deja el criterio como en la preparacion)', 0;
+-- E-3.11.29 Valido: cambia la cantidad de amarillas => se acepta
+BEGIN TRY EXEC evento.criterio_suspension_modificar @cm, 80, 1, 'grupos', 'jugador', 1; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.29', 'evento.criterio_suspension_modificar: Valido: cambia la cantidad de amarillas', 0;
+-- E-3.11.30 Valido: cambia la fase => se acepta
+BEGIN TRY EXEC evento.criterio_suspension_modificar @cm, 80, 1, 'octavos', 'jugador', 1; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.30', 'evento.criterio_suspension_modificar: Valido: cambia la fase', 0;
 GO
 
--- Verificacion evento.criterio_suspension_eliminar
+PRINT '--- E-3.11.31 a E-3.11.32 evento.criterio_suspension_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.16 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @ce  INT = (SELECT criterio_id FROM ##test_criterio WHERE clave = 'elim'),
         @ce2 INT = (SELECT criterio_id FROM ##test_criterio WHERE clave = 'elim2'),
         @cu  INT = (SELECT criterio_id FROM ##test_criterio WHERE clave = 'usado');
-EXEC evento.criterio_suspension_eliminar @ce; --> Baja valida: criterio activo sin suspensiones
--- EXEC evento.criterio_suspension_eliminar @ce2; --> Baja valida: criterio inactivo sin suspensiones
--- EXEC evento.criterio_suspension_eliminar @ce; --> Criterio inexistente (ya dado de baja; ejecutar despues de la baja valida)
--- EXEC evento.criterio_suspension_eliminar 999999; --> Criterio inexistente
--- EXEC evento.criterio_suspension_eliminar NULL; --> Id nulo (el mensaje dice "(nulo)")
+
+-- E-3.11.31 Baja valida: criterio activo sin suspensiones => se acepta
+BEGIN TRY EXEC evento.criterio_suspension_eliminar @ce; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.31', 'evento.criterio_suspension_eliminar: Baja valida: criterio activo sin suspensiones', 0;
+-- E-3.11.32 Baja valida: criterio inactivo sin suspensiones => se acepta
+BEGIN TRY EXEC evento.criterio_suspension_eliminar @ce2; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.32', 'evento.criterio_suspension_eliminar: Baja valida: criterio inactivo sin suspensiones', 0;
+GO
+
+PRINT '--- P-3.17 Preparación de evento.suspension_* (ejecutar UNA sola vez, y usar siempre la misma ventana de consulta)';
+-- Preparación (sin verificaciones) de los casos detallados. Ejecutar UNA sola vez.
+-- Requiere: Lote 0, las Partes 1 y 2 y las preparaciones P-3.xx anteriores.
+-- Requiere las preparaciones de plantel.formacion_* (partido 'jug', anterior), evento.tarjeta_* (partido pt_tar) y
+-- evento.criterio_suspension_* (criterio 'usado'). Crea tres integrantes del cuerpo técnico de ZCA con tarjetas en pt_tar,
+-- una selección rival (ZDA) y cuatro partidos posteriores; el partido 'fin' queda finalizado.
+IF OBJECT_ID('tempdb..##test_suspension') IS NULL
+    CREATE TABLE ##test_suspension (clave VARCHAR(12) COLLATE DATABASE_DEFAULT NOT NULL PRIMARY KEY, id INT NOT NULL);
+GO
+DECLARE @conf INT = (SELECT TOP 1 confederacion_id FROM torneo.confederacion ORDER BY confederacion_id),
+        @s1 INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZCA'),
+        @s2 INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZCB'),
+        @s3 INT = (SELECT s.seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ZCC'),
+        @pt INT = (SELECT partido_id FROM ##test_tarjeta WHERE clave = 'pt_tar'),
+        @pant INT = (SELECT partido_id FROM ##test_formacion WHERE clave = 'jug'),
+        @cu INT = (SELECT criterio_id FROM ##test_criterio WHERE clave = 'usado'),
+        @sede INT = (SELECT TOP 1 sede_id FROM torneo.sede ORDER BY sede_id),
+        @huso CHAR(6), @off INT, @base DATETIME2, @t DATETIMEOFFSET,
+        @pr INT, @sr INT, @pa1 INT, @pa2 INT, @pb INT, @pf INT, @x INT,
+        @ctr INT, @cta INT, @ctm INT, @tr INT, @ta INT, @tm INT, @id INT;
+SELECT @huso = huso_horario FROM torneo.sede WHERE sede_id = @sede;
+SET @off = CAST(SUBSTRING(@huso, 4, 3) AS INT) * 60;
+SET @base = DATEADD(DAY, 3, (SELECT MAX(CAST(fecha_hora_local AS DATETIME2)) FROM torneo.partido
+                             WHERE seleccion_local_id IN (@s1, @s2, @s3) OR seleccion_visitante_id IN (@s1, @s2, @s3)));
+EXEC torneo.pais_insertar 'ZDA', 'Test Susp Rival', 'UTC-03', 0, @pr OUTPUT;
+EXEC torneo.seleccion_insertar @pr, @conf, 'A', @sr OUTPUT;
+SET @t = TODATETIMEOFFSET(@base, @off);                  EXEC torneo.partido_insertar @sede, @t, 'grupos',    @s1, @sr, @partido_id = @pa1 OUTPUT;  -- afectado principal
+SET @t = TODATETIMEOFFSET(DATEADD(DAY, 3, @base), @off); EXEC torneo.partido_insertar @sede, @t, 'octavos',   @sr, @s1, @partido_id = @pa2 OUTPUT;  -- afectado alternativo
+SET @t = TODATETIMEOFFSET(DATEADD(DAY, 6, @base), @off); EXEC torneo.partido_insertar @sede, @t, 'cuartos',   @s2, @sr, @partido_id = @pb  OUTPUT;  -- ZCA no lo juega
+SET @t = TODATETIMEOFFSET(DATEADD(DAY, 9, @base), @off); EXEC torneo.partido_insertar @sede, @t, 'semifinal', @s1, @sr, @partido_id = @pf  OUTPUT;  -- se finaliza al final
+EXEC plantel.cuerpo_tecnico_insertar @s1, 'Test SU', 'CT Roja',     'otro', @x OUTPUT, @ctr OUTPUT;
+EXEC plantel.cuerpo_tecnico_insertar @s1, 'Test SU', 'CT Amarilla', 'otro', @x OUTPUT, @cta OUTPUT;
+EXEC plantel.cuerpo_tecnico_insertar @s1, 'Test SU', 'CT Mod',      'otro', @x OUTPUT, @ctm OUTPUT;
+EXEC evento.tarjeta_insertar @pt, @ctr, 60, 'ST', 'roja',     'Insultos', 'roja_directa', @tarjeta_id = @tr OUTPUT;
+EXEC evento.tarjeta_insertar @pt, @cta, 61, 'ST', 'amarilla', 'Protesta', NULL,           @tarjeta_id = @ta OUTPUT;
+EXEC evento.tarjeta_insertar @pt, @ctm, 62, 'ST', 'roja',     'Insultos', 'roja_directa', @tarjeta_id = @tm OUTPUT;
+INSERT INTO ##test_suspension (clave, id) VALUES
+ ('pa1', @pa1), ('pa2', @pa2), ('pb', @pb), ('pf', @pf), ('pant', @pant), ('t_roja', @tr), ('t_amar', @ta), ('t_mod', @tm);
+EXEC evento.suspension_insertar @tm, 'Roja directa', NULL, @pa1, @id OUTPUT;                 INSERT INTO ##test_suspension VALUES ('mod',  @id);  -- a modificar
+EXEC evento.suspension_insertar @tm, 'Roja directa (segunda fecha)', NULL, @pa2, @id OUTPUT; INSERT INTO ##test_suspension VALUES ('otra', @id);  -- destino de duplicados
+EXEC evento.suspension_insertar @tr, 'Roja directa', NULL, @pa2, @id OUTPUT;                 INSERT INTO ##test_suspension VALUES ('elim', @id);  -- baja válida
+EXEC evento.suspension_insertar @tm, 'Roja directa (cumplida)', NULL, @pf, @id OUTPUT;       INSERT INTO ##test_suspension VALUES ('fin',  @id);  -- partido finalizado
+EXEC evento.suspension_insertar @ta, 'Acumulacion de amarillas', @cu, @pa2, @id OUTPUT;     INSERT INTO ##test_suspension VALUES ('crit', @id);  -- usa el criterio 'usado'
+UPDATE torneo.partido SET estado = 'finalizado' WHERE partido_id = @pf;
+GO
+
+PRINT '--- E-3.11.33 a E-3.11.35 evento.suspension_insertar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.17 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
+DECLARE @id INT,
+        @tr INT = (SELECT id FROM ##test_suspension WHERE clave = 't_roja'),
+        @ta INT = (SELECT id FROM ##test_suspension WHERE clave = 't_amar'),
+        @tm INT = (SELECT id FROM ##test_suspension WHERE clave = 't_mod'),
+        @pa1 INT = (SELECT id FROM ##test_suspension WHERE clave = 'pa1'),
+        @pa2 INT = (SELECT id FROM ##test_suspension WHERE clave = 'pa2'),
+        @pb INT = (SELECT id FROM ##test_suspension WHERE clave = 'pb'),
+        @pant INT = (SELECT id FROM ##test_suspension WHERE clave = 'pant'),
+        @cu INT = (SELECT criterio_id FROM ##test_criterio WHERE clave = 'usado');
+
+-- E-3.11.33 Valido: expulsion sin criterio, con partido afectado => se acepta
+BEGIN TRY EXEC evento.suspension_insertar @tr, 'Roja directa', NULL, @pa1, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.33', 'evento.suspension_insertar: Valido: expulsion sin criterio, con partido afectado', 0;
+-- E-3.11.34 Valido: amarilla con criterio y partido a definir (NULL) => se acepta
+BEGIN TRY EXEC evento.suspension_insertar @ta, 'Acumulacion de amarillas', @cu, NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.34', 'evento.suspension_insertar: Valido: amarilla con criterio y partido a definir (NULL)', 0;
+-- E-3.11.35 Valido: el motivo se guarda recortado => se acepta
+BEGIN TRY EXEC evento.suspension_insertar @tr, '  Motivo con espacios  ', NULL, NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.35', 'evento.suspension_insertar: Valido: el motivo se guarda recortado', 0;
+GO
+
+PRINT '--- E-3.11.36 a E-3.11.38 evento.suspension_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.17 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
+DECLARE @sm INT = (SELECT id FROM ##test_suspension WHERE clave = 'mod'),
+        @pa1 INT = (SELECT id FROM ##test_suspension WHERE clave = 'pa1'),
+        @pa2 INT = (SELECT id FROM ##test_suspension WHERE clave = 'pa2'),
+        @pb INT = (SELECT id FROM ##test_suspension WHERE clave = 'pb'),
+        @pant INT = (SELECT id FROM ##test_suspension WHERE clave = 'pant');
+
+-- E-3.11.36 Valido: cambia el motivo (el mismo partido no choca consigo misma) => se acepta
+BEGIN TRY EXEC evento.suspension_modificar @sm, 'Roja directa: sancion de oficio', @pa1; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.36', 'evento.suspension_modificar: Valido: cambia el motivo (el mismo partido no choca consigo misma)', 0;
+-- E-3.11.37 Valido: partido afectado a definir (NULL) => se acepta
+BEGIN TRY EXEC evento.suspension_modificar @sm, 'Roja directa', NULL; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.37', 'evento.suspension_modificar: Valido: partido afectado a definir (NULL)', 0;
+-- E-3.11.38 Restaurar: vuelve a pa1 (el motivo se guarda recortado) => se acepta
+BEGIN TRY EXEC evento.suspension_modificar @sm, '  Roja directa  ', @pa1; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.38', 'evento.suspension_modificar: Restaurar: vuelve a pa1 (el motivo se guarda recortado)', 0;
+GO
+
+PRINT '--- E-3.11.39 evento.suspension_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.17 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
+DECLARE @se INT = (SELECT id FROM ##test_suspension WHERE clave = 'elim'),
+        @sf INT = (SELECT id FROM ##test_suspension WHERE clave = 'fin');
+
+-- E-3.11.39 Baja valida: el partido afectado no se jugo => se acepta
+BEGIN TRY EXEC evento.suspension_eliminar @se; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.11.39', 'evento.suspension_eliminar: Baja valida: el partido afectado no se jugo', 0;
 GO
 
 -- ============================================================
--- 1.12 arbitraje: arbitro, arbitro_idioma, designacion_arbitral e informe_arbitral
+-- 3.12 arbitraje: arbitro, arbitro_idioma, designacion_arbitral e informe_arbitral
 -- ============================================================
 
+PRINT '--- P-3.18 Preparación de arbitraje.* (ejecutar UNA sola vez, y usar siempre la misma ventana de consulta)';
+-- Preparación (sin verificaciones) de los casos detallados. Ejecutar UNA sola vez.
+-- Requiere: Lote 0, las Partes 1 y 2 y las preparaciones P-3.xx anteriores.
+-- No requiere otras preparaciones. Países ZAA/ZAB sin selección (árbitros) y ZAL, ZAV, ZAX, ZAY con selección;
+-- partidos en 2031: pg (ZAL vs ZAV, grupos), pc (ZAX vs ZAY, 3 horas después), pfin (cuartos, se finaliza) y
+-- pd (dieciseisavos). Designaciones e informes de base en pg, pc y pfin.
+IF OBJECT_ID('tempdb..##test_arbitraje') IS NULL
+    CREATE TABLE ##test_arbitraje (clave VARCHAR(12) COLLATE DATABASE_DEFAULT NOT NULL PRIMARY KEY, id INT NOT NULL);
+GO
+DECLARE @conf INT = (SELECT TOP 1 confederacion_id FROM torneo.confederacion ORDER BY confederacion_id),
+        @pa INT, @pb INT, @pl INT, @pv INT, @px INT, @py INT, @sl INT, @sv INT, @sx INT, @sy INT,
+        @sede1 INT, @sede2 INT, @pg INT, @pc INT, @pd INT, @pfin INT, @id INT, @d INT;
+EXEC torneo.pais_insertar 'ZAA', 'Test Arb Pais A',    'UTC-03', 0, @pa OUTPUT;
+EXEC torneo.pais_insertar 'ZAB', 'Test Arb Pais B',    'UTC-03', 0, @pb OUTPUT;
+EXEC torneo.pais_insertar 'ZAL', 'Test Arb Local',     'UTC-03', 0, @pl OUTPUT;
+EXEC torneo.pais_insertar 'ZAV', 'Test Arb Visitante', 'UTC-03', 0, @pv OUTPUT;
+EXEC torneo.pais_insertar 'ZAX', 'Test Arb X',         'UTC-03', 0, @px OUTPUT;
+EXEC torneo.pais_insertar 'ZAY', 'Test Arb Y',         'UTC-03', 0, @py OUTPUT;
+EXEC torneo.seleccion_insertar @pl, @conf, 'K', @sl OUTPUT;
+EXEC torneo.seleccion_insertar @pv, @conf, 'K', @sv OUTPUT;
+EXEC torneo.seleccion_insertar @px, @conf, 'L', @sx OUTPUT;
+EXEC torneo.seleccion_insertar @py, @conf, 'L', @sy OUTPUT;
+EXEC torneo.sede_insertar 'Test Arb Sede 1', 'Ciudad Arb', @pa, 50000, 'UTC-03', @sede1 OUTPUT;
+EXEC torneo.sede_insertar 'Test Arb Sede 2', 'Ciudad Arb', @pa, 50000, 'UTC-03', @sede2 OUTPUT;
+EXEC torneo.partido_insertar @sede1, '2031-01-10 15:00:00 -03:00', 'grupos',        @sl, @sv, NULL, @pg   OUTPUT;
+EXEC torneo.partido_insertar @sede2, '2031-01-10 18:00:00 -03:00', 'grupos',        @sx, @sy, NULL, @pc   OUTPUT;
+EXEC torneo.partido_insertar @sede1, '2031-01-30 15:00:00 -03:00', 'cuartos',       @sl, @sv, NULL, @pfin OUTPUT;
+EXEC torneo.partido_insertar @sede1, '2031-02-10 15:00:00 -03:00', 'dieciseisavos', @sl, @sv, NULL, @pd   OUTPUT;
+INSERT INTO ##test_arbitraje (clave, id) VALUES ('pg', @pg), ('pc', @pc), ('pfin', @pfin), ('pd', @pd);
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'Base',      @pa, 'FIFA', '1985-05-10', @id OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_base', @id);   -- designado en pg y pfin
+EXEC arbitraje.arbitro_idioma_insertar @id, 'espanol';
+EXEC arbitraje.arbitro_idioma_insertar @id, 'ingles';
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'Mod',       @pa, 'confederacion', '1980-01-01', @id OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_mod', @id);
+EXEC arbitraje.arbitro_idioma_insertar @id, 'aleman';
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'Otro',      @pa, 'FIFA', NULL, @id OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_otro', @id);    -- destino de duplicados
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'Elim',      @pa, 'FIFA', NULL, @id OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_elim', @id);    -- baja válida (con un idioma)
+EXEC arbitraje.arbitro_idioma_insertar @id, 'italiano';
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'Conflicto', @pl, 'FIFA', NULL, @id OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_conf', @id);    -- país de una selección de pg
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'Libre',     @pb, 'FIFA', NULL, @id OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_libre', @id);   -- sin designaciones
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'Libre Dos', @pb, 'FIFA', NULL, @id OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_libre2', @id);
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'Adv',       @px, 'FIFA', NULL, @id OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_adv', @id);     -- país con selección en competencia
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'Inf',       @pa, 'FIFA', NULL, @id OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_inf', @id);
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'DMod',      @pa, 'FIFA', NULL, @id OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_dmod', @id);
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'DElim',     @pa, 'FIFA', NULL, @id OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_delim', @id);
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'PC',        @pa, 'FIFA', NULL, @id OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_pc', @id);
+DECLARE @a_base INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_base'),
+        @a_inf INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_inf'),
+        @a_dmod INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_dmod'),
+        @a_delim INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_delim'),
+        @a_pc INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_pc');
+EXEC arbitraje.designacion_arbitral_insertar @pg,   @a_base,  'principal',   @d OUTPUT; INSERT INTO ##test_arbitraje VALUES ('d_base', @d);
+EXEC arbitraje.designacion_arbitral_insertar @pg,   @a_inf,   'asistente_1', @d OUTPUT; INSERT INTO ##test_arbitraje VALUES ('d_inf', @d);    -- con informes
+EXEC arbitraje.designacion_arbitral_insertar @pg,   @a_dmod,  'cuarto',      @d OUTPUT; INSERT INTO ##test_arbitraje VALUES ('d_mod', @d);    -- a modificar
+EXEC arbitraje.designacion_arbitral_insertar @pg,   @a_delim, 'var',         @d OUTPUT; INSERT INTO ##test_arbitraje VALUES ('d_elim', @d);   -- baja válida
+EXEC arbitraje.designacion_arbitral_insertar @pc,   @a_pc,    'principal',   @d OUTPUT; INSERT INTO ##test_arbitraje VALUES ('d_pc', @d);
+EXEC arbitraje.designacion_arbitral_insertar @pfin, @a_base,  'principal',   @d OUTPUT; INSERT INTO ##test_arbitraje VALUES ('d_fin', @d);    -- finalizado, con informe
+EXEC arbitraje.informe_arbitral_insertar @d, '2031-01-30 20:00:00 +00:00', 'Informe del partido finalizado', NULL, @id OUTPUT;
+EXEC arbitraje.designacion_arbitral_insertar @pfin, @a_dmod,  'var',         @d OUTPUT; INSERT INTO ##test_arbitraje VALUES ('d_fin2', @d);   -- finalizado, sin informe
+SET @d = (SELECT id FROM ##test_arbitraje WHERE clave = 'd_inf');
+EXEC arbitraje.informe_arbitral_insertar @d, '2031-01-10 20:00:00 +00:00', 'Informe base', NULL, @id OUTPUT;       INSERT INTO ##test_arbitraje VALUES ('i_base', @id);
+EXEC arbitraje.informe_arbitral_insertar @d, '2031-01-10 21:00:00 +00:00', 'Informe a eliminar', NULL, @id OUTPUT; INSERT INTO ##test_arbitraje VALUES ('i_elim', @id);
+UPDATE torneo.partido SET estado = 'finalizado' WHERE partido_id = @pfin;
+GO
 
+PRINT '--- E-3.12.01 a E-3.12.07 arbitraje.arbitro_insertar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.18 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
+DECLARE @id INT,
+        @pa INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ZAA'),
+        @pb INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ZAB'),
+        @f18 DATE = DATEADD(YEAR, -18, CAST(SYSDATETIME() AS DATE)),
+        @f70 DATE = DATEADD(YEAR, -70, CAST(SYSDATETIME() AS DATE)),
+        @f18_menos DATE = DATEADD(DAY, 1, DATEADD(YEAR, -18, CAST(SYSDATETIME() AS DATE))),
+        @f70_mas DATE = DATEADD(DAY, -1, DATEADD(YEAR, -70, CAST(SYSDATETIME() AS DATE))),
+        @n100 VARCHAR(100) = 'Test Arb' + REPLICATE('N', 92);
 
+-- E-3.12.01 Valido => se acepta
+BEGIN TRY EXEC arbitraje.arbitro_insertar 'Test Arb', 'Alta', @pa, 'FIFA', '1985-01-01', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.01', 'arbitraje.arbitro_insertar: Valido', 0;
+-- E-3.12.02 Valido: categoria confederacion y sin fecha de nacimiento => se acepta
+BEGIN TRY EXEC arbitraje.arbitro_insertar 'Test Arb', 'Confederacion', @pa, 'confederacion', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.02', 'arbitraje.arbitro_insertar: Valido: categoria confederacion y sin fecha de nacimiento', 0;
+-- E-3.12.03 Valido: nombre y apellido se guardan recortados => se acepta
+BEGIN TRY EXEC arbitraje.arbitro_insertar '  Test Arb  ', '  Recortado  ', @pa, 'FIFA', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.03', 'arbitraje.arbitro_insertar: Valido: nombre y apellido se guardan recortados', 0;
+-- E-3.12.04 Valido: justo 18 anios (borde) => se acepta
+BEGIN TRY EXEC arbitraje.arbitro_insertar 'Test Arb', 'Borde 18', @pa, 'FIFA', @f18, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.04', 'arbitraje.arbitro_insertar: Valido: justo 18 anios (borde)', 0;
+-- E-3.12.05 Valido: justo 70 anios (borde) => se acepta
+BEGIN TRY EXEC arbitraje.arbitro_insertar 'Test Arb', 'Borde 70', @pa, 'FIFA', @f70, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.05', 'arbitraje.arbitro_insertar: Valido: justo 70 anios (borde)', 0;
+-- E-3.12.06 Valido: mismo nombre y apellido en otro pais => se acepta
+BEGIN TRY EXEC arbitraje.arbitro_insertar 'Test Arb', 'Base', @pb, 'FIFA', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.06', 'arbitraje.arbitro_insertar: Valido: mismo nombre y apellido en otro pais', 0;
+-- E-3.12.07 Valido: nombre de 100 caracteres (borde) => se acepta
+BEGIN TRY EXEC arbitraje.arbitro_insertar @n100, 'Nombre Largo', @pa, 'FIFA', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.07', 'arbitraje.arbitro_insertar: Valido: nombre de 100 caracteres (borde)', 0;
+GO
 
+PRINT '--- E-3.12.08 a E-3.12.11 arbitraje.arbitro_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.18 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
+DECLARE @m INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_mod'),
+        @b INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_base'),
+        @pa INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ZAA'),
+        @pb INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ZAB'),
+        @pl INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ZAL'),
+        @f18_menos DATE = DATEADD(DAY, 1, DATEADD(YEAR, -18, CAST(SYSDATETIME() AS DATE))),
+        @f70_mas DATE = DATEADD(DAY, -1, DATEADD(YEAR, -70, CAST(SYSDATETIME() AS DATE)));
+
+-- E-3.12.08 Valido: cambia apellido, pais, categoria y fecha => se acepta
+BEGIN TRY EXEC arbitraje.arbitro_modificar @m, 'Test Arb', 'Mod Nuevo', @pb, 'FIFA', '1990-02-02'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.08', 'arbitraje.arbitro_modificar: Valido: cambia apellido, pais, categoria y fecha', 0;
+-- E-3.12.09 Valido: pais con seleccion, sin designaciones en sus partidos => se acepta
+BEGIN TRY EXEC arbitraje.arbitro_modificar @m, 'Test Arb', 'Mod', @pl, 'confederacion', '1980-01-01'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.09', 'arbitraje.arbitro_modificar: Valido: pais con seleccion, sin designaciones en sus partidos', 0;
+-- E-3.12.10 Valido: sin fecha de nacimiento => se acepta
+BEGIN TRY EXEC arbitraje.arbitro_modificar @m, 'Test Arb', 'Mod', @pa, 'confederacion', NULL; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.10', 'arbitraje.arbitro_modificar: Valido: sin fecha de nacimiento', 0;
+-- E-3.12.11 Restaurar: deja Mod como estaba => se acepta
+BEGIN TRY EXEC arbitraje.arbitro_modificar @m, 'Test Arb', 'Mod', @pa, 'confederacion', '1980-01-01'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.11', 'arbitraje.arbitro_modificar: Restaurar: deja Mod como estaba', 0;
+GO
+
+PRINT '--- E-3.12.12 arbitraje.arbitro_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.18 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
+DECLARE @e INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_elim'),
+        @b INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_base');
+
+-- E-3.12.12 Baja valida: arbitro sin designaciones (se eliminan tambien sus idiomas) => se acepta
+BEGIN TRY EXEC arbitraje.arbitro_eliminar @e; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.12', 'arbitraje.arbitro_eliminar: Baja valida: arbitro sin designaciones (se eliminan tambien sus idiomas)', 0;
+GO
+
+PRINT '--- E-3.12.13 a E-3.12.15 arbitraje.arbitro_idioma_insertar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.18 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
+DECLARE @l INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_libre'),
+        @b INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_base');
+
+-- E-3.12.13 Valido => se acepta
+BEGIN TRY EXEC arbitraje.arbitro_idioma_insertar @l, 'aleman'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.13', 'arbitraje.arbitro_idioma_insertar: Valido', 0;
+-- E-3.12.14 Valido: se guarda en minusculas => se acepta
+BEGIN TRY EXEC arbitraje.arbitro_idioma_insertar @l, 'FRANCES'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.14', 'arbitraje.arbitro_idioma_insertar: Valido: se guarda en minusculas', 0;
+-- E-3.12.15 Valido: idioma de 10 letras (borde) => se acepta
+BEGIN TRY EXEC arbitraje.arbitro_idioma_insertar @l, 'portuguesa'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.15', 'arbitraje.arbitro_idioma_insertar: Valido: idioma de 10 letras (borde)', 0;
+GO
+
+PRINT '--- E-3.12.16 a E-3.12.18 arbitraje.arbitro_idioma_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.18 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
+DECLARE @b INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_base');
+
+-- E-3.12.16 Valido: reemplaza ingles por frances => se acepta
+BEGIN TRY EXEC arbitraje.arbitro_idioma_modificar @b, 'ingles', 'frances'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.16', 'arbitraje.arbitro_idioma_modificar: Valido: reemplaza ingles por frances', 0;
+-- E-3.12.17 Restaurar: vuelve a ingles => se acepta
+BEGIN TRY EXEC arbitraje.arbitro_idioma_modificar @b, 'frances', 'ingles'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.17', 'arbitraje.arbitro_idioma_modificar: Restaurar: vuelve a ingles', 0;
+-- E-3.12.18 Valido: el mismo idioma (no choca consigo mismo) => se acepta
+BEGIN TRY EXEC arbitraje.arbitro_idioma_modificar @b, 'ingles', 'INGLES'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.18', 'arbitraje.arbitro_idioma_modificar: Valido: el mismo idioma (no choca consigo mismo)', 0;
+GO
+
+PRINT '--- E-3.12.19 arbitraje.arbitro_idioma_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.18 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
+DECLARE @m INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_mod'),
+        @b INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_base');
+
+-- E-3.12.19 Baja valida => se acepta
+BEGIN TRY EXEC arbitraje.arbitro_idioma_eliminar @m, 'aleman'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.19', 'arbitraje.arbitro_idioma_eliminar: Baja valida', 0;
+GO
+
+PRINT '--- E-3.12.20 a E-3.12.22 arbitraje.designacion_arbitral_insertar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.18 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
+DECLARE @id INT, @adv VARCHAR(500),
+        @pg INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'pg'),
+        @pc INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'pc'),
+        @pd INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'pd'),
+        @pf INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'pfin'),
+        @b INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_base'),
+        @l INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_libre'),
+        @l2 INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_libre2'),
+        @cf INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_conf'),
+        @ad INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_adv');
+
+-- E-3.12.20 Valido => se acepta
+BEGIN TRY EXEC arbitraje.designacion_arbitral_insertar @pg, @l, 'asistente_2', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.20', 'arbitraje.designacion_arbitral_insertar: Valido', 0;
+-- E-3.12.21 Valido: con ADVERTENCIA (pais del arbitro con seleccion en competencia, desde dieciseisavos) => se acepta
+BEGIN TRY EXEC arbitraje.designacion_arbitral_insertar @pd, @ad, 'principal', @id OUTPUT, @adv OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.21', 'arbitraje.designacion_arbitral_insertar: Valido: con ADVERTENCIA (pais del arbitro con seleccion en competencia, desde dieciseisavos)', 0;
+-- E-3.12.22 Valido: eliminacion directa sin advertencia (pais sin seleccion) => se acepta
+BEGIN TRY EXEC arbitraje.designacion_arbitral_insertar @pd, @l2, 'var', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.22', 'arbitraje.designacion_arbitral_insertar: Valido: eliminacion directa sin advertencia (pais sin seleccion)', 0;
+GO
+
+PRINT '--- E-3.12.23 a E-3.12.27 arbitraje.designacion_arbitral_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.18 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
+DECLARE @dm INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'd_mod'),
+        @di INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'd_inf'),
+        @dpc INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'd_pc'),
+        @adm INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_dmod'),
+        @apc INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_pc'),
+        @b INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_base'),
+        @l INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_libre'),
+        @l2 INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_libre2'),
+        @cf INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_conf');
+
+-- E-3.12.23 Valido: sin cambios (no choca consigo misma) => se acepta
+BEGIN TRY EXEC arbitraje.designacion_arbitral_modificar @dm, @adm, 'cuarto'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.23', 'arbitraje.designacion_arbitral_modificar: Valido: sin cambios (no choca consigo misma)', 0;
+-- E-3.12.24 Valido: reemplaza al arbitro (la designacion no tiene informes) => se acepta
+BEGIN TRY EXEC arbitraje.designacion_arbitral_modificar @dm, @l2, 'cuarto'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.24', 'arbitraje.designacion_arbitral_modificar: Valido: reemplaza al arbitro (la designacion no tiene informes)', 0;
+-- E-3.12.25 Restaurar: vuelve el arbitro original => se acepta
+BEGIN TRY EXEC arbitraje.designacion_arbitral_modificar @dm, @adm, 'cuarto'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.25', 'arbitraje.designacion_arbitral_modificar: Restaurar: vuelve el arbitro original', 0;
+-- E-3.12.26 Valido: cambia el rol => se acepta
+BEGIN TRY EXEC arbitraje.designacion_arbitral_modificar @dpc, @apc, 'cuarto'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.26', 'arbitraje.designacion_arbitral_modificar: Valido: cambia el rol', 0;
+-- E-3.12.27 Restaurar: vuelve el rol original => se acepta
+BEGIN TRY EXEC arbitraje.designacion_arbitral_modificar @dpc, @apc, 'principal'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.27', 'arbitraje.designacion_arbitral_modificar: Restaurar: vuelve el rol original', 0;
+GO
+
+PRINT '--- E-3.12.28 arbitraje.designacion_arbitral_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.18 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
+DECLARE @de INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'd_elim'),
+        @di INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'd_inf'),
+        @df INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'd_fin'),
+        @df2 INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'd_fin2');
+
+-- E-3.12.28 Baja valida: sin informes y con el partido sin jugar => se acepta
+BEGIN TRY EXEC arbitraje.designacion_arbitral_eliminar @de; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.28', 'arbitraje.designacion_arbitral_eliminar: Baja valida: sin informes y con el partido sin jugar', 0;
+GO
+
+PRINT '--- E-3.12.29 a E-3.12.31 arbitraje.informe_arbitral_insertar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.18 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
+DECLARE @id INT,
+        @db INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'd_base'),
+        @ini DATETIMEOFFSET = (SELECT fecha_hora_utc FROM torneo.partido WHERE partido_id = (SELECT id FROM ##test_arbitraje WHERE clave = 'pg')),
+        @antes DATETIMEOFFSET = DATEADD(MINUTE, -1, (SELECT fecha_hora_utc FROM torneo.partido WHERE partido_id = (SELECT id FROM ##test_arbitraje WHERE clave = 'pg')));
+
+-- E-3.12.29 Valido: con sancion => se acepta
+BEGIN TRY EXEC arbitraje.informe_arbitral_insertar @db, '2031-01-10 20:00:00 +00:00', 'Partido sin incidentes', 'Apercibimiento', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.29', 'arbitraje.informe_arbitral_insertar: Valido: con sancion', 0;
+-- E-3.12.30 Valido: sin sancion => se acepta
+BEGIN TRY EXEC arbitraje.informe_arbitral_insertar @db, '2031-01-10 20:30:00 +00:00', 'Segundo informe', NULL, @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.30', 'arbitraje.informe_arbitral_insertar: Valido: sin sancion', 0;
+-- E-3.12.31 Valido: fecha igual al inicio del partido (borde); la sancion vacia se guarda NULL => se acepta
+BEGIN TRY EXEC arbitraje.informe_arbitral_insertar @db, @ini, 'Informe al inicio del partido', '', @id OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.31', 'arbitraje.informe_arbitral_insertar: Valido: fecha igual al inicio del partido (borde); la sancion vacia se guarda NULL', 0;
+GO
+
+PRINT '--- E-3.12.32 a E-3.12.34 arbitraje.informe_arbitral_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.18 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
+DECLARE @ib INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'i_base'),
+        @ini DATETIMEOFFSET = (SELECT fecha_hora_utc FROM torneo.partido WHERE partido_id = (SELECT id FROM ##test_arbitraje WHERE clave = 'pg')),
+        @antes DATETIMEOFFSET = DATEADD(MINUTE, -1, (SELECT fecha_hora_utc FROM torneo.partido WHERE partido_id = (SELECT id FROM ##test_arbitraje WHERE clave = 'pg')));
+
+-- E-3.12.32 Valido: cambia fecha, contenido y sancion => se acepta
+BEGIN TRY EXEC arbitraje.informe_arbitral_modificar @ib, '2031-01-10 22:00:00 +00:00', 'Informe corregido', 'Multa'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.32', 'arbitraje.informe_arbitral_modificar: Valido: cambia fecha, contenido y sancion', 0;
+-- E-3.12.33 Valido: fecha igual al inicio (borde); la sancion en blanco se guarda NULL => se acepta
+BEGIN TRY EXEC arbitraje.informe_arbitral_modificar @ib, @ini, 'Informe base', '   '; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.33', 'arbitraje.informe_arbitral_modificar: Valido: fecha igual al inicio (borde); la sancion en blanco se guarda NULL', 0;
+-- E-3.12.34 Restaurar: deja el informe como estaba => se acepta
+BEGIN TRY EXEC arbitraje.informe_arbitral_modificar @ib, '2031-01-10 20:00:00 +00:00', 'Informe base', NULL; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.34', 'arbitraje.informe_arbitral_modificar: Restaurar: deja el informe como estaba', 0;
+GO
+
+PRINT '--- E-3.12.35 arbitraje.informe_arbitral_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.18 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
+DECLARE @ie INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'i_elim');
+
+-- E-3.12.35 Baja valida => se acepta
+BEGIN TRY EXEC arbitraje.informe_arbitral_eliminar @ie; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.12.35', 'arbitraje.informe_arbitral_eliminar: Baja valida', 0;
+GO
 
 -- ============================================================
--- 1.13 publicidad: anunciante, campania, campania_pais_interes, pieza_publicitaria y espacio_publicitario
+-- 3.13 publicidad: anunciante, campania, campania_pais_interes, pieza_publicitaria y espacio_publicitario
 -- ============================================================
 
-PRINT '--- 1.13.a Alta de anunciantes, campañas, países de interés y piezas';
--- Resultado esperado: 7 anunciantes con una campaña cada uno (vigentes del 01/06 al 19/07/2026), con mercados
--- en 9 países y 12 piezas. El anunciante, la campaña, el país de interés y la pieza temporales se eliminan.
-DECLARE @anun INT, @camp INT, @pieza INT, @p INT, @p2 INT, @p3 INT;
-DECLARE @arg INT = (SELECT valor FROM #id WHERE clave = 'pais_ARG'), @bra INT = (SELECT valor FROM #id WHERE clave = 'pais_BRA'),
-        @ury INT = (SELECT valor FROM #id WHERE clave = 'pais_URY'), @usa INT = (SELECT valor FROM #id WHERE clave = 'pais_USA'),
-        @can INT = (SELECT valor FROM #id WHERE clave = 'pais_CAN'), @mex INT = (SELECT valor FROM #id WHERE clave = 'pais_MEX'),
-        @fra INT = (SELECT valor FROM #id WHERE clave = 'pais_FRA'), @deu INT = (SELECT valor FROM #id WHERE clave = 'pais_DEU'),
-        @jpn INT = (SELECT valor FROM #id WHERE clave = 'pais_JPN'), @esp INT = (SELECT valor FROM #id WHERE clave = 'pais_ESP');
+PRINT '--- E-3.13.01 a E-3.13.02 publicidad.anunciante_insertar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.18 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
+DECLARE @anun INT;
 
+-- E-3.13.01 Valido => se acepta
+BEGIN TRY EXEC publicidad.anunciante_insertar 'TEST01', 'Empresa S.A.', 'ventas@gmail.com', @anun OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.01', 'publicidad.anunciante_insertar: Valido', 0;
+-- E-3.13.02 Valido: sin contacto (es opcional) => se acepta
+BEGIN TRY EXEC publicidad.anunciante_insertar 'TEST06', 'Empresa S.A.', NULL, @anun OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.02', 'publicidad.anunciante_insertar: Valido: sin contacto (es opcional)', 0;
+GO
 
+PRINT '--- E-3.13.03 a E-3.13.04 publicidad.anunciante_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.18 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 
---Verificacion publicidad.anunciante_insertar
--- EXEC publicidad.anunciante_insertar 'TEST01', 'Empresa S.A.', 'ventas@gmail.com', @anun OUTPUT; --> Valido
--- EXEC publicidad.anunciante_insertar '', 'Empresa S.A.', 'ventas@gmail.com', @anun OUTPUT; --> Nombre vacio
--- EXEC publicidad.anunciante_insertar 'TEST01', 'Empresa S.A.', 'ventas@gmail.com', @anun OUTPUT; --> Nombre duplicado
--- EXEC publicidad.anunciante_insertar 'TEST02', 'Empresa S.A.', 'ventasgmail.com', @anun OUTPUT; --> Correo sin @
--- EXEC publicidad.anunciante_insertar 'TEST03', 'Empresa S.A.', 'ventas@@gmail.com', @anun OUTPUT; --> Dos @
--- EXEC publicidad.anunciante_insertar 'TEST01', 'Empresa S.A.', 'ventasventasventasventasventasventasventasventasventasventasventasventasventasventasventasventasventasventasventasventas@gmail.com', @anun OUTPUT; --> +100 caracteres
--- EXEC publicidad.anunciante_insertar 'TEST04', 'Empresa S.A.', 'ventas@gmail', @anun OUTPUT; --> Sin dominio
--- EXEC publicidad.anunciante_insertar 'TEST05', 'Empresa S.A.', 'ventas @gmail.com', @anun OUTPUT; --> Con espacios
--- EXEC publicidad.anunciante_insertar 'TEST06', 'Empresa S.A.', NULL, @anun OUTPUT; --> Sin contacto
+-- E-3.13.03 Modificacion valida => se acepta
+BEGIN TRY EXEC publicidad.anunciante_modificar 1, 'TEST_MOD', 'Empresa S.A.', 'ventas@gmail.com'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.03', 'publicidad.anunciante_modificar: Modificacion valida', 0;
+-- E-3.13.04 Valido: sin contacto (es opcional) => se acepta
+BEGIN TRY EXEC publicidad.anunciante_modificar 1, 'TEST_MOD', 'Empresa S.A.', NULL; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.04', 'publicidad.anunciante_modificar: Valido: sin contacto (es opcional)', 0;
+GO
 
-
-
--- Verificacion publicidad.anunciante_modificar
-EXEC publicidad.anunciante_modificar 1, 'TEST_MOD', 'Empresa S.A.', 'ventas@gmail.com'; --> Modificacion valida
--- EXEC publicidad.anunciante_modificar 1, '', 'Empresa S.A.', 'ventas@gmail.com'; --> Nombre vacio
--- EXEC publicidad.anunciante_modificar 1, 'TEST01', 'Empresa S.A.', 'ventas@gmail.com'; --> Nombre duplicado
--- EXEC publicidad.anunciante_modificar 1, 'TEST_MOD', 'Empresa S.A.', 'ventasgmail.com'; --> Correo sin @
--- EXEC publicidad.anunciante_modificar 1, 'TEST_MOD', 'Empresa S.A.', 'ventas@@gmail.com'; --> Dos @
--- EXEC publicidad.anunciante_modificar 1, 'TEST_MOD', 'Empresa S.A.', 'ventas@gmail'; --> Sin dominio
--- EXEC publicidad.anunciante_modificar 1, 'TEST_MOD', 'Empresa S.A.', 'ventas @gmail.com'; --> Con espacios
--- EXEC publicidad.anunciante_modificar 1, 'TEST_MOD', 'Empresa S.A.', NULL; --> Sin contacto
--- EXEC publicidad.anunciante_modificar 999999, 'TEST_MOD', 'Empresa S.A.', 'ventas@gmail.com'; --> ID inexistente y ya existe anunciante con ese nomb
-
-
-
--- Verificacion publicidad.anunciante_eliminar
--- LAS CUATRO SIGUIENTES LINEAS SE EJECUTAN UNA SOLA VEZ: 
+PRINT '--- P-3.19 Preparación de publicidad.anunciante_eliminar (ejecutar UNA sola vez)';
+-- Preparación (sin verificaciones) de los casos detallados. Ejecutar UNA sola vez.
+-- Requiere: Lote 0, las Partes 1 y 2 y las preparaciones P-3.xx anteriores.
+DECLARE @a INT;
 EXEC publicidad.anunciante_insertar 'ELIM_OK', NULL, NULL;
-EXEC publicidad.anunciante_insertar 'ELIM_CON_CAMP', NULL, NULL;
-INSERT INTO publicidad.campania (anunciante_id, nombre, fecha_inicio, fecha_fin)
-SELECT anunciante_id, 'Camp de prueba', '2026-06-01', '2026-06-30' FROM publicidad.anunciante WHERE nombre = 'ELIM_CON_CAMP';
+EXEC publicidad.anunciante_insertar 'ELIM_CON_CAMP', NULL, NULL, @a OUTPUT;
+EXEC publicidad.campania_insertar @a, 'Camp de prueba', '2026-06-01', '2026-06-30';
+GO
 
+PRINT '--- E-3.13.05 publicidad.anunciante_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.19 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @elim_ok INT = (SELECT anunciante_id FROM publicidad.anunciante WHERE nombre = 'ELIM_OK'),
         @elim_con INT = (SELECT anunciante_id FROM publicidad.anunciante WHERE nombre = 'ELIM_CON_CAMP');
-EXEC publicidad.anunciante_eliminar @elim_ok; --> Baja valida (SI LE DAS DOS VECES TE DICE ID inexistente *ya se elimino*)
--- EXEC publicidad.anunciante_eliminar 999999; --> ID inexistente
--- EXEC publicidad.anunciante_eliminar NULL; --> ID nulo
--- EXEC publicidad.anunciante_eliminar @elim_con; --> Tiene campañas registradas
 
--- Limpieza de publicidad.anunciante
-DELETE FROM publicidad.anunciante
-WHERE nombre IN (
-    'TEST01',
-    'TEST02',
-    'TEST03',
-    'TEST04',
-    'TEST05',
-    'TEST06',
-    'TEST_MOD',
-    'ELIM_OK',
-    'ELIM_CON_CAMP'
-);
+-- E-3.13.05 Baja valida (SI LE DAS DOS VECES TE DICE ID inexistente *ya se elimino*) => se acepta
+BEGIN TRY EXEC publicidad.anunciante_eliminar @elim_ok; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.05', 'publicidad.anunciante_eliminar: Baja valida (SI LE DAS DOS VECES TE DICE ID inexistente *ya se elimino*)', 0;
+GO
 
-
--- Verificacion publicidad.campania_insertar
--- LAS DOS SIGUIENTES LINEAS SE EJECUTAN UNA SOLA VEZ: 
+PRINT '--- P-3.20 Preparación de publicidad.campania_insertar (ejecutar UNA sola vez)';
+-- Preparación (sin verificaciones) de los casos detallados. Ejecutar UNA sola vez.
+-- Requiere: Lote 0, las Partes 1 y 2 y las preparaciones P-3.xx anteriores.
 EXEC publicidad.anunciante_insertar 'CAMP_A', NULL, NULL;
 EXEC publicidad.anunciante_insertar 'CAMP_B', NULL, NULL;
-GO;
+GO
 
-
+PRINT '--- E-3.13.06 a E-3.13.09 publicidad.campania_insertar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.20 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @a INT = (SELECT anunciante_id FROM publicidad.anunciante WHERE nombre = 'CAMP_A'),
         @b INT = (SELECT anunciante_id FROM publicidad.anunciante WHERE nombre = 'CAMP_B'),
         @camp INT;
 
-EXEC publicidad.campania_insertar @a, 'Camp Test', '2026-06-01', '2026-07-19', @camp OUTPUT; --> Valido
--- EXEC publicidad.campania_insertar @a, 'Camp Un Dia', '2026-06-10', '2026-06-10', @camp OUTPUT; --> Valido: fecha fin = fecha inicio
--- EXEC publicidad.campania_insertar @b, 'Camp Test', '2026-06-01', '2026-07-19', @camp OUTPUT; --> Valido: mismo nombre en otro anunciante
--- EXEC publicidad.campania_insertar @a, '  Camp Espacios  ', '2026-06-01', '2026-06-30', @camp OUTPUT; --> Valido: se guarda sin espacios
--- EXEC publicidad.campania_insertar 999999, 'X1', '2026-06-01', '2026-07-19', @camp OUTPUT; --> Anunciante inexistente
--- EXEC publicidad.campania_insertar NULL, 'X2', '2026-06-01', '2026-07-19', @camp OUTPUT; --> Anunciante nulo
--- EXEC publicidad.campania_insertar @a, '', '2026-06-01', '2026-07-19', @camp OUTPUT; --> Nombre vacio
--- EXEC publicidad.campania_insertar @a, NULL, '2026-06-01', '2026-07-19', @camp OUTPUT; --> Nombre nulo
--- EXEC publicidad.campania_insertar @a, '   ', '2026-06-01', '2026-07-19', @camp OUTPUT; --> Nombre solo espacios
--- EXEC publicidad.campania_insertar @a, 'X3', NULL, '2026-07-19', @camp OUTPUT; --> Fecha inicio nula
--- EXEC publicidad.campania_insertar @a, 'X4', '2026-06-01', NULL, @camp OUTPUT; --> Fecha fin nula
--- EXEC publicidad.campania_insertar @a, 'X5', NULL, NULL, @camp OUTPUT; --> Ambas fechas nulas (un solo mensaje)
--- EXEC publicidad.campania_insertar @a, 'X6', '2026-07-01', '2026-06-01', @camp OUTPUT; --> Fin anterior al inicio
--- EXEC publicidad.campania_insertar @a, 'Camp Test', '2026-06-01', '2026-07-19', @camp OUTPUT; --> Nombre duplicado (mismo anunciante)
--- EXEC publicidad.campania_insertar @a, 'CAMP TEST', '2026-06-01', '2026-07-19', @camp OUTPUT; --> Nombre duplicado con otra capitalizacion
--- EXEC publicidad.campania_insertar @a, 'Camp Test   ', '2026-06-01', '2026-07-19', @camp OUTPUT; --> Nombre duplicado con espacios al final
--- EXEC publicidad.campania_insertar 999999, '', '2026-07-01', '2026-06-01', @camp OUTPUT; --> 3 errores: anunciante inexistente, nombre vacio, fin anterior al inicio
--- EXEC publicidad.campania_insertar @a, 'Camp Test', '2026-07-01', '2026-06-01', @camp OUTPUT; --> 2 errores: nombre duplicado y fin anterior al inicio
--- EXEC publicidad.campania_insertar NULL, NULL, NULL, NULL, @camp OUTPUT; --> 3 errores: anunciante, nombre y fechas
+-- E-3.13.06 Valido => se acepta
+BEGIN TRY EXEC publicidad.campania_insertar @a, 'Camp Test', '2026-06-01', '2026-07-19', @camp OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.06', 'publicidad.campania_insertar: Valido', 0;
+-- E-3.13.07 Valido: fecha fin = fecha inicio => se acepta
+BEGIN TRY EXEC publicidad.campania_insertar @a, 'Camp Un Dia', '2026-06-10', '2026-06-10', @camp OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.07', 'publicidad.campania_insertar: Valido: fecha fin = fecha inicio', 0;
+-- E-3.13.08 Valido: mismo nombre en otro anunciante => se acepta
+BEGIN TRY EXEC publicidad.campania_insertar @b, 'Camp Test', '2026-06-01', '2026-07-19', @camp OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.08', 'publicidad.campania_insertar: Valido: mismo nombre en otro anunciante', 0;
+-- E-3.13.09 Valido: se guarda sin espacios => se acepta
+BEGIN TRY EXEC publicidad.campania_insertar @a, '  Camp Espacios  ', '2026-06-01', '2026-06-30', @camp OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.09', 'publicidad.campania_insertar: Valido: se guarda sin espacios', 0;
+GO
 
-
--- Verificacion publicidad.campania_modificar
--- Preparación de campania_modificar (ejecutar UNA sola vez)
+PRINT '--- P-3.21 Preparación de publicidad.campania_modificar (ejecutar UNA sola vez)';
+-- Preparación (sin verificaciones) de los casos detallados. Ejecutar UNA sola vez.
+-- Requiere: Lote 0, las Partes 1 y 2 y las preparaciones P-3.xx anteriores.
 EXEC publicidad.anunciante_insertar 'CMOD_A', NULL, NULL;
 EXEC publicidad.anunciante_insertar 'CMOD_B', NULL, NULL;
 GO
@@ -2768,6 +3913,10 @@ EXEC publicidad.pieza_publicitaria_insertar @c, 'espanol', @pais, 1000, @pz OUTP
 EXEC publicidad.espacio_publicitario_insertar @part, 1, @pz, NULL, @esp OUTPUT;
 GO
 
+PRINT '--- E-3.13.10 a E-3.13.13 publicidad.campania_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.21 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @a INT = (SELECT anunciante_id FROM publicidad.anunciante WHERE nombre = 'CMOD_A'),
         @b INT = (SELECT anunciante_id FROM publicidad.anunciante WHERE nombre = 'CMOD_B'),
         @c1 INT = (SELECT campania_id FROM publicidad.campania WHERE nombre = 'Camp Mod'),
@@ -2778,35 +3927,19 @@ DECLARE @a INT = (SELECT anunciante_id FROM publicidad.anunciante WHERE nombre =
 DECLARE @f_m10 DATE = DATEADD(DAY, -10, @f), @f_m1 DATE = DATEADD(DAY, -1, @f),
         @f_p1  DATE = DATEADD(DAY, 1, @f),   @f_p10 DATE = DATEADD(DAY, 10, @f);
 
-EXEC publicidad.campania_modificar @c1, @a, 'Camp Mod', '2026-06-05', '2026-07-10'; --> Valido: cambia fechas, mismo nombre propio (no es duplicado)
--- EXEC publicidad.campania_modificar @c1, @b, 'Camp Mod', '2026-06-05', '2026-07-10'; --> Valido: cambia de anunciante (despues volver a @a)
--- EXEC publicidad.campania_modificar @c1, @a, '  Camp Mod  ', '2026-06-10', '2026-06-10'; --> Valido: nombre con espacios (se guarda recortado) y fin = inicio
--- EXEC publicidad.campania_modificar @c3, @a, 'Camp Con Espacio', @f_m10, @f_p10; --> Valido: amplia la vigencia, el partido sigue cubierto
--- EXEC publicidad.campania_modificar 999999, @a, 'X1', '2026-06-01', '2026-07-19'; --> Campaña inexistente
--- EXEC publicidad.campania_modificar NULL, @a, 'X2', '2026-06-01', '2026-07-19'; --> Id nulo (1 condicion: el id es obligatorio)
--- EXEC publicidad.campania_modificar @c1, 999999, 'Camp Mod', '2026-06-01', '2026-07-19'; --> Anunciante inexistente
--- EXEC publicidad.campania_modificar @c1, NULL, 'Camp Mod', '2026-06-01', '2026-07-19'; --> Anunciante nulo
--- EXEC publicidad.campania_modificar @c1, @a, '', '2026-06-01', '2026-07-19'; --> Nombre vacio
--- EXEC publicidad.campania_modificar @c1, @a, NULL, '2026-06-01', '2026-07-19'; --> Nombre nulo
--- EXEC publicidad.campania_modificar @c1, @a, '   ', '2026-06-01', '2026-07-19'; --> Nombre solo espacios
--- EXEC publicidad.campania_modificar @c1, @a, 'Camp Mod', NULL, '2026-07-19'; --> Fecha inicio nula
--- EXEC publicidad.campania_modificar @c1, @a, 'Camp Mod', '2026-06-01', NULL; --> Fecha fin nula
--- EXEC publicidad.campania_modificar @c1, @a, 'Camp Mod', NULL, NULL; --> Ambas fechas nulas (un solo mensaje)
--- EXEC publicidad.campania_modificar @c1, @a, 'Camp Mod', '2026-07-01', '2026-06-01'; --> Fin anterior al inicio
--- EXEC publicidad.campania_modificar @c1, @a, 'Camp Otra', '2026-06-01', '2026-07-19'; --> Nombre duplicado (otra campaña del mismo anunciante)
--- EXEC publicidad.campania_modificar @c1, @a, 'CAMP OTRA', '2026-06-01', '2026-07-19'; --> Duplicado con otra capitalizacion
--- EXEC publicidad.campania_modificar @c1, @a, 'Camp Otra   ', '2026-06-01', '2026-07-19'; --> Duplicado con espacios al final
--- EXEC publicidad.campania_modificar @c3, @a, 'Camp Con Espacio', @f_p1, @f_p10; --> Vigencia deja afuera el partido con pieza asignada (inicio posterior al partido)
--- EXEC publicidad.campania_modificar @c3, @a, 'Camp Con Espacio', @f_m10, @f_m1; --> Vigencia deja afuera el partido con pieza asignada (fin anterior al partido)
--- EXEC publicidad.campania_modificar @c3, @a, 'Camp Con Espacio', @f_p1, @f_m1; --> 2 errores: fin anterior al inicio y vigencia que deja afuera el partido
--- EXEC publicidad.campania_modificar 999999, 999999, '', '2026-07-01', '2026-06-01'; --> 4 errores: campaña inexistente, anunciante inexistente, nombre vacio, fin anterior al inicio
--- EXEC publicidad.campania_modificar NULL, NULL, NULL, NULL, NULL; --> 4 errores: id obligatorio, anunciante inexistente, nombre vacio, fechas obligatorias
--- EXEC publicidad.campania_modificar @c1, @a, 'Camp Otra', '2026-07-01', '2026-06-01'; --> 2 errores: nombre duplicado y fin anterior al inicio
+-- E-3.13.10 Valido: cambia fechas, mismo nombre propio (no es duplicado) => se acepta
+BEGIN TRY EXEC publicidad.campania_modificar @c1, @a, 'Camp Mod', '2026-06-05', '2026-07-10'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.10', 'publicidad.campania_modificar: Valido: cambia fechas, mismo nombre propio (no es duplicado)', 0;
+-- E-3.13.11 Valido: cambia de anunciante (despues volver a @a) => se acepta
+BEGIN TRY EXEC publicidad.campania_modificar @c1, @b, 'Camp Mod', '2026-06-05', '2026-07-10'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.11', 'publicidad.campania_modificar: Valido: cambia de anunciante (despues volver a @a)', 0;
+-- E-3.13.12 Valido: nombre con espacios (se guarda recortado) y fin = inicio => se acepta
+BEGIN TRY EXEC publicidad.campania_modificar @c1, @a, '  Camp Mod  ', '2026-06-10', '2026-06-10'; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.12', 'publicidad.campania_modificar: Valido: nombre con espacios (se guarda recortado) y fin = inicio', 0;
+-- E-3.13.13 Valido: amplia la vigencia, el partido sigue cubierto => se acepta
+BEGIN TRY EXEC publicidad.campania_modificar @c3, @a, 'Camp Con Espacio', @f_m10, @f_p10; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.13', 'publicidad.campania_modificar: Valido: amplia la vigencia, el partido sigue cubierto', 0;
+GO
 
-
-
--- Verificacion publicidad.campania_eliminar
--- Preparación de campania_eliminar (ejecutar UNA sola vez)
+PRINT '--- P-3.22 Preparación de publicidad.campania_eliminar (ejecutar UNA sola vez)';
+-- Preparación (sin verificaciones) de los casos detallados. Ejecutar UNA sola vez.
+-- Requiere: Lote 0, las Partes 1 y 2 y las preparaciones P-3.xx anteriores.
 EXEC publicidad.anunciante_insertar 'CELIM', NULL, NULL;
 GO
 DECLARE @a INT = (SELECT anunciante_id FROM publicidad.anunciante WHERE nombre = 'CELIM'),
@@ -2819,29 +3952,20 @@ EXEC publicidad.campania_pais_interes_insertar @c, @pais;
 EXEC publicidad.pieza_publicitaria_insertar @c, 'espanol', @pais, 1000, @pz OUTPUT;
 GO
 
+PRINT '--- E-3.13.14 publicidad.campania_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.22 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @ok INT = (SELECT campania_id FROM publicidad.campania WHERE nombre = 'Elim OK'),
         @con INT = (SELECT campania_id FROM publicidad.campania WHERE nombre = 'Elim Con Pieza');
 
-EXEC publicidad.campania_eliminar @ok; --> Baja valida: elimina la campaña y sus paises de interes, si se ejecuta dos veces seguidas tira error de inexistente
--- EXEC publicidad.campania_eliminar 999999; --> Campaña inexistente
--- EXEC publicidad.campania_eliminar NULL; --> Id nulo (el mensaje dice "(nulo)")
--- EXEC publicidad.campania_eliminar @con; --> Tiene piezas publicitarias registradas
+-- E-3.13.14 Baja valida: elimina la campaña y sus paises de interes, si se ejecuta dos veces seguidas tira error de inexistente => se acepta
+BEGIN TRY EXEC publicidad.campania_eliminar @ok; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.14', 'publicidad.campania_eliminar: Baja valida: elimina la campaña y sus paises de interes, si se ejecuta dos veces seguidas tira error de inexistente', 0;
+GO
 
--- Limpieza de publicidad.campania
-DELETE FROM publicidad.campania WHERE anunciante_id IN (SELECT anunciante_id FROM publicidad.anunciante WHERE nombre IN ('CAMP_A', 'CAMP_B', 'ELIM_CON_CAMP'));
-DELETE FROM publicidad.anunciante WHERE nombre IN ('CAMP_A', 'CAMP_B', 'ELIM_OK', 'ELIM_CON_CAMP');
-DELETE e FROM publicidad.espacio_publicitario e JOIN publicidad.pieza_publicitaria pz ON pz.pieza_id = e.pieza_id JOIN publicidad.campania c ON c.campania_id = pz.campania_id JOIN publicidad.anunciante a ON a.anunciante_id = c.anunciante_id WHERE a.nombre IN ('CMOD_A', 'CMOD_B');
-DELETE pz FROM publicidad.pieza_publicitaria pz JOIN publicidad.campania c ON c.campania_id = pz.campania_id JOIN publicidad.anunciante a ON a.anunciante_id = c.anunciante_id WHERE a.nombre IN ('CMOD_A', 'CMOD_B');
-DELETE i FROM publicidad.campania_pais_interes i JOIN publicidad.campania c ON c.campania_id = i.campania_id JOIN publicidad.anunciante a ON a.anunciante_id = c.anunciante_id WHERE a.nombre IN ('CMOD_A', 'CMOD_B');
-DELETE c FROM publicidad.campania c JOIN publicidad.anunciante a ON a.anunciante_id = c.anunciante_id WHERE a.nombre IN ('CMOD_A', 'CMOD_B');
-DELETE FROM publicidad.anunciante WHERE nombre IN ('CMOD_A', 'CMOD_B');
-DELETE pz FROM publicidad.pieza_publicitaria pz JOIN publicidad.campania c ON c.campania_id = pz.campania_id WHERE c.nombre = 'Elim Con Pieza';
-DELETE i FROM publicidad.campania_pais_interes i JOIN publicidad.campania c ON c.campania_id = i.campania_id WHERE c.nombre = 'Elim Con Pieza';
-DELETE FROM publicidad.campania WHERE nombre IN ('Elim OK', 'Elim Con Pieza');
-DELETE FROM publicidad.anunciante WHERE nombre = 'CELIM';
-
-
--- Preparación de campania_pais_interes_* (ejecutar UNA sola vez)
+PRINT '--- P-3.23 Preparación de campania_pais_interes_* (ejecutar UNA sola vez)';
+-- Preparación (sin verificaciones) de los casos detallados. Ejecutar UNA sola vez.
+-- Requiere: Lote 0, las Partes 1 y 2 y las preparaciones P-3.xx anteriores.
 EXEC publicidad.anunciante_insertar 'CPI', NULL, NULL;
 GO
 DECLARE @a INT = (SELECT anunciante_id FROM publicidad.anunciante WHERE nombre = 'CPI'),
@@ -2868,25 +3992,25 @@ EXEC publicidad.campania_pais_interes_insertar @c, @p3;
 EXEC publicidad.pieza_publicitaria_insertar @c, 'espanol', @p1, 1000, @pz OUTPUT;
 GO
 
--- Verificacion publicidad.campania_pais_interes_insertar
+PRINT '--- E-3.13.15 a E-3.13.16 publicidad.campania_pais_interes_insertar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.23 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @ci INT = (SELECT campania_id FROM publicidad.campania WHERE nombre = 'CPI_INS'),
         @co INT = (SELECT campania_id FROM publicidad.campania WHERE nombre = 'CPI_OTRA'),
         @p1 INT = (SELECT pais_id FROM torneo.pais ORDER BY pais_id OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY),
         @p2 INT = (SELECT pais_id FROM torneo.pais ORDER BY pais_id OFFSET 1 ROWS FETCH NEXT 1 ROWS ONLY);
 
-EXEC publicidad.campania_pais_interes_insertar @ci, @p2; --> Valido
--- EXEC publicidad.campania_pais_interes_insertar @co, @p1; --> Valido: el mismo pais en otra campaña
--- EXEC publicidad.campania_pais_interes_insertar 999999, @p2; --> Campaña inexistente
--- EXEC publicidad.campania_pais_interes_insertar NULL, @p2; --> Campaña nula
--- EXEC publicidad.campania_pais_interes_insertar @ci, 999999; --> Pais inexistente
--- EXEC publicidad.campania_pais_interes_insertar @ci, NULL; --> Pais nulo
--- EXEC publicidad.campania_pais_interes_insertar @ci, @p1; --> Ya figura 
--- EXEC publicidad.campania_pais_interes_insertar 999999, 999999; --> 2 errores: campaña inexistente y pais 
--- EXEC publicidad.campania_pais_interes_insertar NULL, NULL; --> 2 errores: campaña nula y pais nulo
-GO;
+-- E-3.13.15 Valido => se acepta
+BEGIN TRY EXEC publicidad.campania_pais_interes_insertar @ci, @p2; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.15', 'publicidad.campania_pais_interes_insertar: Valido', 0;
+-- E-3.13.16 Valido: el mismo pais en otra campaña => se acepta
+BEGIN TRY EXEC publicidad.campania_pais_interes_insertar @co, @p1; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.16', 'publicidad.campania_pais_interes_insertar: Valido: el mismo pais en otra campaña', 0;
+GO
 
-
--- Verificacion publicidad.campania_pais_interes_modificar
+PRINT '--- E-3.13.17 a E-3.13.19 publicidad.campania_pais_interes_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.23 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @cm INT = (SELECT campania_id FROM publicidad.campania WHERE nombre = 'CPI_MOD'),
         @p1 INT = (SELECT pais_id FROM torneo.pais ORDER BY pais_id OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY),
         @p2 INT = (SELECT pais_id FROM torneo.pais ORDER BY pais_id OFFSET 1 ROWS FETCH NEXT 1 ROWS ONLY),
@@ -2894,48 +4018,30 @@ DECLARE @cm INT = (SELECT campania_id FROM publicidad.campania WHERE nombre = 'C
         @p4 INT = (SELECT pais_id FROM torneo.pais ORDER BY pais_id OFFSET 3 ROWS FETCH NEXT 1 ROWS ONLY),
         @p5 INT = (SELECT pais_id FROM torneo.pais ORDER BY pais_id OFFSET 4 ROWS FETCH NEXT 1 ROWS ONLY);
 
-EXEC publicidad.campania_pais_interes_modificar @cm, @p2, @p4; --> Valido: reemplaza p2 por p4 
--- EXEC publicidad.campania_pais_interes_modificar @cm, @p4, @p2; --> Restaurar: volver p4 a p2 
--- EXEC publicidad.campania_pais_interes_modificar @cm, @p3, @p3; --> Valido: mismo pais
--- EXEC publicidad.campania_pais_interes_modificar 999999, @p2, @p4; --> Campaña inexistente
--- EXEC publicidad.campania_pais_interes_modificar NULL, @p2, @p4; --> Campaña nula
--- EXEC publicidad.campania_pais_interes_modificar @cm, 999999, @p4; --> Pais a reemplazar inexistente (el par no figura)
--- EXEC publicidad.campania_pais_interes_modificar @cm, NULL, @p4; --> Pais a reemplazar nulo
--- EXEC publicidad.campania_pais_interes_modificar @cm, @p4, @p5; --> El pais a reemplazar existe pero no figura en la campaña
--- EXEC publicidad.campania_pais_interes_modificar @cm, @p2, 999999; --> Pais nuevo inexistente
--- EXEC publicidad.campania_pais_interes_modificar @cm, @p2, NULL; --> Pais nuevo nulo
--- EXEC publicidad.campania_pais_interes_modificar @cm, @p2, @p3; --> Pais nuevo ya figura en la campaña
--- EXEC publicidad.campania_pais_interes_modificar @cm, @p1, @p4; --> La campaña tiene piezas dirigidas al pais a reemplazar (p1)
--- EXEC publicidad.campania_pais_interes_modificar @cm, @p1, @p3; --> 2 errores: pais nuevo ya figura y hay piezas dirigidas a p1
--- EXEC publicidad.campania_pais_interes_modificar @cm, @p4, 999999; --> 2 errores: el par no figura y pais nuevo inexistente
--- EXEC publicidad.campania_pais_interes_modificar 999999, 999999, NULL; --> 2 errores: el par no figura y pais nuevo nulo
-GO;
+-- E-3.13.17 Valido: reemplaza p2 por p4 => se acepta
+BEGIN TRY EXEC publicidad.campania_pais_interes_modificar @cm, @p2, @p4; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.17', 'publicidad.campania_pais_interes_modificar: Valido: reemplaza p2 por p4', 0;
+-- E-3.13.18 Restaurar: volver p4 a p2 => se acepta
+BEGIN TRY EXEC publicidad.campania_pais_interes_modificar @cm, @p4, @p2; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.18', 'publicidad.campania_pais_interes_modificar: Restaurar: volver p4 a p2', 0;
+-- E-3.13.19 Valido: mismo pais => se acepta
+BEGIN TRY EXEC publicidad.campania_pais_interes_modificar @cm, @p3, @p3; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.19', 'publicidad.campania_pais_interes_modificar: Valido: mismo pais', 0;
+GO
 
--- Verificacion publicidad.campania_pais_interes_eliminar
+PRINT '--- E-3.13.20 publicidad.campania_pais_interes_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.23 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @ce INT = (SELECT campania_id FROM publicidad.campania WHERE nombre = 'CPI_ELIM'),
         @p1 INT = (SELECT pais_id FROM torneo.pais ORDER BY pais_id OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY),
         @p2 INT = (SELECT pais_id FROM torneo.pais ORDER BY pais_id OFFSET 1 ROWS FETCH NEXT 1 ROWS ONLY),
         @p4 INT = (SELECT pais_id FROM torneo.pais ORDER BY pais_id OFFSET 3 ROWS FETCH NEXT 1 ROWS ONLY);
 
-EXEC publicidad.campania_pais_interes_eliminar @ce, @p2; --> Baja valida (si se ejecuta 2 veces tira error)
--- EXEC publicidad.campania_pais_interes_eliminar @ce, @p4; --> El pais no figura en la campaña
--- EXEC publicidad.campania_pais_interes_eliminar 999999, @p2; --> Campaña inexistente (el par no figura)
--- EXEC publicidad.campania_pais_interes_eliminar NULL, @p2; --> Campaña nula
--- EXEC publicidad.campania_pais_interes_eliminar @ce, 999999; --> Pais inexistente (el par no figura)
--- EXEC publicidad.campania_pais_interes_eliminar @ce, NULL; --> Pais nulo
--- EXEC publicidad.campania_pais_interes_eliminar @ce, @p1; --> La campaña tiene piezas dirigidas a ese pais
--- EXEC publicidad.campania_pais_interes_eliminar 999999, 999999; --> 1 error: el par no figura (las dos condiciones son excluyentes)
+-- E-3.13.20 Baja valida (si se ejecuta 2 veces tira error) => se acepta
+BEGIN TRY EXEC publicidad.campania_pais_interes_eliminar @ce, @p2; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.20', 'publicidad.campania_pais_interes_eliminar: Baja valida (si se ejecuta 2 veces tira error)', 0;
+GO
 
-
--- Limpieza de campania_pais_interes_* (al terminar)
-DELETE pz FROM publicidad.pieza_publicitaria pz JOIN publicidad.campania c ON c.campania_id = pz.campania_id WHERE c.nombre LIKE 'CPI[_]%';
-DELETE i FROM publicidad.campania_pais_interes i JOIN publicidad.campania c ON c.campania_id = i.campania_id WHERE c.nombre LIKE 'CPI[_]%';
-DELETE FROM publicidad.campania WHERE nombre LIKE 'CPI[_]%';
-DELETE FROM publicidad.anunciante WHERE nombre = 'CPI';
-
-
-
--- Preparación de pieza_publicitaria* (ejecutar UNA sola vez)
+PRINT '--- P-3.24 Preparación de pieza_publicitaria* (ejecutar UNA sola vez)';
+-- Preparación (sin verificaciones) de los casos detallados. Ejecutar UNA sola vez.
+-- Requiere: Lote 0, las Partes 1 y 2 y las preparaciones P-3.xx anteriores.
 EXEC publicidad.anunciante_insertar 'PZ', NULL, NULL;
 GO
 DECLARE @a INT = (SELECT anunciante_id FROM publicidad.anunciante WHERE nombre = 'PZ'),
@@ -2980,7 +4086,10 @@ EXEC publicidad.pieza_publicitaria_insertar @c, 'ingles',  @p2, 2000, @pz OUTPUT
 EXEC publicidad.espacio_publicitario_insertar @part, 2, @pz, NULL, @esp OUTPUT;
 GO
 
--- Verificacion publicidad.pieza_publicitaria_insertar
+PRINT '--- E-3.13.21 a E-3.13.26 publicidad.pieza_publicitaria_insertar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.24 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @ci INT = (SELECT campania_id FROM publicidad.campania WHERE nombre = 'PZ_INS'),
         @co INT = (SELECT campania_id FROM publicidad.campania WHERE nombre = 'PZ_OTRA'),
         @p1 INT = (SELECT pais_id FROM torneo.pais ORDER BY pais_id OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY),
@@ -2988,32 +4097,24 @@ DECLARE @ci INT = (SELECT campania_id FROM publicidad.campania WHERE nombre = 'P
         @p4 INT = (SELECT pais_id FROM torneo.pais ORDER BY pais_id OFFSET 3 ROWS FETCH NEXT 1 ROWS ONLY),
         @pz INT;
 
-EXEC publicidad.pieza_publicitaria_insertar @ci, 'ingles', @p1, 500, @pz OUTPUT; --> Valido
--- EXEC publicidad.pieza_publicitaria_insertar @ci, 'espanol', @p2, 800, @pz OUTPUT; --> Valido: mismo idioma, otro mercado
--- EXEC publicidad.pieza_publicitaria_insertar @ci, 'frances', @p1, 0, @pz OUTPUT; --> Valido: tarifa 0 
--- EXEC publicidad.pieza_publicitaria_insertar @ci, 'ALEMAN', @p1, 700, @pz OUTPUT; --> Valido: se guarda en minusculas
--- EXEC publicidad.pieza_publicitaria_insertar @ci, 'abcdefghij', @p2, 100, @pz OUTPUT; --> Valido: idioma de 10 letras 
--- EXEC publicidad.pieza_publicitaria_insertar @co, 'espanol', @p1, 1000, @pz OUTPUT; --> Valido: mismo idioma y mercado que la base, en otra campaña
--- EXEC publicidad.pieza_publicitaria_insertar 999999, 'ingles', @p1, 500, @pz OUTPUT; --> Campaña inexistente
--- EXEC publicidad.pieza_publicitaria_insertar NULL, 'ingles', @p1, 500, @pz OUTPUT; --> Campaña nula
--- EXEC publicidad.pieza_publicitaria_insertar @ci, '', @p1, 500, @pz OUTPUT; --> Idioma vacio
--- EXEC publicidad.pieza_publicitaria_insertar @ci, NULL, @p1, 500, @pz OUTPUT; --> Idioma nulo
--- EXEC publicidad.pieza_publicitaria_insertar @ci, '   ', @p1, 500, @pz OUTPUT; --> Idioma solo espacios
--- EXEC publicidad.pieza_publicitaria_insertar @ci, 'ingl3s', @p1, 500, @pz OUTPUT; --> Idioma con numero
--- EXEC publicidad.pieza_publicitaria_insertar @ci, 'ingles uk', @p1, 500, @pz OUTPUT; --> Idioma con espacio
--- EXEC publicidad.pieza_publicitaria_insertar @ci, 'abcdefghijk', @p1, 500, @pz OUTPUT; --> Idioma de 11 letras 
--- EXEC publicidad.pieza_publicitaria_insertar @ci, 'ingles', 999999, 500, @pz OUTPUT; --> Pais mercado inexistente
--- EXEC publicidad.pieza_publicitaria_insertar @ci, 'ingles', NULL, 500, @pz OUTPUT; --> Pais mercado nulo
--- EXEC publicidad.pieza_publicitaria_insertar @ci, 'ingles', @p4, 500, @pz OUTPUT; --> Pais mercado que no es de interes de la campaña
--- EXEC publicidad.pieza_publicitaria_insertar @co, 'ingles', @p2, 500, @pz OUTPUT; --> Pais mercado de interes de OTRA campaña, no de esta
--- EXEC publicidad.pieza_publicitaria_insertar @ci, 'ingles', @p2, NULL, @pz OUTPUT; --> Tarifa nula
--- EXEC publicidad.pieza_publicitaria_insertar @ci, 'ingles', @p2, -1, @pz OUTPUT; --> Tarifa negativa
--- EXEC publicidad.pieza_publicitaria_insertar @ci, 'espanol', @p1, 1000, @pz OUTPUT; --> Duplicado: la campaña ya tiene 'espanol' para ese mercado
--- EXEC publicidad.pieza_publicitaria_insertar 999999, '', @p1, -1, @pz OUTPUT; --> 3 errores: campaña inexistente, idioma vacio, tarifa negativa
--- EXEC publicidad.pieza_publicitaria_insertar NULL, NULL, NULL, NULL, @pz OUTPUT; --> 4 errores: campaña nula, idioma nulo, pais nulo, tarifa nula
-GO;
+-- E-3.13.21 Valido => se acepta
+BEGIN TRY EXEC publicidad.pieza_publicitaria_insertar @ci, 'ingles', @p1, 500, @pz OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.21', 'publicidad.pieza_publicitaria_insertar: Valido', 0;
+-- E-3.13.22 Valido: mismo idioma, otro mercado => se acepta
+BEGIN TRY EXEC publicidad.pieza_publicitaria_insertar @ci, 'espanol', @p2, 800, @pz OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.22', 'publicidad.pieza_publicitaria_insertar: Valido: mismo idioma, otro mercado', 0;
+-- E-3.13.23 Valido: tarifa 0 => se acepta
+BEGIN TRY EXEC publicidad.pieza_publicitaria_insertar @ci, 'frances', @p1, 0, @pz OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.23', 'publicidad.pieza_publicitaria_insertar: Valido: tarifa 0', 0;
+-- E-3.13.24 Valido: se guarda en minusculas => se acepta
+BEGIN TRY EXEC publicidad.pieza_publicitaria_insertar @ci, 'ALEMAN', @p1, 700, @pz OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.24', 'publicidad.pieza_publicitaria_insertar: Valido: se guarda en minusculas', 0;
+-- E-3.13.25 Valido: idioma de 10 letras => se acepta
+BEGIN TRY EXEC publicidad.pieza_publicitaria_insertar @ci, 'abcdefghij', @p2, 100, @pz OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.25', 'publicidad.pieza_publicitaria_insertar: Valido: idioma de 10 letras', 0;
+-- E-3.13.26 Valido: mismo idioma y mercado que la base, en otra campaña => se acepta
+BEGIN TRY EXEC publicidad.pieza_publicitaria_insertar @co, 'espanol', @p1, 1000, @pz OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.26', 'publicidad.pieza_publicitaria_insertar: Valido: mismo idioma y mercado que la base, en otra campaña', 0;
+GO
 
--- Verificacion publicidad.pieza_publicitaria_modificar
+PRINT '--- E-3.13.27 a E-3.13.33 publicidad.pieza_publicitaria_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.24 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @c1 INT = (SELECT campania_id FROM publicidad.campania WHERE nombre = 'PZ_MOD'),
         @cd INT = (SELECT campania_id FROM publicidad.campania WHERE nombre = 'PZ_DEST'),
         @p1 INT = (SELECT pais_id FROM torneo.pais ORDER BY pais_id OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY),
@@ -3027,60 +4128,39 @@ DECLARE @c1 INT = (SELECT campania_id FROM publicidad.campania WHERE nombre = 'P
         @m3 INT = (SELECT pz.pieza_id FROM publicidad.pieza_publicitaria pz JOIN publicidad.campania c ON c.campania_id = pz.campania_id
                    WHERE c.nombre IN ('PZ_MOD', 'PZ_DEST') ORDER BY pz.pieza_id OFFSET 2 ROWS FETCH NEXT 1 ROWS ONLY);
 
-EXEC publicidad.pieza_publicitaria_modificar @m1, @c1, 'ingles', @p1, 1500; --> Valido: cambia la tarifa (no es duplicado de si misma)
--- EXEC publicidad.pieza_publicitaria_modificar @m1, @c1, 'INGLES', @p1, 1000; --> Valido: idioma en mayusculas, se guarda en minusculas
--- EXEC publicidad.pieza_publicitaria_modificar @m1, @c1, 'italiano', @p1, 1000; --> Valido: cambia el idioma
--- EXEC publicidad.pieza_publicitaria_modificar @m1, @c1, 'ingles', @p2, 1000; --> Valido: cambia el mercado, sin espacios asignados 
--- EXEC publicidad.pieza_publicitaria_modificar @m1, @cd, 'ingles', @p1, 1000; --> Valido: cambia de campaña, sin espacios asignados
--- EXEC publicidad.pieza_publicitaria_modificar @m3, @c1, 'aleman', @p3, 3500; --> Valido: pieza con espacio, solo cambia la tarifa
--- EXEC publicidad.pieza_publicitaria_modificar @m1, @c1, 'ingles', @p1, 1000; --> Restaurar: deja m1 como estaba
--- EXEC publicidad.pieza_publicitaria_modificar 999999, @c1, 'ingles', @p1, 1000; --> Pieza inexistente
--- EXEC publicidad.pieza_publicitaria_modificar NULL, @c1, 'ingles', @p1, 1000; --> Id nulo 
--- EXEC publicidad.pieza_publicitaria_modificar @m1, 999999, 'ingles', @p1, 1000; --> Campaña inexistente
--- EXEC publicidad.pieza_publicitaria_modificar @m1, NULL, 'ingles', @p1, 1000; --> Campaña nula
--- EXEC publicidad.pieza_publicitaria_modificar @m1, @c1, '', @p1, 1000; --> Idioma vacio
--- EXEC publicidad.pieza_publicitaria_modificar @m1, @c1, NULL, @p1, 1000; --> Idioma nulo
--- EXEC publicidad.pieza_publicitaria_modificar @m1, @c1, '   ', @p1, 1000; --> Idioma solo espacios
--- EXEC publicidad.pieza_publicitaria_modificar @m1, @c1, 'ingl3s', @p1, 1000; --> Idioma con numero
--- EXEC publicidad.pieza_publicitaria_modificar @m1, @c1, 'ingles uk', @p1, 1000; --> Idioma con espacio
--- EXEC publicidad.pieza_publicitaria_modificar @m1, @c1, 'abcdefghijk', @p1, 1000; --> Idioma de 11 letras 
--- EXEC publicidad.pieza_publicitaria_modificar @m1, @c1, 'ingles', 999999, 1000; --> Pais mercado inexistente
--- EXEC publicidad.pieza_publicitaria_modificar @m1, @c1, 'ingles', NULL, 1000; --> Pais mercado nulo
--- EXEC publicidad.pieza_publicitaria_modificar @m1, @c1, 'ingles', @p4, 1000; --> Pais mercado que no es de interes de la campaña
--- EXEC publicidad.pieza_publicitaria_modificar @m1, @cd, 'ingles', @p2, 1000; --> Mercado @p2 no es de interes de la campaña destino
--- EXEC publicidad.pieza_publicitaria_modificar @m1, @c1, 'ingles', @p1, NULL; --> Tarifa nula
--- EXEC publicidad.pieza_publicitaria_modificar @m1, @c1, 'ingles', @p1, -1; --> Tarifa negativa
--- EXEC publicidad.pieza_publicitaria_modificar @m1, @c1, 'frances', @p2, 1000; --> Duplicado: m2 ya es 'frances' en ese mercado
--- EXEC publicidad.pieza_publicitaria_modificar @m1, @c1, 'FRANCES', @p2, 1000; --> Duplicado con otra capitalizacion 
--- EXEC publicidad.pieza_publicitaria_modificar @m3, @c1, 'aleman', @p2, 3000; --> Pieza con espacio: no puede cambiar de mercado
--- EXEC publicidad.pieza_publicitaria_modificar @m3, @cd, 'aleman', @p3, 3000; --> Pieza con espacio: no puede cambiar de campaña
--- EXEC publicidad.pieza_publicitaria_modificar @m3, @cd, 'aleman', @p3, -1; --> 2 errores: pieza con espacio cambia de campaña y tarifa negativa
--- EXEC publicidad.pieza_publicitaria_modificar @m1, @c1, 'ingl3s', @p4, -1; --> 3 errores: idioma invalido, mercado que no es de interes, tarifa negativa
--- EXEC publicidad.pieza_publicitaria_modificar 999999, 999999, '', 999999, -1; --> 5 errores: pieza, campaña, idioma, pais inexistentes y tarifa negativa
-GO;
+-- E-3.13.27 Valido: cambia la tarifa (no es duplicado de si misma) => se acepta
+BEGIN TRY EXEC publicidad.pieza_publicitaria_modificar @m1, @c1, 'ingles', @p1, 1500; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.27', 'publicidad.pieza_publicitaria_modificar: Valido: cambia la tarifa (no es duplicado de si misma)', 0;
+-- E-3.13.28 Valido: idioma en mayusculas, se guarda en minusculas => se acepta
+BEGIN TRY EXEC publicidad.pieza_publicitaria_modificar @m1, @c1, 'INGLES', @p1, 1000; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.28', 'publicidad.pieza_publicitaria_modificar: Valido: idioma en mayusculas, se guarda en minusculas', 0;
+-- E-3.13.29 Valido: cambia el idioma => se acepta
+BEGIN TRY EXEC publicidad.pieza_publicitaria_modificar @m1, @c1, 'italiano', @p1, 1000; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.29', 'publicidad.pieza_publicitaria_modificar: Valido: cambia el idioma', 0;
+-- E-3.13.30 Valido: cambia el mercado, sin espacios asignados => se acepta
+BEGIN TRY EXEC publicidad.pieza_publicitaria_modificar @m1, @c1, 'ingles', @p2, 1000; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.30', 'publicidad.pieza_publicitaria_modificar: Valido: cambia el mercado, sin espacios asignados', 0;
+-- E-3.13.31 Valido: cambia de campaña, sin espacios asignados => se acepta
+BEGIN TRY EXEC publicidad.pieza_publicitaria_modificar @m1, @cd, 'ingles', @p1, 1000; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.31', 'publicidad.pieza_publicitaria_modificar: Valido: cambia de campaña, sin espacios asignados', 0;
+-- E-3.13.32 Valido: pieza con espacio, solo cambia la tarifa => se acepta
+BEGIN TRY EXEC publicidad.pieza_publicitaria_modificar @m3, @c1, 'aleman', @p3, 3500; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.32', 'publicidad.pieza_publicitaria_modificar: Valido: pieza con espacio, solo cambia la tarifa', 0;
+-- E-3.13.33 Restaurar: deja m1 como estaba => se acepta
+BEGIN TRY EXEC publicidad.pieza_publicitaria_modificar @m1, @c1, 'ingles', @p1, 1000; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.33', 'publicidad.pieza_publicitaria_modificar: Restaurar: deja m1 como estaba', 0;
+GO
 
--- Verificacion publicidad.pieza_publicitaria_eliminar
+PRINT '--- E-3.13.34 publicidad.pieza_publicitaria_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.24 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @ce INT = (SELECT campania_id FROM publicidad.campania WHERE nombre = 'PZ_ELIM'),
         @p1 INT = (SELECT pais_id FROM torneo.pais ORDER BY pais_id OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY),
         @e1 INT = (SELECT pieza_id FROM publicidad.pieza_publicitaria WHERE campania_id = (SELECT campania_id FROM publicidad.campania WHERE nombre = 'PZ_ELIM') AND idioma = 'espanol'),
         @e2 INT = (SELECT pieza_id FROM publicidad.pieza_publicitaria WHERE campania_id = (SELECT campania_id FROM publicidad.campania WHERE nombre = 'PZ_ELIM') AND idioma = 'ingles'),
         @pz INT;
 
-EXEC publicidad.pieza_publicitaria_eliminar @e1; --> Baja valida (si se ejecuta 2 veces seguidas tira error)
--- EXEC publicidad.pieza_publicitaria_eliminar 999999; --> Pieza inexistente
--- EXEC publicidad.pieza_publicitaria_eliminar NULL; --> Id nulo (el mensaje dice "(nulo)")
--- EXEC publicidad.pieza_publicitaria_eliminar @e2; --> Esta asignada a espacios publicitarios de partidos
-
-
--- Limpieza de publicidad.pieza_publicitaria (al terminar)
-DELETE e FROM publicidad.espacio_publicitario e JOIN publicidad.pieza_publicitaria pz ON pz.pieza_id = e.pieza_id JOIN publicidad.campania c ON c.campania_id = pz.campania_id WHERE c.nombre LIKE 'PZ[_]%';
-DELETE pz FROM publicidad.pieza_publicitaria pz JOIN publicidad.campania c ON c.campania_id = pz.campania_id WHERE c.nombre LIKE 'PZ[_]%';
-DELETE i FROM publicidad.campania_pais_interes i JOIN publicidad.campania c ON c.campania_id = i.campania_id WHERE c.nombre LIKE 'PZ[_]%';
-DELETE FROM publicidad.campania WHERE nombre LIKE 'PZ[_]%';
-DELETE FROM publicidad.anunciante WHERE nombre = 'PZ';
+-- E-3.13.34 Baja valida (si se ejecuta 2 veces seguidas tira error) => se acepta
+BEGIN TRY EXEC publicidad.pieza_publicitaria_eliminar @e1; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.34', 'publicidad.pieza_publicitaria_eliminar: Baja valida (si se ejecuta 2 veces seguidas tira error)', 0;
 GO
 
--- Preparación de espacio_publicitario* (ejecutar UNA sola vez)
+PRINT '--- P-3.25 Preparación de espacio_publicitario* (ejecutar UNA sola vez)';
+-- Preparación (sin verificaciones) de los casos detallados. Ejecutar UNA sola vez.
+-- Requiere: Lote 0, las Partes 1 y 2 y las preparaciones P-3.xx anteriores.
 EXEC publicidad.anunciante_insertar 'ESP', NULL, NULL;
 GO
 DECLARE @a INT = (SELECT anunciante_id FROM publicidad.anunciante WHERE nombre = 'ESP'),
@@ -3128,7 +4208,10 @@ EXEC publicidad.espacio_publicitario_insertar @pc, 3, @z4, NULL, @esp OUTPUT;
 EXEC publicidad.espacio_publicitario_insertar @pc, 4, @z5, NULL, @esp OUTPUT;
 GO
 
--- Verificacion publicidad.espacio_publicitario_insertar
+PRINT '--- E-3.13.35 a E-3.13.37 publicidad.espacio_publicitario_insertar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.25 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @vig INT = (SELECT campania_id FROM publicidad.campania WHERE nombre = 'ESP_VIG'),
         @fuera INT = (SELECT campania_id FROM publicidad.campania WHERE nombre = 'ESP_FUERA');
 DECLARE @z1 INT = (SELECT pieza_id FROM publicidad.pieza_publicitaria WHERE campania_id = @vig AND idioma = 'espanol'),
@@ -3140,27 +4223,18 @@ DECLARE @pa INT = (SELECT partido_id FROM publicidad.espacio_publicitario WHERE 
         @pb INT = (SELECT partido_id FROM publicidad.espacio_publicitario WHERE pieza_id = @z6 AND numero_espacio = 4),
         @esp INT;
 
-EXEC publicidad.espacio_publicitario_insertar @pb, 1, @z7, 1, @esp OUTPUT; --> Valido: con pieza y prioridad 1 
--- EXEC publicidad.espacio_publicitario_insertar @pb, 2, @z1, 4, @esp OUTPUT; --> Valido: pieza que ya esta en otro partido (PA), prioridad 4 (borde)
--- EXEC publicidad.espacio_publicitario_insertar @pb, 3, NULL, NULL, @esp OUTPUT; --> Valido: espacio vacio (sin pieza ni prioridad)
--- EXEC publicidad.espacio_publicitario_insertar 999999, 1, NULL, NULL, @esp OUTPUT; --> Partido inexistente
--- EXEC publicidad.espacio_publicitario_insertar NULL, 1, NULL, NULL, @esp OUTPUT; --> Partido nulo
--- EXEC publicidad.espacio_publicitario_insertar @pa, 0, NULL, NULL, @esp OUTPUT; --> Numero de espacio 0 (fuera de rango)
--- EXEC publicidad.espacio_publicitario_insertar @pa, 5, NULL, NULL, @esp OUTPUT; --> Numero de espacio 5 (fuera de rango)
--- EXEC publicidad.espacio_publicitario_insertar @pa, NULL, NULL, NULL, @esp OUTPUT; --> Numero de espacio nulo
--- EXEC publicidad.espacio_publicitario_insertar @pa, 1, NULL, NULL, @esp OUTPUT; --> Espacio duplicado
--- EXEC publicidad.espacio_publicitario_insertar @pa, 2, NULL, 0, @esp OUTPUT; --> Prioridad 0 (fuera de rango)
--- EXEC publicidad.espacio_publicitario_insertar @pa, 2, NULL, 5, @esp OUTPUT; --> Prioridad 5 (fuera de rango)
--- EXEC publicidad.espacio_publicitario_insertar @pa, 2, 999999, NULL, @esp OUTPUT; --> Pieza inexistente
--- EXEC publicidad.espacio_publicitario_insertar @pa, 2, @zf, NULL, @esp OUTPUT; --> Campaña de la pieza no vigente en la fecha del partido
--- EXEC publicidad.espacio_publicitario_insertar @pa, 2, @z1, NULL, @esp OUTPUT; --> La pieza ya ocupa otro espacio del mismo partido 
--- EXEC publicidad.espacio_publicitario_insertar @pa, 1, @z1, NULL, @esp OUTPUT; --> 2 errores: espacio duplicado y pieza ya ocupa otro espacio
--- EXEC publicidad.espacio_publicitario_insertar @pa, 0, 999999, 9, @esp OUTPUT; --> 3 errores: numero fuera de rango, prioridad fuera de rango y pieza inexistente
--- EXEC publicidad.espacio_publicitario_insertar 999999, 7, 999999, 9, @esp OUTPUT; --> 4 errores: partido inexistente, numero, prioridad y pieza inexistente
-GO;
+-- E-3.13.35 Valido: con pieza y prioridad 1 => se acepta
+BEGIN TRY EXEC publicidad.espacio_publicitario_insertar @pb, 1, @z7, 1, @esp OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.35', 'publicidad.espacio_publicitario_insertar: Valido: con pieza y prioridad 1', 0;
+-- E-3.13.36 Valido: pieza que ya esta en otro partido (PA), prioridad 4 (borde) => se acepta
+BEGIN TRY EXEC publicidad.espacio_publicitario_insertar @pb, 2, @z1, 4, @esp OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.36', 'publicidad.espacio_publicitario_insertar: Valido: pieza que ya esta en otro partido (PA), prioridad 4 (borde)', 0;
+-- E-3.13.37 Valido: espacio vacio (sin pieza ni prioridad) => se acepta
+BEGIN TRY EXEC publicidad.espacio_publicitario_insertar @pb, 3, NULL, NULL, @esp OUTPUT; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.37', 'publicidad.espacio_publicitario_insertar: Valido: espacio vacio (sin pieza ni prioridad)', 0;
+GO
 
-
--- Verificacion publicidad.espacio_publicitario_modificar
+PRINT '--- E-3.13.38 a E-3.13.45 publicidad.espacio_publicitario_modificar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.25 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @vig INT = (SELECT campania_id FROM publicidad.campania WHERE nombre = 'ESP_VIG'),
         @fuera INT = (SELECT campania_id FROM publicidad.campania WHERE nombre = 'ESP_FUERA');
 DECLARE @z2 INT = (SELECT pieza_id FROM publicidad.pieza_publicitaria WHERE campania_id = @vig AND idioma = 'ingles'),
@@ -3174,38 +4248,28 @@ DECLARE @m1 INT = (SELECT espacio_id FROM publicidad.espacio_publicitario WHERE 
         @mf INT = (SELECT espacio_id FROM publicidad.espacio_publicitario WHERE partido_id = @pc AND numero_espacio = 3),
         @fx DATETIMEOFFSET = (SELECT fecha_hora_utc FROM torneo.partido WHERE partido_id = @pc);
 
-EXEC publicidad.espacio_publicitario_modificar @m1, @z2, 3; --> Valido: cambia la prioridad y conserva la pieza
--- EXEC publicidad.espacio_publicitario_modificar @m1, @z7, 1; --> Valido: cambia la pieza (despues restaurar)
--- EXEC publicidad.espacio_publicitario_modificar @m1, NULL, NULL; --> Valido: deja el espacio vacio (despues restaurar)
--- EXEC publicidad.espacio_publicitario_modificar @m1, @z2, 2, @fx; --> Valido: informa fecha de exhibicion sin facturar
--- EXEC publicidad.espacio_publicitario_modificar @m1, @z2, NULL, NULL, NULL; --> Valido: facturado NULL se toma como 0
--- EXEC publicidad.espacio_publicitario_modificar @ef, @z3, NULL, @fx, 1, 20000; --> Valido: espacio ya facturado, misma pieza, cambia el monto
--- EXEC publicidad.espacio_publicitario_modificar @m1, @z2, NULL, NULL, 0, NULL; --> Restaurar: deja m1 como estaba
--- EXEC publicidad.espacio_publicitario_modificar 999999, @z2, NULL; --> Espacio inexistente
--- EXEC publicidad.espacio_publicitario_modificar NULL, @z2, NULL; --> Id nulo (el mensaje dice "(nulo)")
--- EXEC publicidad.espacio_publicitario_modificar @m1, 999999, NULL; --> Pieza inexistente
--- EXEC publicidad.espacio_publicitario_modificar @m1, @zf, NULL; --> Campaña de la pieza no vigente en la fecha del partido
--- EXEC publicidad.espacio_publicitario_modificar @m1, @z3, NULL; --> La pieza ya ocupa otro espacio del partido
--- EXEC publicidad.espacio_publicitario_modificar @m1, @z2, 0; --> Prioridad 0 (fuera de rango)
--- EXEC publicidad.espacio_publicitario_modificar @m1, @z2, 5; --> Prioridad 5 (fuera de rango)
--- EXEC publicidad.espacio_publicitario_modificar @ef, @z7, NULL, @fx, 1, 10000; --> Espacio ya facturado: no se puede cambiar la pieza
--- EXEC publicidad.espacio_publicitario_modificar @m1, NULL, NULL, NULL, 1, NULL; --> Facturado sin pieza, fecha ni monto (un solo mensaje)
--- EXEC publicidad.espacio_publicitario_modificar @m1, @z2, NULL, NULL, 1, 100; --> Facturado sin fecha de exhibicion
--- EXEC publicidad.espacio_publicitario_modificar @m1, @z2, NULL, @fx, 1, NULL; --> Facturado sin monto
--- EXEC publicidad.espacio_publicitario_modificar @m1, @z2, NULL, @fx, 0, 100; --> Monto informado con facturado = 0
--- EXEC publicidad.espacio_publicitario_modificar @m1, @z2, NULL, NULL, NULL, 100; --> Monto informado con facturado NULL
--- EXEC publicidad.espacio_publicitario_modificar @m1, @z2, NULL, @fx, 1, -1; --> Monto negativo (con facturado completo)
--- EXEC publicidad.espacio_publicitario_modificar @m1, NULL, NULL, @fx; --> Fecha de exhibicion en un espacio sin pieza
--- EXEC publicidad.espacio_publicitario_modificar 999999, NULL, 9, @fx; --> 2 errores: espacio inexistente y fecha sin pieza (la prioridad no se valida si el espacio no existe)
--- EXEC publicidad.espacio_publicitario_modificar @m1, @z3, 0; --> 2 errores: pieza ya ocupa otro espacio y prioridad fuera de rango
--- EXEC publicidad.espacio_publicitario_modificar @m1, @z2, NULL, @fx, 0, -1; --> 2 errores: monto con facturado = 0 y monto negativo
--- EXEC publicidad.espacio_publicitario_modificar @m1, 999999, 0, @fx, 1, -1; --> 3 errores: pieza inexistente, prioridad fuera de rango y monto negativo
--- EXEC publicidad.espacio_publicitario_modificar @m1, NULL, 9, @fx, 1, -1; --> 4 errores: prioridad, facturado sin pieza, monto negativo y fecha sin pieza
--- EXEC publicidad.espacio_publicitario_modificar @mf, @z4, 1, @fx, 1, 5000; --> Valido: marca facturado.
-GO;
+-- E-3.13.38 Valido: cambia la prioridad y conserva la pieza => se acepta
+BEGIN TRY EXEC publicidad.espacio_publicitario_modificar @m1, @z2, 3; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.38', 'publicidad.espacio_publicitario_modificar: Valido: cambia la prioridad y conserva la pieza', 0;
+-- E-3.13.39 Valido: cambia la pieza (despues restaurar) => se acepta
+BEGIN TRY EXEC publicidad.espacio_publicitario_modificar @m1, @z7, 1; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.39', 'publicidad.espacio_publicitario_modificar: Valido: cambia la pieza (despues restaurar)', 0;
+-- E-3.13.40 Valido: deja el espacio vacio (despues restaurar) => se acepta
+BEGIN TRY EXEC publicidad.espacio_publicitario_modificar @m1, NULL, NULL; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.40', 'publicidad.espacio_publicitario_modificar: Valido: deja el espacio vacio (despues restaurar)', 0;
+-- E-3.13.41 Valido: informa fecha de exhibicion sin facturar => se acepta
+BEGIN TRY EXEC publicidad.espacio_publicitario_modificar @m1, @z2, 2, @fx; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.41', 'publicidad.espacio_publicitario_modificar: Valido: informa fecha de exhibicion sin facturar', 0;
+-- E-3.13.42 Valido: facturado NULL se toma como 0 => se acepta
+BEGIN TRY EXEC publicidad.espacio_publicitario_modificar @m1, @z2, NULL, NULL, NULL; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.42', 'publicidad.espacio_publicitario_modificar: Valido: facturado NULL se toma como 0', 0;
+-- E-3.13.43 Valido: espacio ya facturado, misma pieza, cambia el monto => se acepta
+BEGIN TRY EXEC publicidad.espacio_publicitario_modificar @ef, @z3, NULL, @fx, 1, 20000; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.43', 'publicidad.espacio_publicitario_modificar: Valido: espacio ya facturado, misma pieza, cambia el monto', 0;
+-- E-3.13.44 Restaurar: deja m1 como estaba => se acepta
+BEGIN TRY EXEC publicidad.espacio_publicitario_modificar @m1, @z2, NULL, NULL, 0, NULL; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.44', 'publicidad.espacio_publicitario_modificar: Restaurar: deja m1 como estaba', 0;
+-- E-3.13.45 Valido: marca facturado. => se acepta
+BEGIN TRY EXEC publicidad.espacio_publicitario_modificar @mf, @z4, 1, @fx, 1, 5000; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.45', 'publicidad.espacio_publicitario_modificar: Valido: marca facturado.', 0;
+GO
 
-
--- Verificacion publicidad.espacio_publicitario_eliminar
+PRINT '--- E-3.13.46 publicidad.espacio_publicitario_eliminar';
+-- Resultado esperado: cada caso se acepta y queda aplicado, en orden.
+-- Requiere: Lote 0 y las preparaciones hasta P-3.25 (Partes 1 y 2 ya ejecutadas).
+-- Un solo caso: seleccionar las líneas del DECLARE y las del caso, y ejecutar la selección.
 DECLARE @vig INT = (SELECT campania_id FROM publicidad.campania WHERE nombre = 'ESP_VIG');
 DECLARE @z3 INT = (SELECT pieza_id FROM publicidad.pieza_publicitaria WHERE campania_id = @vig AND idioma = 'frances'),
         @z5 INT = (SELECT pieza_id FROM publicidad.pieza_publicitaria WHERE campania_id = @vig AND idioma = 'japones');
@@ -3214,273 +4278,26 @@ DECLARE @e1 INT = (SELECT espacio_id FROM publicidad.espacio_publicitario WHERE 
         @ef INT = (SELECT espacio_id FROM publicidad.espacio_publicitario WHERE partido_id = @pc AND numero_espacio = 2),
         @esp INT;
 
-EXEC publicidad.espacio_publicitario_eliminar @e1; --> Baja valida (espacio no facturado) SI SE ELIMINA 2 VECES SEGUIDAS TIRA ERROR
--- EXEC publicidad.espacio_publicitario_eliminar 999999; --> Espacio inexistente
--- EXEC publicidad.espacio_publicitario_eliminar NULL; --> Id nulo (el mensaje dice "(nulo)")
--- EXEC publicidad.espacio_publicitario_eliminar @ef; --> Espacio ya facturado (historial de facturacion)
-
-
--- Limpieza de publicidad.espacio_publicitario (al terminar)
-DELETE e FROM publicidad.espacio_publicitario e WHERE e.partido_id IN (SELECT e2.partido_id FROM publicidad.espacio_publicitario e2 JOIN publicidad.pieza_publicitaria pz ON pz.pieza_id = e2.pieza_id JOIN publicidad.campania c ON c.campania_id = pz.campania_id WHERE c.nombre IN ('ESP_VIG', 'ESP_FUERA'));
-DELETE pz FROM publicidad.pieza_publicitaria pz JOIN publicidad.campania c ON c.campania_id = pz.campania_id WHERE c.nombre IN ('ESP_VIG', 'ESP_FUERA');
-DELETE i FROM publicidad.campania_pais_interes i JOIN publicidad.campania c ON c.campania_id = i.campania_id WHERE c.nombre IN ('ESP_VIG', 'ESP_FUERA');
-DELETE FROM publicidad.campania WHERE nombre IN ('ESP_VIG', 'ESP_FUERA');
-DELETE FROM publicidad.anunciante WHERE nombre = 'ESP';
+-- E-3.13.46 Baja valida (espacio no facturado) SI SE ELIMINA 2 VECES SEGUIDAS TIRA ERROR => se acepta
+BEGIN TRY EXEC publicidad.espacio_publicitario_eliminar @e1; END TRY BEGIN CATCH EXEC #capturar; END CATCH; EXEC #registrar 'E-3.13.46', 'publicidad.espacio_publicitario_eliminar: Baja valida (espacio no facturado) SI SE ELIMINA 2 VECES SEGUIDAS TIRA ERROR', 0;
 GO
 
 -- ============================================================
--- 2.1 plantel.reemplazar_convocado (baja + alta de último momento, en una transacción)
+-- RESUMEN
 -- ============================================================
 
-
-
-
-
--- ============================================================
--- 2.2 plantel.cargar_formacion (cabecera + titulares + banco, todo o nada)
--- ============================================================
-
-
-
-
-
--- ============================================================
--- 2.3 evento.registrar_sustitucion (por dorsales; ventana automática; reglamento de cambios)
--- ============================================================
-
-
-
-
-
--- ============================================================
--- 2.4 evento.registrar_gol (por dorsales; actualiza el marcador)
--- ============================================================
-
-
-
-
-
--- ============================================================
--- 2.5 evento.registrar_tarjeta (tarjeta + cálculo de suspensión en una transacción)
--- ============================================================
-
-
-
-
-
--- ============================================================
--- 2.6 publicidad.asignar_espacios_partido (los cuatro espacios según los criterios de la sección H)
--- ============================================================
-
-
-
-
-
--- ============================================================
--- 2.7 torneo.registrar_resultado (cierre del partido + pauta exhibida) y facturación
--- ============================================================
-
-
-
-
-
--- ============================================================
--- 2.8 Acumulación de amarillas, doble amarilla y jugador suspendido fuera de la formación
--- ============================================================
-
-
-
-
--- ============================================================
--- 2.9 arbitraje.designar_arbitros (terna completa, con validación de conflicto de nacionalidad)
--- ============================================================
-
-
-
-
-
--- ============================================================
--- 2.10 Partido de eliminación directa completo (P4: Francia vs Japón, dieciseisavos)
--- ============================================================
-
-
-
-
-
--- ============================================================
--- 2.11 Transaccionalidad: todo o nada en operaciones que afectan varias tablas
--- ============================================================
-
-
-
-
-
--- =======================================================================================================
---                                          LIMPIEZA
--- =======================================================================================================
-
--- Limpieza de torneo.parametro (al terminar)
-DECLARE @bk_hasta INT = (SELECT valor FROM torneo.parametro WHERE clave = 'tst_backup_hasta'),
-        @bk_desde INT = (SELECT valor FROM torneo.parametro WHERE clave = 'tst_backup_desde');
-EXEC torneo.parametro_modificar 'prime_time_hora_hasta', @bk_hasta;   
-EXEC torneo.parametro_modificar 'prime_time_hora_desde', @bk_desde;
-DELETE FROM torneo.parametro WHERE clave LIKE 'tst[_]%';
+PRINT '################ RESUMEN ################';
+-- Resultado esperado: todas las pruebas en OK y ninguna en FALLO.
+DECLARE @ok INT = (SELECT COUNT(*) FROM #resultado WHERE resultado = 'OK'),
+        @fallo INT = (SELECT COUNT(*) FROM #resultado WHERE resultado <> 'OK');
+PRINT CONCAT('TOTAL: ', @ok, ' OK, ', @fallo, ' FALLO');
+SELECT resultado, COUNT(*) AS pruebas FROM #resultado GROUP BY resultado;
+SELECT orden, prueba, descripcion, resultado FROM #resultado ORDER BY orden;
+IF @fallo > 0
+    SELECT 'PRUEBAS FALLIDAS' AS atencion, prueba, descripcion, detalle FROM #resultado WHERE resultado <> 'OK' ORDER BY orden;
+ELSE
+    PRINT 'Todas las pruebas finalizaron con el resultado esperado.';
 GO
 
--- Limpieza de torneo.pais (al terminar)
-DELETE pz FROM publicidad.pieza_publicitaria pz JOIN publicidad.campania c ON c.campania_id = pz.campania_id WHERE c.nombre = 'PAIS_CAMP';
-DELETE i FROM publicidad.campania_pais_interes i JOIN publicidad.campania c ON c.campania_id = i.campania_id WHERE c.nombre = 'PAIS_CAMP';
-DELETE FROM publicidad.campania WHERE nombre = 'PAIS_CAMP';
-DELETE FROM publicidad.anunciante WHERE nombre = 'PAIS_ANUN';
-DELETE FROM arbitraje.arbitro WHERE pais_id IN (SELECT pais_id FROM torneo.pais WHERE codigo_iso LIKE 'ZZ[A-Z]');
-DELETE FROM torneo.seleccion WHERE pais_id IN (SELECT pais_id FROM torneo.pais WHERE codigo_iso LIKE 'ZZ[A-Z]');
-DELETE FROM torneo.sede WHERE pais_id IN (SELECT pais_id FROM torneo.pais WHERE codigo_iso LIKE 'ZZ[A-Z]');
-DELETE FROM torneo.pais WHERE codigo_iso LIKE 'ZZ[A-Z]';
-GO
-
--- Limpieza de torneo.confederacion (al terminar)
-DELETE FROM torneo.seleccion WHERE pais_id IN (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ZYC');
-DELETE FROM torneo.pais WHERE codigo_iso = 'ZYC';
-IF NOT EXISTS (SELECT 1 FROM torneo.confederacion WHERE nombre = 'AFC')      EXEC torneo.confederacion_insertar 'AFC';
-IF NOT EXISTS (SELECT 1 FROM torneo.confederacion WHERE nombre = 'CAF')      EXEC torneo.confederacion_insertar 'CAF';
-IF NOT EXISTS (SELECT 1 FROM torneo.confederacion WHERE nombre = 'CONCACAF') EXEC torneo.confederacion_insertar 'CONCACAF';
-IF NOT EXISTS (SELECT 1 FROM torneo.confederacion WHERE nombre = 'CONMEBOL') EXEC torneo.confederacion_insertar 'CONMEBOL';
-IF NOT EXISTS (SELECT 1 FROM torneo.confederacion WHERE nombre = 'OFC')      EXEC torneo.confederacion_insertar 'OFC';
-IF NOT EXISTS (SELECT 1 FROM torneo.confederacion WHERE nombre = 'UEFA')     EXEC torneo.confederacion_insertar 'UEFA';
-GO
-
--- Limpieza de torneo.seleccion (al terminar)
-DELETE FROM plantel.convocatoria WHERE seleccion_id IN (SELECT seleccion_id FROM torneo.seleccion WHERE pais_id IN (SELECT pais_id FROM torneo.pais WHERE codigo_iso LIKE 'ZQ_'));
-DELETE FROM plantel.cuerpo_tecnico WHERE seleccion_id IN (SELECT seleccion_id FROM torneo.seleccion WHERE pais_id IN (SELECT pais_id FROM torneo.pais WHERE codigo_iso LIKE 'ZQ_'));
-DELETE FROM torneo.partido WHERE seleccion_local_id IN (SELECT seleccion_id FROM torneo.seleccion WHERE pais_id IN (SELECT pais_id FROM torneo.pais WHERE codigo_iso LIKE 'ZQ_'))
-       OR seleccion_visitante_id IN (SELECT seleccion_id FROM torneo.seleccion WHERE pais_id IN (SELECT pais_id FROM torneo.pais WHERE codigo_iso LIKE 'ZQ_'));
-DELETE FROM torneo.seleccion WHERE pais_id IN (SELECT pais_id FROM torneo.pais WHERE codigo_iso LIKE 'ZQ_');
-DELETE FROM torneo.sede WHERE nombre LIKE 'Test Sel%';
-DELETE FROM torneo.pais WHERE codigo_iso LIKE 'ZQ_';
-GO
-
--- Limpieza de torneo.partido (al terminar)
-DROP TABLE IF EXISTS #pp;
-DROP TABLE IF EXISTS #ps;
-DROP TABLE IF EXISTS #pt;
-SELECT pais_id INTO #pp FROM torneo.pais WHERE codigo_iso IN ('ZPA', 'ZPB', 'ZPC', 'ZPD', 'ZPE');
-SELECT sede_id INTO #ps FROM torneo.sede WHERE pais_id IN (SELECT pais_id FROM #pp) OR nombre LIKE 'Test Partido%';
-SELECT partido_id INTO #pt FROM torneo.partido
-WHERE sede_id IN (SELECT sede_id FROM #ps)
-    OR seleccion_local_id IN (SELECT seleccion_id FROM torneo.seleccion WHERE pais_id IN (SELECT pais_id FROM #pp))
-    OR seleccion_visitante_id IN (SELECT seleccion_id FROM torneo.seleccion WHERE pais_id IN (SELECT pais_id FROM #pp));
-DELETE FROM evento.suspension WHERE partido_afectado_id IN (SELECT partido_id FROM #pt);
-DELETE FROM evento.tarjeta WHERE partido_id IN (SELECT partido_id FROM #pt);
-DELETE FROM plantel.formacion WHERE partido_id IN (SELECT partido_id FROM #pt);
-DELETE FROM arbitraje.designacion_arbitral WHERE partido_id IN (SELECT partido_id FROM #pt);
-DELETE FROM publicidad.espacio_publicitario WHERE partido_id IN (SELECT partido_id FROM #pt);
-DELETE FROM torneo.partido WHERE partido_id IN (SELECT partido_id FROM #pt);
-DELETE FROM torneo.seleccion WHERE pais_id IN (SELECT pais_id FROM #pp);
-DELETE FROM torneo.sede WHERE sede_id IN (SELECT sede_id FROM #ps);
-DELETE FROM torneo.pais WHERE pais_id IN (SELECT pais_id FROM #pp);
-DROP TABLE #pt, #ps, #pp;
-GO
-
--- Limpieza de torneo.sede (al terminar)
-DELETE FROM torneo.partido WHERE sede_id IN (SELECT sede_id FROM torneo.sede WHERE nombre LIKE 'Test Sede%');
-DELETE FROM torneo.seleccion WHERE pais_id IN (SELECT pais_id FROM torneo.pais WHERE codigo_iso IN ('ZSA', 'ZSB', 'ZSC'));
-DELETE FROM torneo.sede WHERE nombre LIKE 'Test Sede%';
-DELETE FROM torneo.pais WHERE codigo_iso IN ('ZSA', 'ZSB', 'ZSC');
-GO
-
-
--- Limpieza de evento.gol_* (al terminar)
-DELETE FROM evento.gol WHERE formacion_id IN (SELECT formacion_id FROM ##test_gol WHERE formacion_id IS NOT NULL);
-DELETE FROM evento.sustitucion WHERE formacion_id IN (SELECT formacion_id FROM ##test_gol WHERE clave IN ('f_loc', 'f_vis', 'z_loc', 'z_vis'));
-DELETE FROM plantel.formacion_jugador WHERE formacion_id IN (SELECT formacion_id FROM ##test_gol WHERE clave IN ('f_loc', 'f_vis', 'z_loc', 'z_vis'));
-DELETE FROM plantel.formacion WHERE formacion_id IN (SELECT formacion_id FROM ##test_gol WHERE clave IN ('f_loc', 'f_vis', 'z_loc', 'z_vis'));
-DELETE FROM torneo.partido WHERE partido_id IN (SELECT partido_id FROM ##test_gol WHERE clave IN ('p_gol', 'p_z'));
-DECLARE @pm INT;
-IF OBJECT_ID('tempdb..##test_formacion') IS NOT NULL
-BEGIN
-    SET @pm = (SELECT partido_id FROM ##test_formacion WHERE clave = 'mod');
-    EXEC torneo.partido_actualizar_marcador @pm;   -- recalcula el marcador del partido 'mod' sin el gol g_jug
-END;
-DROP TABLE ##test_gol;
-GO
-
---Limpieza de evento.sustitucion_* (al terminar; descomentar y ejecutar todo junto)
--- Ejecutarla antes de limpiar partidos/formaciones de las preparaciones previas, y después de las limpiezas de las futuras preparaciones que usen estos datos (gol, tarjeta, etc.).
-DECLARE @f TABLE (formacion_id INT, partido_id INT);
-INSERT INTO @f SELECT v.formacion_id, v.partido_id FROM plantel.vw_formacion v WHERE v.formacion_id IN (SELECT formacion_id FROM ##test_sustitucion WHERE clave LIKE 'f[_]%');
-DELETE FROM evento.sustitucion WHERE formacion_id IN (SELECT formacion_id FROM @f);
-DELETE FROM evento.sustitucion WHERE formacion_id = (SELECT formacion_id FROM ##test_formacion WHERE clave = 'jug');   -- cambio registrado en la verificación de grupos (si se ejecutó)
-DELETE FROM plantel.formacion_jugador WHERE formacion_id IN (SELECT formacion_id FROM @f);
-DELETE FROM plantel.formacion WHERE formacion_id IN (SELECT formacion_id FROM @f);
-DELETE FROM torneo.partido WHERE partido_id IN (SELECT partido_id FROM @f);
-DROP TABLE ##test_sustitucion;
-GO
-
--- Limpieza de evento.tarjeta_* (al terminar)
-DELETE FROM evento.suspension WHERE tarjeta_id IN (SELECT tarjeta_id FROM evento.tarjeta
-    WHERE partido_id IN (SELECT partido_id FROM ##test_tarjeta WHERE clave IN ('pt_tar', 'pt_z'))
-    OR tarjeta_id IN (SELECT tarjeta_id FROM ##test_tarjeta WHERE clave = 't_jug'));
-DELETE FROM evento.tarjeta
-WHERE partido_id IN (SELECT partido_id FROM ##test_tarjeta WHERE clave IN ('pt_tar', 'pt_z'))
-    OR tarjeta_id IN (SELECT tarjeta_id FROM ##test_tarjeta WHERE clave = 't_jug');
-DELETE FROM plantel.formacion_jugador WHERE formacion_id IN (SELECT formacion_id FROM ##test_tarjeta WHERE clave IN ('f_loc', 'f_vis', 'z_loc'));
-DELETE FROM plantel.formacion WHERE formacion_id IN (SELECT formacion_id FROM ##test_tarjeta WHERE clave IN ('f_loc', 'f_vis', 'z_loc'));
-DELETE FROM torneo.partido WHERE partido_id IN (SELECT partido_id FROM ##test_tarjeta WHERE clave IN ('pt_tar', 'pt_z'));
-DELETE FROM plantel.cuerpo_tecnico WHERE persona_id IN (SELECT persona_id FROM ##test_tarjeta WHERE clave LIKE 'l[_]%' OR clave IN ('u_err', 'u_ea', 'u_ctv'));
-DELETE FROM plantel.persona WHERE persona_id IN (SELECT persona_id FROM ##test_tarjeta WHERE clave LIKE 'l[_]%' OR clave IN ('u_err', 'u_ea', 'u_ctv'));
-DROP TABLE ##test_tarjeta;
-GO
-
--- Limpieza de plantel.persona (al terminar)
-DELETE FROM evento.tarjeta WHERE persona_id IN (SELECT persona_id FROM ##test_persona);
-DELETE FROM plantel.jugador WHERE persona_id IN (SELECT persona_id FROM ##test_persona);
-DELETE FROM plantel.cuerpo_tecnico WHERE persona_id IN (SELECT persona_id FROM ##test_persona);
-DELETE FROM plantel.persona WHERE persona_id IN (SELECT persona_id FROM ##test_persona);
-DROP TABLE ##test_persona;
-GO
-
--- Limpieza de plantel.cuerpo_tecnico_* (al terminar)
-DECLARE @p TABLE (persona_id INT);
-INSERT INTO @p SELECT persona_id FROM plantel.cuerpo_tecnico WHERE nombre LIKE 'Test CT%';
-DELETE FROM evento.tarjeta WHERE persona_id IN (SELECT persona_id FROM @p);
-DELETE FROM plantel.cuerpo_tecnico WHERE nombre LIKE 'Test CT%';
-DELETE FROM plantel.persona WHERE persona_id IN (SELECT persona_id FROM @p);
-DELETE FROM torneo.seleccion WHERE pais_id IN (SELECT pais_id FROM torneo.pais WHERE codigo_iso IN ('ZCA', 'ZCB', 'ZCC'));
-DELETE FROM torneo.pais WHERE codigo_iso IN ('ZCA', 'ZCB', 'ZCC');
-GO
-
--- Limpieza de plantel.jugador_* (al terminar)
-DECLARE @p TABLE (persona_id INT, jugador_id INT);
-INSERT INTO @p SELECT persona_id, jugador_id FROM plantel.jugador WHERE nombre LIKE 'Test JU%';
-DELETE FROM evento.tarjeta WHERE persona_id IN (SELECT persona_id FROM @p);
-DELETE FROM plantel.formacion_jugador WHERE jugador_id IN (SELECT jugador_id FROM @p);
-DELETE FROM plantel.convocatoria WHERE jugador_id IN (SELECT jugador_id FROM @p);
-DELETE FROM plantel.jugador WHERE nombre LIKE 'Test JU%';
-DELETE FROM plantel.persona WHERE persona_id IN (SELECT persona_id FROM @p);
-GO
-
--- Limpieza de plantel.convocatoria_* (al terminar)
-DECLARE @p TABLE (persona_id INT, jugador_id INT);
-INSERT INTO @p SELECT persona_id, jugador_id FROM plantel.jugador WHERE nombre = 'Test JU' AND apellido LIKE 'Conv %';
-DELETE FROM plantel.convocatoria WHERE jugador_id IN (SELECT jugador_id FROM plantel.jugador WHERE nombre = 'Test JU');
-DELETE FROM plantel.jugador WHERE jugador_id IN (SELECT jugador_id FROM @p);
-DELETE FROM plantel.persona WHERE persona_id IN (SELECT persona_id FROM @p);
-GO
-
--- Limpieza de plantel.formacion_* (al terminar)
-DELETE FROM plantel.formacion_jugador WHERE formacion_id IN (SELECT formacion_id FROM plantel.formacion WHERE partido_id IN (SELECT partido_id FROM ##test_formacion));
-DELETE FROM plantel.formacion WHERE partido_id IN (SELECT partido_id FROM ##test_formacion);
-DELETE FROM torneo.partido WHERE partido_id IN (SELECT partido_id FROM ##test_formacion);
-DROP 
-TABLE ##test_formacion;
-GO
-
--- Limpieza de plantel.formacion_jugador_* (al terminar)
-DELETE FROM plantel.formacion_jugador WHERE jugador_id IN (SELECT jugador_id FROM ##test_fjugador);
-DECLARE @p TABLE (persona_id INT, jugador_id INT);
-INSERT INTO @p SELECT persona_id, jugador_id FROM plantel.jugador WHERE nombre = 'Test JU' AND apellido LIKE 'FJ %';
-DELETE FROM plantel.convocatoria WHERE jugador_id IN (SELECT jugador_id FROM @p);
-DELETE FROM plantel.jugador WHERE jugador_id IN (SELECT jugador_id FROM @p);
-DELETE FROM plantel.persona WHERE persona_id IN (SELECT persona_id FROM @p);
-DROP TABLE ##test_fjugador;
+SET NOEXEC OFF;
 GO

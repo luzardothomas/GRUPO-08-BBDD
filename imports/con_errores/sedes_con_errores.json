@@ -1,0 +1,44 @@
+{
+  "fuentes": [
+    "https://en.wikipedia.org/wiki/2026_FIFA_World_Cup"
+  ],
+  "obtenido_en": "2026-10-27T00:00:00+00:00",
+  "descripcion": "Archivo con errores a propósito (mismo formato que imports/scraping/sedes.json): 1 sin cambios, 1 actualizada y 3 rechazadas.",
+  "sedes": [
+    {
+      "estadio": "Estadio Azteca",
+      "ciudad": "Mexico City",
+      "pais": "MEX",
+      "capacidad": "80824",
+      "huso_horario": "UTC-06"
+    },
+    {
+      "estadio": "MetLife Stadium",
+      "ciudad": "New York/New Jersey",
+      "pais": "USA",
+      "capacidad": "82500",
+      "huso_horario": "UTC-04"
+    },
+    {
+      "estadio": "Estadio Fantasma",
+      "ciudad": "Atlantis",
+      "pais": "XXX",
+      "capacidad": "50000",
+      "huso_horario": "UTC-05"
+    },
+    {
+      "estadio": "Estadio Sin Capacidad",
+      "ciudad": "Toronto",
+      "pais": "CAN",
+      "capacidad": "abc",
+      "huso_horario": "UTC-04"
+    },
+    {
+      "estadio": "Estadio Sin Huso",
+      "ciudad": "Ciudad Desconocida",
+      "pais": "USA",
+      "capacidad": "40000",
+      "huso_horario": null
+    }
+  ]
+}

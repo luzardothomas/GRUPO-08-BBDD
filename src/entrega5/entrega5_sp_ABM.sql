@@ -17,7 +17,8 @@
 --            único mensaje de error agrupado por SP y operación.
 --     III.   Procedimientos de lógica de negocio, transaccionales y multi-tabla.
 --     IV.    Carga de los parámetros iniciales.
---   Las pruebas están en entrega5_test.sql, que se ejecuta después de este script.
+--   Las pruebas están en entrega5_test_exitosos.sql y entrega5_test_fallidos.sql, que se ejecutan
+--   después de este script.
 -- =======================================================================================
 
 USE mundial_2026;
@@ -154,7 +155,7 @@ BEGIN
         SET @errores += '- Ya existe un país con el código ISO ''' + UPPER(@codigo_iso) + '''.' + @nl;
     IF NULLIF(LTRIM(RTRIM(@nombre)), '') IS NULL
         SET @errores += '- El nombre es obligatorio.' + @nl;
-    IF @huso_horario IS NULL OR LEN(@huso_horario) <> 6 OR @huso_horario NOT LIKE 'UTC[-+][0-9][0-9]'
+    IF @huso_horario IS NULL OR DATALENGTH(@huso_horario) <> 6 OR @huso_horario NOT LIKE 'UTC[-+][0-9][0-9]'
         SET @errores += '- El huso horario debe tener el formato UTC+hh o UTC-hh (ej: UTC-03).' + @nl;
     ELSE IF CAST(SUBSTRING(@huso_horario, 4, 3) AS INT) NOT BETWEEN -12 AND 14
         SET @errores += '- El huso horario debe estar entre UTC-12 y UTC+14.' + @nl;
@@ -1158,17 +1159,18 @@ CREATE OR ALTER PROCEDURE plantel.convocatoria_validar
     @fecha_alta      DATE,
     @fecha_baja      DATE,
     @motivo_baja     VARCHAR(150),
-    @errores         VARCHAR(2000) OUTPUT
+    @errores         VARCHAR(2000) OUTPUT,
+    @solo_datos      BIT = 0                         -- 1: el registro o su contexto no existen: sólo se validan los datos recibidos
 AS
 BEGIN
     SET NOCOUNT ON;
     DECLARE @nl CHAR(2) = CHAR(13) + CHAR(10), @cupo_max INT, @ya_vigente BIT = 0;
     SET @errores = ISNULL(@errores, '');
 
-    IF NOT EXISTS (SELECT 1 FROM torneo.seleccion WHERE seleccion_id = @seleccion_id)
+    IF @solo_datos = 0 AND NOT EXISTS (SELECT 1 FROM torneo.seleccion WHERE seleccion_id = @seleccion_id)
         SET @errores += '- No existe la selección con id '
                       + ISNULL(CAST(@seleccion_id AS VARCHAR(12)), '(nulo)') + '.' + @nl;
-    IF NOT EXISTS (SELECT 1 FROM plantel.jugador WHERE jugador_id = @jugador_id)
+    IF @solo_datos = 0 AND NOT EXISTS (SELECT 1 FROM plantel.jugador WHERE jugador_id = @jugador_id)
         SET @errores += '- No existe el jugador con id ' + ISNULL(CAST(@jugador_id AS VARCHAR(12)), '(nulo)') + '.' + @nl;
     IF @dorsal IS NULL OR @dorsal NOT BETWEEN 1 AND 99
         SET @errores += '- El dorsal debe estar entre 1 y 99.' + @nl;
@@ -1181,7 +1183,7 @@ BEGIN
     IF @fecha_baja IS NOT NULL AND NULLIF(LTRIM(RTRIM(@motivo_baja)), '') IS NULL
         SET @errores += '- La baja debe indicar su motivo.' + @nl;
 
-    IF @fecha_baja IS NULL
+    IF @fecha_baja IS NULL AND @solo_datos = 0
     BEGIN
         IF EXISTS (SELECT 1 FROM plantel.convocatoria
                    WHERE seleccion_id = @seleccion_id AND dorsal = @dorsal AND fecha_baja IS NULL
@@ -1253,7 +1255,7 @@ CREATE OR ALTER PROCEDURE plantel.convocatoria_modificar
 AS
 BEGIN
     SET NOCOUNT ON;
-    DECLARE @errores VARCHAR(2000) = '', @nl CHAR(2) = CHAR(13) + CHAR(10),
+    DECLARE @errores VARCHAR(2000) = '', @solo_datos BIT, @nl CHAR(2) = CHAR(13) + CHAR(10),
             @seleccion_id INT, @jugador_id INT;
 
     SELECT @seleccion_id = seleccion_id, @jugador_id = jugador_id
@@ -1262,9 +1264,11 @@ BEGIN
     IF @seleccion_id IS NULL
         SET @errores = '- No existe la convocatoria con id '
                      + ISNULL(CAST(@convocatoria_id AS VARCHAR(12)), '(nulo)') + '.' + @nl;
-    ELSE
-        EXEC plantel.convocatoria_validar @convocatoria_id, @seleccion_id, @jugador_id, @dorsal, @fecha_alta,
-             @fecha_baja, @motivo_baja, @errores OUTPUT;
+    -- Aunque no exista, se validan los datos recibidos (sin lo que depende del registro).
+    SET @solo_datos = IIF(@seleccion_id IS NULL, 1, 0);
+    EXEC plantel.convocatoria_validar @convocatoria_id, @seleccion_id, @jugador_id, @dorsal, @fecha_alta,
+         @fecha_baja, @motivo_baja, @errores OUTPUT,
+         @solo_datos = @solo_datos;
 
     IF @errores <> ''
     BEGIN
@@ -1335,7 +1339,7 @@ BEGIN
     IF EXISTS (SELECT 1 FROM plantel.formacion WHERE partido_id = @partido_id AND condicion = @condicion)
         SET @errores += '- El equipo ' + @condicion + ' ya tiene formación cargada en ese partido.' + @nl;
     -- Esquema: entre 3 y 5 líneas numéricas separadas por guion que suman los 10 jugadores de campo.
-    IF @esquema_tactico IS NULL OR LEN(@esquema_tactico) > 9
+    IF @esquema_tactico IS NULL OR @esquema_tactico LIKE '%[^0-9-]%'
        OR (SELECT COUNT(*) FROM STRING_SPLIT(@esquema_tactico, '-')) NOT BETWEEN 3 AND 5
        OR EXISTS (SELECT 1 FROM STRING_SPLIT(@esquema_tactico, '-') WHERE value NOT LIKE '[1-9]')
        OR (SELECT SUM(TRY_CAST(value AS INT)) FROM STRING_SPLIT(@esquema_tactico, '-')) <> 10
@@ -1369,7 +1373,7 @@ BEGIN
                       + ISNULL(CAST(@formacion_id AS VARCHAR(12)), '(nulo)') + '.' + @nl;
     IF EXISTS (SELECT 1 FROM plantel.vw_formacion WHERE formacion_id = @formacion_id AND estado = 'finalizado')
         SET @errores += '- El partido ya está finalizado.' + @nl;
-    IF @esquema_tactico IS NULL OR LEN(@esquema_tactico) > 9
+    IF @esquema_tactico IS NULL OR @esquema_tactico LIKE '%[^0-9-]%'
        OR (SELECT COUNT(*) FROM STRING_SPLIT(@esquema_tactico, '-')) NOT BETWEEN 3 AND 5
        OR EXISTS (SELECT 1 FROM STRING_SPLIT(@esquema_tactico, '-') WHERE value NOT LIKE '[1-9]')
        OR (SELECT SUM(TRY_CAST(value AS INT)) FROM STRING_SPLIT(@esquema_tactico, '-')) <> 10
@@ -1595,7 +1599,8 @@ CREATE OR ALTER PROCEDURE evento.sustitucion_validar
     @periodo          VARCHAR(15),
     @numero_ventana   INT,
     @motivo           VARCHAR(15),
-    @errores          VARCHAR(2000) OUTPUT
+    @errores          VARCHAR(2000) OUTPUT,
+    @solo_datos      BIT = 0                         -- 1: el registro o su contexto no existen: sólo se validan los datos recibidos
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -1608,7 +1613,7 @@ BEGIN
     SELECT @partido_id = partido_id, @estado = estado, @fase = fase
     FROM plantel.vw_formacion WHERE formacion_id = @formacion_id;
 
-    IF @partido_id IS NULL
+    IF @partido_id IS NULL AND @solo_datos = 0
         SET @errores += '- No existe la formación con id '
                       + ISNULL(CAST(@formacion_id AS VARCHAR(12)), '(nulo)') + '.' + @nl;
     IF @estado = 'finalizado'
@@ -1619,12 +1624,14 @@ BEGIN
         SET @errores += '- El motivo debe ser tactico, lesion o precaucion.' + @nl;
     IF @periodo IS NULL OR @periodo NOT IN ('PT', 'ST', 'alargue_1', 'alargue_2')
         SET @errores += '- El período debe ser PT, ST, alargue_1 o alargue_2.' + @nl;
-    ELSE IF @minuto IS NULL
-         OR NOT EXISTS (SELECT 1
+    IF @minuto IS NULL
+        SET @errores += '- El minuto es obligatorio.' + @nl;
+    ELSE IF @periodo IN ('PT', 'ST', 'alargue_1', 'alargue_2')
+         AND NOT EXISTS (SELECT 1
                         FROM (VALUES ('PT', 1, 60), ('ST', 45, 110), ('alargue_1', 90, 115), ('alargue_2', 105, 135))
                              AS r (periodo, desde, hasta)
                         WHERE r.periodo = @periodo AND @minuto BETWEEN r.desde AND r.hasta)
-        SET @errores += '- El minuto ' + ISNULL(CAST(@minuto AS VARCHAR(5)), '(nulo)')
+        SET @errores += '- El minuto ' + CAST(@minuto AS VARCHAR(5))
                       + ' no corresponde al período ' + @periodo + '.' + @nl;
     IF @numero_ventana IS NULL OR @numero_ventana <= 0
         SET @errores += '- El número de ventana debe ser mayor a cero.' + @nl;
@@ -1756,7 +1763,7 @@ CREATE OR ALTER PROCEDURE evento.sustitucion_modificar
 AS
 BEGIN
     SET NOCOUNT ON;
-    DECLARE @errores VARCHAR(2000) = '', @nl CHAR(2) = CHAR(13) + CHAR(10),
+    DECLARE @errores VARCHAR(2000) = '', @solo_datos BIT, @nl CHAR(2) = CHAR(13) + CHAR(10),
             @formacion_id INT, @sale INT, @entra INT;
 
     SELECT @formacion_id = formacion_id, @sale = jugador_sale_id, @entra = jugador_entra_id
@@ -1765,9 +1772,11 @@ BEGIN
     IF @formacion_id IS NULL
         SET @errores = '- No existe la sustitución con id '
                      + ISNULL(CAST(@sustitucion_id AS VARCHAR(12)), '(nulo)') + '.' + @nl;
-    ELSE
-        EXEC evento.sustitucion_validar @sustitucion_id, @formacion_id, @sale, @entra, @minuto, @periodo,
-             @numero_ventana, @motivo, @errores OUTPUT;
+    -- Aunque no exista, se validan los datos recibidos (sin lo que depende del registro).
+    SET @solo_datos = IIF(@formacion_id IS NULL, 1, 0);
+    EXEC evento.sustitucion_validar @sustitucion_id, @formacion_id, @sale, @entra, @minuto, @periodo,
+         @numero_ventana, @motivo, @errores OUTPUT,
+         @solo_datos = @solo_datos;
 
     IF @errores <> ''
     BEGIN
@@ -1858,7 +1867,8 @@ CREATE OR ALTER PROCEDURE evento.gol_validar
     @minuto                INT,
     @tipo_gol              VARCHAR(15),
     @periodo               VARCHAR(20),
-    @errores               VARCHAR(2000) OUTPUT
+    @errores               VARCHAR(2000) OUTPUT,
+    @solo_datos      BIT = 0                         -- 1: el registro o su contexto no existen: sólo se validan los datos recibidos
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -1870,9 +1880,9 @@ BEGIN
 
     IF @fase = 'grupos' AND @periodo IN ('alargue_1', 'alargue_2', 'adicional_alargue', 'penales')
         SET @errores += '- En fase de grupos no hay tiempo suplementario ni definición por penales.' + @nl;
-    IF @gol_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM evento.gol WHERE gol_id = @gol_id)
+    IF @solo_datos = 0 AND @gol_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM evento.gol WHERE gol_id = @gol_id)
         SET @errores += '- No existe el gol con id ' + CAST(@gol_id AS VARCHAR(12)) + '.' + @nl;
-    ELSE IF @partido_id IS NULL
+    ELSE IF @solo_datos = 0 AND @partido_id IS NULL
         SET @errores += '- No existe la formación con id '
                       + ISNULL(CAST(@formacion_id AS VARCHAR(12)), '(nulo)') + '.' + @nl;
     IF @estado = 'finalizado'
@@ -1883,14 +1893,17 @@ BEGIN
     IF @periodo IS NULL OR @periodo NOT IN ('PT', 'ST', 'adicional_PT', 'adicional_ST',
                                              'alargue_1', 'alargue_2', 'adicional_alargue', 'penales')
         SET @errores += '- El período debe ser PT, adicional_PT, ST, adicional_ST, alargue_1, alargue_2, adicional_alargue o penales.' + @nl;
-    ELSE IF @minuto IS NULL
-         OR NOT EXISTS (SELECT 1
+    IF @minuto IS NULL
+        SET @errores += '- El minuto es obligatorio.' + @nl;
+    ELSE IF @periodo IN ('PT', 'ST', 'adicional_PT', 'adicional_ST',
+                       'alargue_1', 'alargue_2', 'adicional_alargue', 'penales')
+         AND NOT EXISTS (SELECT 1
                         FROM (VALUES ('PT', 1, 45), ('adicional_PT', 46, 60), ('ST', 46, 90),
                                      ('adicional_ST', 91, 110), ('alargue_1', 91, 105), ('alargue_2', 106, 120),
                                      ('adicional_alargue', 106, 135), ('penales', 120, 135))
                              AS r (periodo, desde, hasta)
                         WHERE r.periodo = @periodo AND @minuto BETWEEN r.desde AND r.hasta)
-        SET @errores += '- El minuto ' + ISNULL(CAST(@minuto AS VARCHAR(5)), '(nulo)')
+        SET @errores += '- El minuto ' + CAST(@minuto AS VARCHAR(5))
                       + ' no corresponde al período ' + @periodo + '.' + @nl;
 
     IF @partido_id IS NOT NULL
@@ -1985,7 +1998,7 @@ AS
 BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
-    DECLARE @errores VARCHAR(2000) = '', @formacion_id INT, @jugador_id INT, @partido_id INT,
+    DECLARE @errores VARCHAR(2000) = '', @solo_datos BIT, @formacion_id INT, @jugador_id INT, @partido_id INT,
             @tran_propia BIT = IIF(@@TRANCOUNT = 0, 1, 0);
 
     SELECT @formacion_id = g.formacion_id, @jugador_id = g.jugador_id, @partido_id = f.partido_id
@@ -1996,9 +2009,11 @@ BEGIN
     IF @formacion_id IS NULL
         SET @errores = '- No existe el gol con id ' + ISNULL(CAST(@gol_id AS VARCHAR(12)), '(nulo)') + '.'
                      + CHAR(13) + CHAR(10);
-    ELSE
-        EXEC evento.gol_validar @gol_id, @formacion_id, @jugador_id, @asistencia_jugador_id, @minuto,
-             @tipo_gol, @periodo, @errores OUTPUT;
+    -- Aunque no exista, se validan los datos recibidos (sin lo que depende del registro).
+    SET @solo_datos = IIF(@formacion_id IS NULL, 1, 0);
+    EXEC evento.gol_validar @gol_id, @formacion_id, @jugador_id, @asistencia_jugador_id, @minuto,
+         @tipo_gol, @periodo, @errores OUTPUT,
+         @solo_datos = @solo_datos;
 
     IF @errores <> ''
     BEGIN
@@ -2081,14 +2096,15 @@ CREATE OR ALTER PROCEDURE evento.tarjeta_validar
     @periodo        VARCHAR(25),
     @tipo           VARCHAR(10),
     @tipo_expulsion VARCHAR(20),
-    @errores        VARCHAR(2000) OUTPUT
+    @errores        VARCHAR(2000) OUTPUT,
+    @solo_datos      BIT = 0                         -- 1: el registro o su contexto no existen: sólo se validan los datos recibidos
 AS
 BEGIN
     SET NOCOUNT ON;
     DECLARE @nl CHAR(2) = CHAR(13) + CHAR(10), @amarillas_previas INT;
     SET @errores = ISNULL(@errores, '');
 
-    IF NOT EXISTS (SELECT 1 FROM torneo.partido WHERE partido_id = @partido_id)
+    IF @tarjeta_id IS NULL AND NOT EXISTS (SELECT 1 FROM torneo.partido WHERE partido_id = @partido_id)   -- en la modificación sale de la tarjeta
         SET @errores += '- No existe el partido con id ' + ISNULL(CAST(@partido_id AS VARCHAR(12)), '(nulo)') + '.' + @nl;
     IF EXISTS (SELECT 1 FROM torneo.partido WHERE partido_id = @partido_id AND estado = 'finalizado')
         SET @errores += '- El partido ya está finalizado.' + @nl;
@@ -2099,23 +2115,26 @@ BEGIN
     IF @periodo IS NULL OR @periodo NOT IN ('PT', 'adicional_PT', 'ST', 'adicional_ST', 'alargue_1',
                                              'adicional_alargue_1', 'alargue_2', 'adicional_alargue_2', 'penales')
         SET @errores += '- El período no es válido (PT, adicional_PT, ST, adicional_ST, alargue_1, adicional_alargue_1, alargue_2, adicional_alargue_2 o penales).' + @nl;
-    ELSE IF @minuto IS NULL
-         OR NOT EXISTS (SELECT 1
+    IF @minuto IS NULL
+        SET @errores += '- El minuto es obligatorio.' + @nl;
+    ELSE IF @periodo IN ('PT', 'adicional_PT', 'ST', 'adicional_ST', 'alargue_1',
+                       'adicional_alargue_1', 'alargue_2', 'adicional_alargue_2', 'penales')
+         AND NOT EXISTS (SELECT 1
                         FROM (VALUES ('PT', 1, 45), ('adicional_PT', 46, 60), ('ST', 46, 90),
                                      ('adicional_ST', 91, 110), ('alargue_1', 91, 105),
                                      ('adicional_alargue_1', 106, 115), ('alargue_2', 106, 120),
                                      ('adicional_alargue_2', 121, 135), ('penales', 120, 135))
                              AS r (periodo, desde, hasta)
                         WHERE r.periodo = @periodo AND @minuto BETWEEN r.desde AND r.hasta)
-        SET @errores += '- El minuto ' + ISNULL(CAST(@minuto AS VARCHAR(5)), '(nulo)')
+        SET @errores += '- El minuto ' + CAST(@minuto AS VARCHAR(5))
                       + ' no corresponde al período ' + @periodo + '.' + @nl;
 
     IF @tarjeta_id IS NULL
     BEGIN
-        IF NOT EXISTS (SELECT 1 FROM plantel.persona WHERE persona_id = @persona_id)
+        IF @solo_datos = 0 AND NOT EXISTS (SELECT 1 FROM plantel.persona WHERE persona_id = @persona_id)
             SET @errores += '- No existe la persona con id '
                           + ISNULL(CAST(@persona_id AS VARCHAR(12)), '(nulo)') + '.' + @nl;
-        ELSE IF NOT EXISTS (SELECT 1 FROM plantel.vw_persona_partido
+        ELSE IF @solo_datos = 0 AND NOT EXISTS (SELECT 1 FROM plantel.vw_persona_partido
                             WHERE partido_id = @partido_id AND persona_id = @persona_id)
             SET @errores += '- La persona no participa del partido (no integra una formación ni el cuerpo técnico de las selecciones).' + @nl;
 
@@ -2126,16 +2145,16 @@ BEGIN
         IF @tipo = 'roja' AND (@tipo_expulsion IS NULL OR @tipo_expulsion NOT IN ('doble_amarilla', 'roja_directa'))
             SET @errores += '- Una tarjeta roja debe indicar si es doble_amarilla o roja_directa.' + @nl;
 
-        IF EXISTS (SELECT 1 FROM evento.tarjeta
+        IF @solo_datos = 0 AND EXISTS (SELECT 1 FROM evento.tarjeta
                    WHERE partido_id = @partido_id AND persona_id = @persona_id AND tipo = 'roja')
             SET @errores += '- La persona ya fue expulsada en este partido.' + @nl;
 
         SELECT @amarillas_previas = COUNT(*) FROM evento.tarjeta
         WHERE partido_id = @partido_id AND persona_id = @persona_id AND tipo = 'amarilla';
 
-        IF @tipo = 'amarilla' AND @amarillas_previas >= 1
+        IF @solo_datos = 0 AND @tipo = 'amarilla' AND @amarillas_previas >= 1
             SET @errores += '- La persona ya tiene una amarilla en este partido: la segunda se registra como roja por doble_amarilla.' + @nl;
-        IF @tipo = 'roja' AND @tipo_expulsion = 'doble_amarilla' AND @amarillas_previas <> 1
+        IF @solo_datos = 0 AND @tipo = 'roja' AND @tipo_expulsion = 'doble_amarilla' AND @amarillas_previas <> 1
             SET @errores += '- La expulsión por doble amarilla requiere una amarilla previa en el mismo partido.' + @nl;
     END;
 END;
@@ -2181,14 +2200,17 @@ CREATE OR ALTER PROCEDURE evento.tarjeta_modificar
 AS
 BEGIN
     SET NOCOUNT ON;
-    DECLARE @errores VARCHAR(2000) = '', @nl CHAR(2) = CHAR(13) + CHAR(10), @partido_id INT;
+    DECLARE @errores VARCHAR(2000) = '', @solo_datos BIT, @nl CHAR(2) = CHAR(13) + CHAR(10), @partido_id INT,
+            @id_validar INT = ISNULL(@tarjeta_id, 0);   -- un id informado indica modificación a tarjeta_validar
 
     SELECT @partido_id = partido_id FROM evento.tarjeta WHERE tarjeta_id = @tarjeta_id;
 
     IF @partido_id IS NULL
         SET @errores = '- No existe la tarjeta con id ' + ISNULL(CAST(@tarjeta_id AS VARCHAR(12)), '(nulo)') + '.' + @nl;
-    ELSE
-        EXEC evento.tarjeta_validar @tarjeta_id, @partido_id, NULL, @minuto, @periodo, NULL, NULL, @errores OUTPUT;
+    -- Aunque no exista, se validan los datos recibidos (sin lo que depende del registro).
+    SET @solo_datos = IIF(@partido_id IS NULL, 1, 0);
+    EXEC evento.tarjeta_validar @id_validar, @partido_id, NULL, @minuto, @periodo, NULL, NULL, @errores OUTPUT,
+         @solo_datos = @solo_datos;
 
     IF @errores <> ''
     BEGIN
@@ -2360,7 +2382,8 @@ CREATE OR ALTER PROCEDURE evento.suspension_validar
     @tarjeta_id          INT,
     @partido_afectado_id INT,
     @motivo              VARCHAR(150),
-    @errores             VARCHAR(2000) OUTPUT
+    @errores             VARCHAR(2000) OUTPUT,
+    @solo_datos      BIT = 0                         -- 1: el registro o su contexto no existen: sólo se validan los datos recibidos
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -2378,7 +2401,7 @@ BEGIN
     FROM plantel.vw_persona_partido
     WHERE persona_id = @persona_id AND partido_id = @partido_origen_id;
 
-    IF @persona_id IS NULL
+    IF @persona_id IS NULL AND @solo_datos = 0
         SET @errores += '- No existe la tarjeta con id ' + ISNULL(CAST(@tarjeta_id AS VARCHAR(12)), '(nulo)') + '.' + @nl;
     IF @criterio_id IS NOT NULL
        AND NOT EXISTS (SELECT 1 FROM evento.criterio_suspension WHERE criterio_id = @criterio_id)
@@ -2446,7 +2469,7 @@ CREATE OR ALTER PROCEDURE evento.suspension_modificar
 AS
 BEGIN
     SET NOCOUNT ON;
-    DECLARE @errores VARCHAR(2000) = '', @nl CHAR(2) = CHAR(13) + CHAR(10), @tarjeta_id INT, @criterio_id INT;
+    DECLARE @errores VARCHAR(2000) = '', @solo_datos BIT, @nl CHAR(2) = CHAR(13) + CHAR(10), @tarjeta_id INT, @criterio_id INT;
 
     SELECT @tarjeta_id = tarjeta_id, @criterio_id = criterio_id
     FROM evento.suspension WHERE suspension_id = @suspension_id;
@@ -2454,9 +2477,11 @@ BEGIN
     IF @tarjeta_id IS NULL
         SET @errores = '- No existe la suspensión con id '
                      + ISNULL(CAST(@suspension_id AS VARCHAR(12)), '(nulo)') + '.' + @nl;
-    ELSE
-        EXEC evento.suspension_validar @suspension_id, @criterio_id, @tarjeta_id, @partido_afectado_id, @motivo,
-             @errores OUTPUT;
+    -- Aunque no exista, se validan los datos recibidos (sin lo que depende del registro).
+    SET @solo_datos = IIF(@tarjeta_id IS NULL, 1, 0);
+    EXEC evento.suspension_validar @suspension_id, @criterio_id, @tarjeta_id, @partido_afectado_id, @motivo,
+         @errores OUTPUT,
+         @solo_datos = @solo_datos;
 
     IF @errores <> ''
     BEGIN
@@ -2512,6 +2537,9 @@ BEGIN
     SET NOCOUNT ON;
     DECLARE @nl CHAR(2) = CHAR(13) + CHAR(10), @hoy DATE = CAST(SYSDATETIME() AS DATE);
     SET @errores = ISNULL(@errores, '');
+
+    SET @nombre   = LTRIM(RTRIM(@nombre));
+    SET @apellido = LTRIM(RTRIM(@apellido));
 
     IF @arbitro_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM arbitraje.arbitro WHERE arbitro_id = @arbitro_id)
         SET @errores += '- No existe el árbitro con id ' + CAST(@arbitro_id AS VARCHAR(12)) + '.' + @nl;
@@ -2721,7 +2749,8 @@ CREATE OR ALTER PROCEDURE arbitraje.designacion_arbitral_validar
     @arbitro_id     INT,
     @rol            VARCHAR(15),
     @errores        VARCHAR(2000) OUTPUT,
-    @advertencia    VARCHAR(500) OUTPUT
+    @advertencia    VARCHAR(500) OUTPUT,
+    @solo_datos      BIT = 0                         -- 1: el registro o su contexto no existen: sólo se validan los datos recibidos
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -2734,10 +2763,10 @@ BEGIN
     SELECT @pais_arbitro = pais_id, @arbitro = nombre + ' ' + apellido
     FROM arbitraje.arbitro WHERE arbitro_id = @arbitro_id;
 
-    IF @designacion_id IS NOT NULL
+    IF @solo_datos = 0 AND @designacion_id IS NOT NULL
        AND NOT EXISTS (SELECT 1 FROM arbitraje.designacion_arbitral WHERE designacion_id = @designacion_id)
         SET @errores += '- No existe la designación con id ' + CAST(@designacion_id AS VARCHAR(12)) + '.' + @nl;
-    IF @fase IS NULL
+    IF @fase IS NULL AND @solo_datos = 0
         SET @errores += '- No existe el partido con id ' + ISNULL(CAST(@partido_id AS VARCHAR(12)), '(nulo)') + '.' + @nl;
     IF EXISTS (SELECT 1 FROM torneo.partido WHERE partido_id = @partido_id AND estado = 'finalizado')
         SET @errores += '- El partido ya está finalizado.' + @nl;
@@ -2824,16 +2853,18 @@ CREATE OR ALTER PROCEDURE arbitraje.designacion_arbitral_modificar
 AS
 BEGIN
     SET NOCOUNT ON;
-    DECLARE @errores VARCHAR(2000) = '', @nl CHAR(2) = CHAR(13) + CHAR(10), @partido_id INT;
+    DECLARE @errores VARCHAR(2000) = '', @solo_datos BIT, @nl CHAR(2) = CHAR(13) + CHAR(10), @partido_id INT;
 
     SELECT @partido_id = partido_id FROM arbitraje.designacion_arbitral WHERE designacion_id = @designacion_id;
 
     IF @partido_id IS NULL
         SET @errores = '- No existe la designación con id '
                      + ISNULL(CAST(@designacion_id AS VARCHAR(12)), '(nulo)') + '.' + @nl;
-    ELSE
-        EXEC arbitraje.designacion_arbitral_validar @designacion_id, @partido_id, @arbitro_id, @rol,
-             @errores OUTPUT, @advertencia OUTPUT;
+    -- Aunque no exista, se validan los datos recibidos (sin lo que depende del registro).
+    SET @solo_datos = IIF(@partido_id IS NULL, 1, 0);
+    EXEC arbitraje.designacion_arbitral_validar @designacion_id, @partido_id, @arbitro_id, @rol,
+         @errores OUTPUT, @advertencia OUTPUT,
+         @solo_datos = @solo_datos;
 
     IF EXISTS (SELECT 1 FROM arbitraje.designacion_arbitral
                WHERE designacion_id = @designacion_id AND arbitro_id <> @arbitro_id)
@@ -2885,17 +2916,18 @@ CREATE OR ALTER PROCEDURE arbitraje.informe_arbitral_validar
     @designacion_id INT,
     @fecha          DATETIMEOFFSET,
     @contenido      VARCHAR(MAX),
-    @errores        VARCHAR(2000) OUTPUT
+    @errores        VARCHAR(2000) OUTPUT,
+    @solo_datos      BIT = 0                         -- 1: el registro o su contexto no existen: sólo se validan los datos recibidos
 AS
 BEGIN
     SET NOCOUNT ON;
     DECLARE @nl CHAR(2) = CHAR(13) + CHAR(10);
     SET @errores = ISNULL(@errores, '');
 
-    IF @informe_id IS NOT NULL
+    IF @solo_datos = 0 AND @informe_id IS NOT NULL
        AND NOT EXISTS (SELECT 1 FROM arbitraje.informe_arbitral WHERE informe_id = @informe_id)
         SET @errores += '- No existe el informe con id ' + CAST(@informe_id AS VARCHAR(12)) + '.' + @nl;
-    IF NOT EXISTS (SELECT 1 FROM arbitraje.designacion_arbitral WHERE designacion_id = @designacion_id)
+    IF @solo_datos = 0 AND NOT EXISTS (SELECT 1 FROM arbitraje.designacion_arbitral WHERE designacion_id = @designacion_id)
         SET @errores += '- No existe la designación con id '
                       + ISNULL(CAST(@designacion_id AS VARCHAR(12)), '(nulo)') + '.' + @nl;
     IF @fecha IS NULL
@@ -2943,14 +2975,16 @@ CREATE OR ALTER PROCEDURE arbitraje.informe_arbitral_modificar
 AS
 BEGIN
     SET NOCOUNT ON;
-    DECLARE @errores VARCHAR(2000) = '', @nl CHAR(2) = CHAR(13) + CHAR(10), @designacion_id INT;
+    DECLARE @errores VARCHAR(2000) = '', @solo_datos BIT, @nl CHAR(2) = CHAR(13) + CHAR(10), @designacion_id INT;
 
     SELECT @designacion_id = designacion_id FROM arbitraje.informe_arbitral WHERE informe_id = @informe_id;
 
     IF @designacion_id IS NULL
         SET @errores = '- No existe el informe con id ' + ISNULL(CAST(@informe_id AS VARCHAR(12)), '(nulo)') + '.' + @nl;
-    ELSE
-        EXEC arbitraje.informe_arbitral_validar @informe_id, @designacion_id, @fecha, @contenido, @errores OUTPUT;
+    -- Aunque no exista, se validan los datos recibidos (sin lo que depende del registro).
+    SET @solo_datos = IIF(@designacion_id IS NULL, 1, 0);
+    EXEC arbitraje.informe_arbitral_validar @informe_id, @designacion_id, @fecha, @contenido, @errores OUTPUT,
+         @solo_datos = @solo_datos;
 
     IF @errores <> ''
     BEGIN
@@ -2998,16 +3032,17 @@ BEGIN
     SET NOCOUNT ON;
     DECLARE @errores VARCHAR(2000) = '', @nl CHAR(2) = CHAR(13) + CHAR(10);
 
-    IF NULLIF(LTRIM(RTRIM(@nombre)), '') IS NULL
+    SET @nombre = LTRIM(RTRIM(@nombre));
+
+    IF NULLIF(@nombre, '') IS NULL
         SET @errores += '- El nombre del anunciante es obligatorio.' + @nl;
     IF EXISTS (SELECT 1 FROM publicidad.anunciante WHERE nombre = @nombre)
-    SET @errores += '- Ya existe un anunciante con ese nombre.' + @nl;
+        SET @errores += '- Ya existe un anunciante con ese nombre.' + @nl;
     
     IF @contacto IS NOT NULL AND NULLIF(LTRIM(RTRIM(@contacto)), '') IS NOT NULL
     BEGIN
         SET @contacto = LTRIM(RTRIM(@contacto));
-        IF LEN(@contacto) > 100
-            OR LEN(@contacto) - LEN(REPLACE(@contacto, '@', '')) <> 1
+        IF LEN(@contacto) - LEN(REPLACE(@contacto, '@', '')) <> 1
             OR @contacto NOT LIKE '_%@_%._%'
             OR @contacto LIKE '% %'
             OR @contacto LIKE '%[^a-zA-Z0-9@._%+-]%'
@@ -3115,6 +3150,8 @@ BEGIN
     SET NOCOUNT ON;
     DECLARE @nl CHAR(2) = CHAR(13) + CHAR(10);
     SET @errores = ISNULL(@errores, '');
+
+    SET @nombre = LTRIM(RTRIM(@nombre));
 
     IF @campania_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM publicidad.campania WHERE campania_id = @campania_id)
         SET @errores += '- No existe la campaña con id ' + CAST(@campania_id AS VARCHAR(12)) + '.' + @nl;
@@ -3441,16 +3478,17 @@ CREATE OR ALTER PROCEDURE publicidad.espacio_publicitario_validar
     @numero_espacio  INT,
     @pieza_id        INT,
     @orden_prioridad INT,
-    @errores         VARCHAR(2000) OUTPUT
+    @errores         VARCHAR(2000) OUTPUT,
+    @solo_datos      BIT = 0                         -- 1: el registro o su contexto no existen: sólo se validan los datos recibidos
 AS
 BEGIN
     SET NOCOUNT ON;
     DECLARE @nl CHAR(2) = CHAR(13) + CHAR(10);
     SET @errores = ISNULL(@errores, '');
 
-    IF NOT EXISTS (SELECT 1 FROM torneo.partido WHERE partido_id = @partido_id)
+    IF @solo_datos = 0 AND NOT EXISTS (SELECT 1 FROM torneo.partido WHERE partido_id = @partido_id)
         SET @errores += '- No existe el partido con id ' + ISNULL(CAST(@partido_id AS VARCHAR(12)), '(nulo)') + '.' + @nl;
-    IF @numero_espacio IS NULL OR @numero_espacio NOT BETWEEN 1 AND 4
+    IF @solo_datos = 0 AND (@numero_espacio IS NULL OR @numero_espacio NOT BETWEEN 1 AND 4)
         SET @errores += '- El número de espacio debe estar entre 1 y 4.' + @nl;
     IF EXISTS (SELECT 1 FROM publicidad.espacio_publicitario
                WHERE partido_id = @partido_id AND numero_espacio = @numero_espacio
@@ -3463,7 +3501,7 @@ BEGIN
     BEGIN
         IF NOT EXISTS (SELECT 1 FROM publicidad.pieza_publicitaria WHERE pieza_id = @pieza_id)
             SET @errores += '- No existe la pieza con id ' + CAST(@pieza_id AS VARCHAR(12)) + '.' + @nl;
-        ELSE IF NOT EXISTS (SELECT 1 FROM publicidad.pieza_publicitaria pz
+        ELSE IF @solo_datos = 0 AND NOT EXISTS (SELECT 1 FROM publicidad.pieza_publicitaria pz
                             JOIN publicidad.campania c ON c.campania_id = pz.campania_id
                             JOIN torneo.partido p      ON p.partido_id = @partido_id
                             WHERE pz.pieza_id = @pieza_id
@@ -3517,7 +3555,7 @@ CREATE OR ALTER PROCEDURE publicidad.espacio_publicitario_modificar
 AS
 BEGIN
     SET NOCOUNT ON;
-    DECLARE @errores VARCHAR(2000) = '', @nl CHAR(2) = CHAR(13) + CHAR(10),
+    DECLARE @errores VARCHAR(2000) = '', @solo_datos BIT, @nl CHAR(2) = CHAR(13) + CHAR(10),
             @partido_id INT, @numero_espacio INT, @pieza_actual INT, @facturado_actual BIT;
 
     SELECT @partido_id = partido_id, @numero_espacio = numero_espacio,
@@ -3526,9 +3564,11 @@ BEGIN
 
     IF @partido_id IS NULL
         SET @errores = '- No existe el espacio con id ' + ISNULL(CAST(@espacio_id AS VARCHAR(12)), '(nulo)') + '.' + @nl;
-    ELSE
-        EXEC publicidad.espacio_publicitario_validar @espacio_id, @partido_id, @numero_espacio, @pieza_id,
-             @orden_prioridad, @errores OUTPUT;
+    -- Aunque no exista, se validan los datos recibidos (sin lo que depende del registro).
+    SET @solo_datos = IIF(@partido_id IS NULL, 1, 0);
+    EXEC publicidad.espacio_publicitario_validar @espacio_id, @partido_id, @numero_espacio, @pieza_id,
+         @orden_prioridad, @errores OUTPUT,
+         @solo_datos = @solo_datos;
 
     IF @facturado_actual = 1 AND ISNULL(@pieza_id, 0) <> ISNULL(@pieza_actual, 0)
         SET @errores += '- El espacio ya fue facturado: no se puede cambiar la pieza exhibida.' + @nl;

@@ -9,15 +9,15 @@ resolvió cada punto y las decisiones de diseño que hay que poder defender en e
 |---|---|---|
 | 1 | Importar información masiva mediante SP | Un SP por fuente, ver "Datasets y APIs" |
 | 2 | Al menos dos datasets, en al menos dos formatos | **CSV**: `teams.csv` y `players.csv` (Kaggle). **JSON**: `worldcup.json` (openfootball) y wikitext de Wikipedia. **XML**: `tarifas_publicidad.xml` (tarifario comercial) |
-| 3 | Al menos uno obtenido por scraping, documentando técnica y página | Sedes, selecciones y planteles, scrapeados de Wikipedia en T-SQL (`entrega6_scraping.sql`) |
+| 3 | Al menos uno obtenido por scraping, documentando técnica y página | Sedes, selecciones y planteles, scrapeados de Wikipedia con Python (`entrega6_scraping.py`, que los guarda en `imports/scraping/`) e importados con los SP de la sección 6 de `entrega6_importacion.sql` |
 | 4 | Al menos dos APIs, documentando sus límites | Banco Mundial y Frankfurter (`entrega6_apis.sql`) |
 | 5 | Procesar los archivos tal cual se proveen | `teams.csv` y `players.csv` con `BULK INSERT`; `worldcup.json` y `tarifas_publicidad.xml` con `OPENROWSET(BULK ..., SINGLE_BLOB)` |
-| 6 | Descargar o scrapear en vivo durante la defensa | Los SP `scrapear_*` descargan y procesan la página en el momento |
+| 6 | Descargar o scrapear en vivo durante la defensa | `entrega6_scraping.py` descarga y procesa las páginas en el momento; las APIs se consultan en vivo desde T-SQL |
 | 7 | Upsert sin duplicados | Clave natural de cada fila + `EXISTS`, sin `MERGE`. Prueba 4.1: reimportar todo no inserta ni cambia nada |
 | 8 | Mantener el registro de la información histórica | Convocatorias (bajas con fecha y motivo), partidos finalizados, PBI por año, tipos de cambio por fecha, lotes y errores |
 | 9 | Usar los SP de la Entrega 5 | Sedes, selecciones, jugadores, convocatorias, cuerpo técnico, partidos, resultados, anunciantes, campañas y piezas publicitarias se dan de alta y se modifican con sus SP de la Entrega 5 |
 | 10 | Importar los registros correctos y reportar los que no | Cada fila en su propio `TRY...CATCH` y su propia transacción; las rechazadas quedan en `importacion.error` con el motivo |
-| 11 | El nombre del archivo es un parámetro | `@ruta_archivo` en los importadores de CSV, JSON y XML; `@pagina` en los de scraping |
+| 11 | El nombre del archivo es un parámetro | `@ruta_archivo` en todos los importadores (CSV, JSON, XML y los JSON de scraping); las páginas de Wikipedia, con `--pagina-torneo` y `--pagina-planteles` del script |
 | 12 | Errores con excepciones (`THROW`) | 50003 rechaza el archivo o la página entera; 50004 rechaza una fila por formato o datos incompletos; 50001/50002 vienen de los SP de la Entrega 5 |
 | 13 | Conversión de moneda en T-SQL | `publicidad.convertir_moneda` convierte a USD en T-SQL los montos de `tarifas_publicidad.xml` (EUR, MXN, BRL, GBP, CAD, JPY, KRW, AUD) usando `publicidad.tipo_cambio` |
 | 14 | Caso obligatorio "importación con errores parciales" | Pruebas 5.1 (`teams_con_errores.csv`), 5.2 (`players_con_errores.csv`), 5.3 (`worldcup_con_errores.json`) y 5.4 (`tarifas_con_errores.xml`) |
@@ -27,40 +27,48 @@ resolvió cada punto y las decisiones de diseño que hay que poder defender en e
 
 | Archivo | Orden | Contenido |
 |---|---|---|
-| `entrega6_importacion.sql` | 1° | Habilita `external rest endpoint enabled`; esquema `importacion` (lotes, errores, equivalencias de país); tablas de datos importados; vista `importacion.vw_ultimo_lote`; funciones `fn_pais_id` y `fn_seleccion_id`; datos de referencia (confederaciones y países); utilidades comunes (lectura CSV/JSON/XML y conversión de moneda); importadores de `teams.csv`, `players.csv`, `worldcup.json` y `tarifas_publicidad.xml` |
-| `entrega6_scraping.sql` | 2° | Scraping de Wikipedia en T-SQL: sedes, selecciones y planteles |
-| `entrega6_apis.sql` | 3° | Banco Mundial y Frankfurter |
-| `entrega6_test.sql` | 4° | Pruebas, con el resultado esperado de cada una y un resumen final |
+| `entrega6_importacion.sql` | 1° | Habilita `external rest endpoint enabled`; esquema `importacion` (lotes, errores, equivalencias de país); tablas de datos importados; vista `importacion.vw_ultimo_lote`; funciones `fn_pais_id` y `fn_seleccion_id`; datos de referencia (confederaciones y países); utilidades comunes (lectura CSV/JSON/XML y conversión de moneda); importadores de `teams.csv`, `players.csv`, `worldcup.json` y `tarifas_publicidad.xml`; importadores de los JSON del scraping (`torneo.importar_sedes`, `torneo.importar_selecciones` y `plantel.importar_planteles`) |
+| `entrega6_scraping.py` | antes de importar | Scraping de Wikipedia en Python (sólo biblioteca estándar): genera `imports/scraping/sedes.json`, `selecciones.json` y `planteles.json` |
+| `entrega6_apis.sql` | 2° | Banco Mundial y Frankfurter |
+| `entrega6_test.sql` | 3° | Pruebas: un lote por prueba, ejecutable solo (importa antes lo que necesite), y un resumen final |
 
-En `imports/`: `teams.csv` y `players.csv` (CSV de Kaggle, sin modificar), `worldcup.json` (JSON de openfootball con los 104 partidos y resultados), `tarifas_publicidad.xml` (XML del tarifario comercial en 9 monedas) y en `con_errores/` cuatro archivos con errores a propósito para las pruebas de importación parcial en cada dataset (`teams_con_errores.csv`, `players_con_errores.csv`, `worldcup_con_errores.json` y `tarifas_con_errores.xml`).
+En `imports/datasets/`: `teams.csv` y `players.csv` (CSV de Kaggle, sin modificar), `worldcup.json` (JSON de openfootball con los 104 partidos y resultados) y `tarifas_publicidad.xml` (XML del tarifario comercial en 9 monedas). En `imports/scraping/` los JSON que genera `entrega6_scraping.py` (`sedes.json`, `selecciones.json` y `planteles.json`) y en `imports/con_errores/` cinco archivos con errores a propósito para las pruebas de importación parcial (`teams_con_errores.csv`, `players_con_errores.csv`, `worldcup_con_errores.json`, `tarifas_con_errores.xml` y `sedes_con_errores.json`, con el formato de la salida del scraping).
 
 ### Cómo ejecutarlos
 
 1. Recrear la base con los tres scripts de creación de la Entrega 5 (`entrega5_db_definition.sql`,
    `entrega5_sp_ABM.sql`, `entrega5_sp_logica_negocio.sql`).
-2. Copiar `imports\` a una carpeta que pueda leer la cuenta del servicio de SQL Server (por defecto
-   `C:\mundial2026\imports\`; `C:\` y sus subcarpetas lo permiten). Si es otra, cambiarla en el
-   `sp_set_session_context` del comienzo de `entrega6_test.sql`.
-3. Ejecutar en SSMS en orden: `entrega6_importacion.sql`, `entrega6_scraping.sql`, `entrega6_apis.sql` y
-   `entrega6_test.sql`.
-4. El resumen final debe mostrar todas las pruebas en `OK`.
+2. Scrapear Wikipedia: `python3 src/entrega6/entrega6_scraping.py` (en Windows, `python`). Genera
+   `imports/scraping/*.json`.
+3. Copiar `imports\` (con `imports\datasets\`) a una carpeta que pueda leer la cuenta del servicio de SQL Server
+   (por defecto `C:\mundial2026\imports\`; `C:\` y sus subcarpetas lo permiten). Si es otra, cambiarla en el Lote 0
+   de `entrega6_test.sql`.
+4. Ejecutar en SSMS en orden: `entrega6_importacion.sql`, `entrega6_apis.sql` y `entrega6_test.sql`.
+5. El resumen final debe mostrar todas las pruebas en `OK`.
 
-Requisitos: SQL Server 2025 (17.x), por `sp_invoke_external_rest_endpoint`, `REGEXP_SUBSTR` y `STRING_SPLIT`
-con ordinal; conexión a internet; un login `sysadmin` la primera vez (habilita la opción de servidor y usa
-`BULK INSERT`).
+Requisitos: SQL Server 2025 (17.x), por `sp_invoke_external_rest_endpoint` y `STRING_SPLIT` con ordinal;
+Python 3.9 o superior (sin paquetes adicionales); conexión a internet; un login `sysadmin` la primera vez
+(habilita la opción de servidor y usa `BULK INSERT`).
+
+Con el contenedor de `sqlserver-docker/` (local, no versionado), `./entrega6.sh` scrapea, recrea la base y ejecuta
+las pruebas. SQL Server para Linux no admite `BULK INSERT ... CODEPAGE = '65001'`: ahí
+`importacion.archivo_cargar_csv` carga el CSV con `CODEPAGE = 'RAW'` en una copia de la tabla destino con columnas
+UTF-8 (`Latin1_General_100_CI_AI_SC_UTF8`) y de ésa lo pasa a la tabla destino, que convierte el texto a la
+intercalación de la base. En Windows se carga directo con `CODEPAGE = '65001'`.
 
 ### Defensa en vivo
 
 ```sql
 EXEC publicidad.consultar_api_frankfurter;             -- tipos de cambio (necesarios antes de tarifas XML)
 EXEC torneo.consultar_api_banco_mundial;               -- PBI per cápita
-EXEC torneo.scrapear_sedes;                            -- descarga y procesa Wikipedia en el momento
-EXEC torneo.scrapear_selecciones;
-EXEC plantel.scrapear_planteles;
-EXEC torneo.importar_estadisticas_equipos_kaggle_2026 'C:\mundial2026\imports\teams.csv';
-EXEC plantel.importar_estadisticas_jugadores_kaggle_2026 'C:\mundial2026\imports\players.csv';
-EXEC torneo.importar_fixture 'C:\mundial2026\imports\worldcup.json';
-EXEC publicidad.importar_tarifas 'C:\mundial2026\imports\tarifas_publicidad.xml';
+-- antes: python3 src/entrega6/entrega6_scraping.py  (descarga y procesa Wikipedia en el momento)
+EXEC torneo.importar_sedes 'C:\mundial2026\imports\scraping\sedes.json';
+EXEC torneo.importar_selecciones 'C:\mundial2026\imports\scraping\selecciones.json';
+EXEC plantel.importar_planteles 'C:\mundial2026\imports\scraping\planteles.json';
+EXEC torneo.importar_estadisticas_equipos_kaggle_2026 'C:\mundial2026\imports\datasets\teams.csv';
+EXEC plantel.importar_estadisticas_jugadores_kaggle_2026 'C:\mundial2026\imports\datasets\players.csv';
+EXEC torneo.importar_fixture 'C:\mundial2026\imports\datasets\worldcup.json';
+EXEC publicidad.importar_tarifas 'C:\mundial2026\imports\datasets\tarifas_publicidad.xml';
 SELECT * FROM importacion.vw_ultimo_lote;              -- resultado de cada importación
 SELECT * FROM importacion.error ORDER BY error_id DESC;
 ```
@@ -69,9 +77,9 @@ SELECT * FROM importacion.error ORDER BY error_id DESC;
 
 | Fuente | Formato | Importa | Destino en el modelo |
 |---|---|---|---|
-| Wikipedia, `https://en.wikipedia.org/wiki/2026_FIFA_World_Cup` (sección Venues) | JSON (wikitext) | `torneo.scrapear_sedes` | `torneo.sede` |
-| Wikipedia, `https://en.wikipedia.org/wiki/2026_FIFA_World_Cup` (Qualification y Tournament ranking) + `https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_squads` (grupos) | JSON (wikitext) | `torneo.scrapear_selecciones` | `torneo.seleccion`, `torneo.seleccion_estadistica` |
-| Wikipedia, `https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_squads` | JSON (wikitext) | `plantel.scrapear_planteles` | `plantel.jugador`, `plantel.convocatoria`, `plantel.cuerpo_tecnico` |
+| Wikipedia, `https://en.wikipedia.org/wiki/2026_FIFA_World_Cup` (sección Venues) | JSON (wikitext) → `scraping/sedes.json` | `torneo.importar_sedes` | `torneo.sede` |
+| Wikipedia, `https://en.wikipedia.org/wiki/2026_FIFA_World_Cup` (Qualification y Tournament ranking) + `https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_squads` (grupos) | JSON (wikitext) → `scraping/selecciones.json` | `torneo.importar_selecciones` | `torneo.seleccion`, `torneo.seleccion_estadistica` |
+| Wikipedia, `https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_squads` | JSON (wikitext) → `scraping/planteles.json` | `plantel.importar_planteles` | `plantel.jugador`, `plantel.convocatoria`, `plantel.cuerpo_tecnico` |
 | Kaggle (`https://www.kaggle.com/datasets/swaptr/fifa-wc-2026-matches`, `teams.csv`) | CSV | `torneo.importar_estadisticas_equipos_kaggle_2026` | `torneo.seleccion_estadistica_kaggle`, vinculada a `torneo.seleccion` |
 | Kaggle (`https://www.kaggle.com/datasets/swaptr/fifa-wc-2026-players`, `players.csv`) | CSV | `plantel.importar_estadisticas_jugadores_kaggle_2026` | `plantel.jugador_estadistica_kaggle`, vinculada a selección y jugador |
 | openfootball (`https://github.com/openfootball/worldcup.json`, `worldcup.json`) | JSON | `torneo.importar_fixture` | `torneo.partido` (104 partidos y resultados con alargue y penales) |
@@ -91,24 +99,25 @@ tarjetas) vinculadas por clave foránea a `torneo.seleccion` y `plantel.jugador`
 Límites de uso:
 
 - **API de MediaWiki** (`en.wikipedia.org/w/api.php`): sin clave. Pide un User-Agent identificable y no
-  hacer pedidos en paralelo; cada scraping hace una o dos llamadas.
+  hacer pedidos en paralelo; el script hace a lo sumo dos llamadas (una por página).
 - **Banco Mundial** (`api.worldbank.org/v2`): sin clave ni límite publicado; respuestas paginadas
   (`per_page` hasta 20000). Publica por país soberano: no hay datos de Inglaterra y Escocia por separado.
 - **Frankfurter**: sin clave ni límite publicado. Cotizaciones del Banco Central Europeo, sólo días hábiles
   y unas 30 monedas (no cotiza el peso argentino).
-- Las tres se consumen desde T-SQL con `sp_invoke_external_rest_endpoint`, que exige la opción de servidor
-  `external rest endpoint enabled` y sólo admite HTTPS.
+- Banco Mundial y Frankfurter se consumen desde T-SQL con `sp_invoke_external_rest_endpoint`, que exige la
+  opción de servidor `external rest endpoint enabled` y sólo admite HTTPS. MediaWiki, desde Python (`urllib`).
 
 ## Técnica de scraping
 
-Todo en T-SQL. `importacion.obtener_wikitext` pide a la API de MediaWiki el texto fuente de la página
-(`action=parse&prop=wikitext`), que llega dentro de un JSON. El texto se parte en líneas con `STRING_SPLIT`, se
-ubica cada sección por su encabezado (`==Venues==`, `===Tournament ranking===`, `==Group A==`,
-`===Argentina===`) y de cada línea se extraen los campos con `REGEXP_SUBSTR`:
+En Python (`src/entrega6/entrega6_scraping.py`, sólo biblioteca estándar). El script pide a la API de MediaWiki el
+texto fuente de cada página (`action=parse&prop=wikitext`), que llega dentro de un JSON. Lo parte en líneas, ubica
+cada sección por su encabezado (`==Venues==`, `===Tournament ranking===`, `==Group A==`, `===Argentina===`) y de
+cada línea extrae los campos con expresiones regulares:
 
 - **Sedes:** cada fila de la tabla de estadios empieza con `! ... {{#invoke:flag|icon|MEX}} [[Mexico City]]`;
-  la línea siguiente es el estadio y la tercera, la capacidad. La tabla no informa el huso: se calcula con
-  `AT TIME ZONE` (zonas horarias de Windows) para el 15/06/2026, según la zona de cada ciudad.
+  la línea siguiente es el estadio y la tercera, la capacidad. La tabla no informa el huso: se calcula para el
+  15/06/2026 con la zona horaria IANA de cada ciudad (`zoneinfo`; si el sistema no tiene la base de zonas,
+  desplazamientos fijos de junio de 2026).
 - **Selecciones:** la confederación sale de la sección de clasificados (`'''[[...|AFC]]'''` seguido de
   `* {{#invoke:flag|fb|AUS}}`). La tabla final sale de `|team_order=ESP, ARG, ...`, `|pos_MAR={{=}}7` (puestos
   compartidos) y `|win_ARG=7 |draw_ARG=0 |loss_ARG=1 |gf_ARG=19|ga_ARG=8`. El grupo, de la página de planteles.
@@ -116,12 +125,15 @@ ubica cada sección por su encabezado (`==Venues==`, `===Tournament ranking===`,
   Matej|age={{birth date and age2|...|2000|5|17}}|club=[[PSV Eindhoven]]|...}}`, y una línea `Coach: [[...]]`
   por selección.
 
-Las selecciones aparecen con su código FIFA (`GER`, `NED`, `KSA`) o con su nombre en inglés;
-`importacion.fn_pais_id` los traduce con `importacion.pais_equivalencia`.
+El resultado se guarda tal como figura en la página (texto UTF-8) en `imports/scraping/`: `sedes.json` (16 sedes),
+`selecciones.json` (48 selecciones y el grupo de cada una) y `planteles.json` (1248 jugadores y 48 directores
+técnicos). Si una página no existe o no trae la sección esperada, el script informa el error, no escribe ese
+archivo y termina con código 1.
 
-Cada `scrapear_*` abre el lote en `importacion.lote`, descarga la página en vivo con `importacion.obtener_wikitext` y
-procesa los registros en el mismo SP; si la página no existe o no trae la sección esperada, el lote queda registrado
-como `rechazado` (`THROW 50003`).
+Los SP de la sección 6 de `entrega6_importacion.sql` importan esos archivos: validan cada registro, traducen el país (las selecciones
+aparecen con su código FIFA, `GER`, `NED`, `KSA`, o con su nombre en inglés; `importacion.fn_pais_id` los traduce
+con `importacion.pais_equivalencia`), dividen nombre y apellido y dan de alta o modifican con los SP de la
+Entrega 5. Un archivo que no se puede leer o no trae el arreglo esperado deja el lote `rechazado` (`THROW 50003`).
 
 ## Norma común de los importadores
 
@@ -174,10 +186,11 @@ como `rechazado` (`THROW 50003`).
 
 ## Cambios respecto del boceto anterior (`HEAD` — `branch_eksztein`)
 
-- Se conserva la estructura original de tres archivos de creación (`entrega6_importacion.sql`,
+- Se conservaba la estructura original de tres archivos de creación (`entrega6_importacion.sql`,
   `entrega6_scraping.sql`, `entrega6_apis.sql`) y se agrega por separado el script de pruebas (`entrega6_test.sql`,
-  exigido por las pautas generales del TP).
-- Se conservan los dos datasets CSV de `imports/` (`teams.csv` y `players.csv` de Kaggle), agregando el importador
+  exigido por las pautas generales del TP). Desde el 27/10/2026 son dos: `entrega6_scraping.sql` se eliminó (ver
+  más abajo).
+- Se conservan los dos datasets CSV (en `imports/datasets/`) (`teams.csv` y `players.csv` de Kaggle), agregando el importador
   `torneo.importar_estadisticas_equipos_kaggle_2026` para `teams.csv` (que no tenía SP en el commit anterior) junto con
   `plantel.importar_estadisticas_jugadores_kaggle_2026` para `players.csv`, vinculando ambos con `torneo.seleccion` y
   `plantel.jugador`, registrando lote/errores y evitando `UPDATE` innecesarios cuando no hay cambios.
@@ -187,6 +200,12 @@ como `rechazado` (`THROW 50003`).
 - El scraping pasa a hacerse completo en T-SQL (`sp_invoke_external_rest_endpoint` + `REGEXP_SUBSTR`): el boceto de
   `entrega6_scraping.sql` sólo definía `torneo.importar_sedes_scraping` recibiendo `@datos_json` ya armado por
   parámetro y dejaba la descarga y el parseo afuera del motor.
+- **27/10/2026:** el scraping pasa a Python (`entrega6_scraping.py`), que guarda sedes, selecciones y planteles en
+  `imports/scraping/*.json`, con importadores para esos archivos
+  (`torneo.importar_sedes`, `torneo.importar_selecciones`, `plantel.importar_planteles`, con la ruta como parámetro)
+  y la misma lógica de validación y upsert; después se eliminó `entrega6_scraping.sql` y esos importadores pasaron a
+  la sección 6 de `entrega6_importacion.sql`. Las pruebas de `entrega6_test.sql` pasan a ser independientes entre sí,
+  cada una con su bloque de comentario `PRUEBA <id> - <qué prueba>`, y la carga de CSV funciona también en Linux.
 - Un único esquema `importacion` con una tabla de lotes (`importacion.lote`) y una de errores (`importacion.error`),
   en lugar de tres esquemas (`apis`, `scraping` e `importacion`) con tres tablas de error distintas y sin registro
   de lotes.
@@ -197,17 +216,23 @@ como `rechazado` (`THROW 50003`).
 
 ## Testing
 
-`entrega6_test.sql` necesita la base recién creada (si ya tiene selecciones, avisa y no ejecuta nada).
+`entrega6_test.sql` tiene un lote por prueba, encabezado por un bloque de comentario `PRUEBA <id> - <qué prueba>`
+(y cada parte, por uno `PARTE n`). Cada lote importa antes, si faltan, los datos que necesita
+(`#preparar`), así que se puede ejecutar solo (Lote 0 + el lote de la prueba) y repetir. Los conteos suponen la
+base sólo con datos importados.
 
 | Parte | Pruebas |
 |---|---|
 | 1. APIs | 1.1 Frankfurter del día (base USD); 1.2 Frankfurter histórico por fecha (`2025-06-11`); 1.3 PBI per cápita 2020-2025; 1.4 serie histórica 2015-2019 sin pisar el PBI vigente |
-| 2. Scraping | 2.1 sedes (16, 3 países, 4 husos); 2.2 selecciones (48 en 12 grupos, con tabla final); 2.3 planteles (26 convocados y DT por selección) |
+| 2. Scraping (`imports/scraping/*.json`) | 2.1 sedes (16, 3 países, 4 husos); 2.2 selecciones (48 en 12 grupos, con tabla final); 2.3 planteles (26 convocados y DT por selección) |
 | 3. Archivos (CSV, JSON, XML) | 3.1 `teams.csv`: 48 filas vinculadas a su selección; 3.2 `players.csv`: 1248 filas vinculadas a su selección y 1185 a su jugador; 3.3 `worldcup.json`: 104 partidos finalizados; 3.4 `tarifas_publicidad.xml`: 30 piezas convertidas a USD con las tasas reales de Frankfurter |
-| 4. Reimportación | 4.1 se repiten los 7 procesos (3 de scraping + 4 de archivos): ningún alta ni cambio, mismas filas |
-| 5. Errores | 5.1 `teams_con_errores.csv` (parcial CSV de equipos); 5.2 `players_con_errores.csv` (parcial CSV de jugadores); 5.3 `worldcup_con_errores.json` (parcial JSON, partido finalizado no se reescribe); 5.4 `tarifas_con_errores.xml` (parcial XML y validación 50001 de Entrega 5); 5.5 archivo inexistente; 5.6 página de Wikipedia inexistente y página sin planteles |
+| 4. Reimportación | 4.1 a 4.7: cada proceso (sedes, selecciones, planteles, teams, players, fixture y tarifas) importado dos veces: la segunda no da de alta ni modifica nada |
+| 5. Errores | 5.1 `teams_con_errores.csv`; 5.2 `players_con_errores.csv`; 5.3 `worldcup_con_errores.json` (un partido finalizado no se reescribe); 5.4 `tarifas_con_errores.xml` (y validación 50001 de Entrega 5); 5.5 `sedes_con_errores.json` (parcial con datos de scraping); 5.6 archivo inexistente; 5.7 archivo de scraping sin el arreglo esperado |
 
-Resultado verificado el 23/10/2026 en SQL Server 2025 Express (Windows 11), en SSMS: 18 pruebas en `OK`.
+El resumen final informa `TOTAL: n OK, m FALLO` y las pruebas sin resultado (no ejecutadas o cortadas por un error).
+Verificado el 27/10/2026 en SQL Server 2025 para Linux (contenedor): 25 pruebas en `OK` y 0 en `FALLO`, tanto con
+el script completo como ejecutando sola cada prueba de CSV (3.1, 3.2, 4.4, 4.5, 5.1 y 5.2). La versión anterior (scraping en T-SQL) se había verificado
+completa en SQL Server 2025 Express sobre Windows 11 el 23/10/2026.
 
 ## Pendientes
 
