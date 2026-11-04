@@ -138,3 +138,146 @@ BEGIN
     ORDER BY pa.nombre, Persona;
 END;
 GO
+
+
+-- ========================================================================================
+-- REPORTE 4: Designaciones arbitrales e historial disciplinario del árbitro.
+-- ========================================================================================
+CREATE OR ALTER PROCEDURE arbitraje.ReporteDesignacionesArbitrales
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT 
+        a.nombre + ' ' + a.apellido AS Arbitro,
+        pa.nombre AS Nacionalidad,
+        da.rol AS Rol_Asignado,
+        COUNT(DISTINCT da.partido_id) AS Partidos_Dirigidos,
+        ISNULL(SUM(CASE WHEN t.tipo = 'amarilla' THEN 1 ELSE 0 END), 0) AS Amarillas_Mostradas,
+        ISNULL(SUM(CASE WHEN t.tipo = 'roja' THEN 1 ELSE 0 END), 0) AS Rojas_Mostradas
+    FROM arbitraje.arbitro a
+    JOIN torneo.pais pa ON a.pais_id = pa.pais_id
+    JOIN arbitraje.designacion_arbitral da ON a.arbitro_id = da.arbitro_id
+    -- Left join a las tarjetas del partido donde este árbitro fue el 'principal'
+    LEFT JOIN evento.tarjeta t ON da.partido_id = t.partido_id AND da.rol = 'principal'
+    GROUP BY a.nombre, a.apellido, pa.nombre, da.rol
+    ORDER BY Partidos_Dirigidos DESC, Arbitro ASC;
+END;
+GO
+
+
+-- ========================================================================================
+-- REPORTE 5: Ocupación publicitaria e ingresos generados.
+-- ========================================================================================
+CREATE OR ALTER PROCEDURE publicidad.ReporteOcupacionPublicitaria
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT 
+        se.nombre AS Sede_Estadio,
+        p.fase AS Fase_Partido,
+        p.fecha_hora_local AS Fecha_Partido,
+        ep.numero_espacio AS Numero_Cartel,
+        ISNULL(an.nombre, 'ESPACIO VACÍO') AS Anunciante,
+        ISNULL(cp.nombre, '-') AS Campania,
+        CASE 
+            WHEN ep.facturado = 1 THEN 'Facturado' 
+            WHEN ep.pieza_id IS NOT NULL THEN 'Pendiente de Facturación' 
+            ELSE 'No Asignado' 
+        END AS Estado_Cobro,
+        ISNULL(ep.monto_facturado, 0) AS Ingreso_Generado
+    FROM torneo.partido p
+    JOIN torneo.sede se ON p.sede_id = se.sede_id
+    -- Usamos un JOIN estricto a los espacios (ya que son exactamente 4 por partido)
+    JOIN publicidad.espacio_publicitario ep ON p.partido_id = ep.partido_id
+    LEFT JOIN publicidad.pieza_publicitaria pz ON ep.pieza_id = pz.pieza_id
+    LEFT JOIN publicidad.campania cp ON pz.campania_id = cp.campania_id
+    LEFT JOIN publicidad.anunciante an ON cp.anunciante_id = an.anunciante_id
+    ORDER BY p.fecha_hora_local, se.nombre, ep.numero_espacio;
+END;
+GO
+
+
+-- ========================================================================================
+-- REPORTE 6 (PIVOT): Matriz de Prime Time. 
+-- ========================================================================================
+CREATE OR ALTER PROCEDURE torneo.ReporteMatrizPrimeTime
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Nota: Asumimos que los horarios están guardados en torneo.parametro (ej: 19 y 22 hs).
+    -- En la práctica, calculamos dinámicamente usando el DATETIMEOFFSET del partido y el huso del país.
+    
+    -- Usamos CTE para preparar los datos antes de pivotear.
+    WITH PrimeTimeData AS (
+        SELECT 
+            p.partido_id,
+            CONCAT(pa_local.nombre, ' vs ', pa_visitante.nombre) AS Encuentro,
+            mercado.codigo_iso AS Mercado_ISO,
+            -- Cálculo ultra-simplificado para el Pivot:
+            -- Toma la hora UTC del partido y le aplica el offset numérico del huso horario del mercado.
+            CASE 
+                WHEN DATEPART(HOUR, DATEADD(HOUR, CAST(REPLACE(mercado.huso_horario, 'UTC', '') AS INT), p.fecha_hora_utc)) BETWEEN 19 AND 23 
+                THEN 'SI' 
+                ELSE 'NO' 
+            END AS Es_PrimeTime
+        FROM torneo.partido p
+        JOIN torneo.seleccion sl ON p.seleccion_local_id = sl.seleccion_id
+        JOIN torneo.pais pa_local ON sl.pais_id = pa_local.pais_id
+        JOIN torneo.seleccion sv ON p.seleccion_visitante_id = sv.seleccion_id
+        JOIN torneo.pais pa_visitante ON sv.pais_id = pa_visitante.pais_id
+        -- Cross join con los países principales para evaluar su prime time
+        CROSS JOIN torneo.pais mercado 
+    )
+    SELECT 
+        Encuentro, 
+        [ARG] AS Argentina, 
+        [BRA] AS Brasil, 
+        [ESP] AS Espana, 
+        [MEX] AS Mexico,
+        [FRA] AS Francia
+    FROM PrimeTimeData
+    PIVOT (
+        MAX(Es_PrimeTime)
+        FOR Mercado_ISO IN ([ARG], [BRA], [ESP], [MEX], [FRA])
+    ) AS PivotTable
+    ORDER BY Encuentro;
+END;
+GO
+
+
+-- ========================================================================================
+-- REPORTE 7: Resultados de los encuentros.
+-- ========================================================================================
+CREATE OR ALTER PROCEDURE torneo.ReporteResultados
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT 
+        p.fase AS Fase,
+        p.fecha_hora_utc AS Fecha_UTC,
+        se.nombre + ' (' + se.ciudad + ')' AS Sede,
+        pa_local.nombre AS Equipo_Local,
+        CASE 
+            WHEN p.estado = 'programado' THEN ' vs '
+            WHEN p.estado = 'suspendido' THEN ' [SUSP] '
+            ELSE CAST(p.goles_local AS VARCHAR) + ' - ' + CAST(p.goles_visitante AS VARCHAR)
+        END AS Resultado,
+        pa_visitante.nombre AS Equipo_Visitante,
+        CASE 
+            WHEN p.penales_local IS NOT NULL THEN 
+                '(' + CAST(p.penales_local AS VARCHAR) + '-' + CAST(p.penales_visitante AS VARCHAR) + ' pen.)' 
+            ELSE '' 
+        END AS Penales
+    FROM torneo.partido p
+    JOIN torneo.seleccion sl ON p.seleccion_local_id = sl.seleccion_id
+    JOIN torneo.pais pa_local ON sl.pais_id = pa_local.pais_id
+    JOIN torneo.seleccion sv ON p.seleccion_visitante_id = sv.seleccion_id
+    JOIN torneo.pais pa_visitante ON sv.pais_id = pa_visitante.pais_id
+    JOIN torneo.sede se ON p.sede_id = se.sede_id
+    ORDER BY p.fecha_hora_utc ASC;
+END;
+GO
