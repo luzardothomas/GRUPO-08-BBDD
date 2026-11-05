@@ -15,8 +15,6 @@
 4. `entrega5_test_exitosos.sql` (sobre la base recién creada)
 5. `entrega5_test_fallidos.sql` (sobre la base recién creada: repetir antes los pasos 1 a 3)
 
-Con Docker (carpeta local `sqlserver-docker/`, no versionada): `./sqlserver-docker/entrega5.sh`.
-
 ### Entrega 6 (`src/entrega6/`)
 0. `python3 src/entrega6/entrega6_scraping.py` (scraping de Wikipedia → `imports/scraping/*.json`)
 1. `entrega6_importacion.sql`
