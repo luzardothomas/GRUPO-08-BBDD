@@ -5947,7 +5947,7 @@ GO
 PRINT '--- RESET 4/4: torneo.parametro vuelve a cargarse desde el CSV';
 DELETE FROM torneo.parametro;
 BULK INSERT torneo.parametro FROM 'C:\Users\luzar\Desktop\GRUPO-08-BBDD\src\entrega5\entrega5_datos_iniciales.csv'
-WITH (FORMAT = 'CSV', FIRSTROW = 2, FIELDTERMINATOR = ';', ROWTERMINATOR = '0x0a', CODEPAGE = '65001');
+WITH (FORMAT = 'CSV', FIRSTROW = 2, FIELDTERMINATOR = ';', ROWTERMINATOR = '0x0d0a', CODEPAGE = '65001');  -- el CSV tiene fin de línea CRLF
 -- SELECT clave, valor, descripcion FROM torneo.parametro ORDER BY clave;   -- 11 filas
 GO
 
