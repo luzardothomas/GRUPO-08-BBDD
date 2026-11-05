@@ -22,3 +22,9 @@ Con Docker (carpeta local `sqlserver-docker/`, no versionada): `./sqlserver-dock
 1. `entrega6_importacion.sql`
 2. `entrega6_apis.sql`
 3. `entrega6_test.sql`
+
+### Entrega 7 (`src/entrega7/`)
+Sobre la base recién creada con los pasos 1 a 3 de la Entrega 5 (sin ejecutar sus tests):
+1. `entrega7_carga_datos.sql` (juego de datos de la sección IV, cargado con los SP de la Entrega 5)
+2. `entrega7_reportes.sql`
+3. `entrega7_test_reportes.sql` (todas las pruebas deben imprimir `OK`)
