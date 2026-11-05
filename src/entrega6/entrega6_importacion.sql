@@ -273,13 +273,13 @@ IF OBJECT_ID('plantel.jugador_estadistica_kaggle', 'U') IS NULL
         club                   VARCHAR(120),
         partidos               INT,
         titularidades          INT,
-        minutos                NUMERIC(10,1),
-        goles                  NUMERIC(8,1),
-        asistencias            NUMERIC(8,1),
-        amarillas              NUMERIC(8,1),
-        rojas                  NUMERIC(8,1),
-        goles_penal            NUMERIC(8,1),
-        goles_en_contra        NUMERIC(8,1),
+        minutos                INT,
+        goles                  INT,
+        asistencias            INT,
+        amarillas              INT,
+        rojas                  INT,
+        goles_penal            INT,
+        goles_en_contra        INT,
         archivo_origen         VARCHAR(500) NOT NULL,
         importado_en           DATETIMEOFFSET NOT NULL DEFAULT SYSDATETIMEOFFSET(),
 
@@ -290,6 +290,23 @@ IF OBJECT_ID('plantel.jugador_estadistica_kaggle', 'U') IS NULL
         CONSTRAINT fk_jugador_estadistica_kaggle_jugador FOREIGN KEY (jugador_id)
             REFERENCES plantel.jugador (jugador_id)
     );
+GO
+
+-- Los conteos (minutos, goles, asistencias, tarjetas) son enteros. Una versión anterior de esta tabla los
+-- guardaba con un decimal (NUMERIC(x,1)) porque la fuente los publica como "10.0": si la tabla ya existe
+-- así, se convierten a INT (los valores existentes son todos enteros, sólo cambia cómo se guardan).
+
+IF EXISTS (SELECT 1 FROM sys.columns
+           WHERE object_id = OBJECT_ID('plantel.jugador_estadistica_kaggle') AND name = 'goles' AND system_type_id = 108)
+BEGIN
+    ALTER TABLE plantel.jugador_estadistica_kaggle ALTER COLUMN minutos INT NULL;
+    ALTER TABLE plantel.jugador_estadistica_kaggle ALTER COLUMN goles INT NULL;
+    ALTER TABLE plantel.jugador_estadistica_kaggle ALTER COLUMN asistencias INT NULL;
+    ALTER TABLE plantel.jugador_estadistica_kaggle ALTER COLUMN amarillas INT NULL;
+    ALTER TABLE plantel.jugador_estadistica_kaggle ALTER COLUMN rojas INT NULL;
+    ALTER TABLE plantel.jugador_estadistica_kaggle ALTER COLUMN goles_penal INT NULL;
+    ALTER TABLE plantel.jugador_estadistica_kaggle ALTER COLUMN goles_en_contra INT NULL;
+END;
 GO
 
 -- ============================================================
@@ -333,6 +350,18 @@ RETURNS INT
 AS
 BEGIN
     RETURN (SELECT seleccion_id FROM torneo.seleccion WHERE pais_id = importacion.fn_pais_id(@texto));
+END;
+GO
+
+-- Convierte un texto a entero. Acepta "10" y también "10.0" (la fuente publica los conteos como decimales
+-- con un cero), pero devuelve NULL si no es un número o si tiene parte decimal ("2.5" no es un entero).
+
+CREATE OR ALTER FUNCTION importacion.fn_entero (@texto VARCHAR(4000))
+RETURNS INT
+AS
+BEGIN
+    DECLARE @n NUMERIC(18,6) = TRY_CONVERT(NUMERIC(18,6), NULLIF(LTRIM(RTRIM(@texto)), ''));
+    RETURN IIF(@n = FLOOR(@n) AND ABS(@n) <= 2147483647, CONVERT(INT, @n), NULL);
 END;
 GO
 
@@ -946,20 +975,22 @@ BEGIN
            LEFT(NULLIF(posicion, ''), 10) AS posicion, TRY_CONVERT(INT, NULLIF(edad, '')) AS edad,
            TRY_CONVERT(INT, NULLIF(anio_nacimiento, '')) AS anio_nacimiento, LEFT(NULLIF(club, ''), 120) AS club,
            TRY_CONVERT(INT, NULLIF(partidos, '')) AS partidos, TRY_CONVERT(INT, NULLIF(titularidades, '')) AS titularidades,
-           TRY_CONVERT(NUMERIC(10,1), NULLIF(minutos, '')) AS minutos, TRY_CONVERT(NUMERIC(8,1), NULLIF(goles, '')) AS goles,
-           TRY_CONVERT(NUMERIC(8,1), NULLIF(asistencias, '')) AS asistencias,
-           TRY_CONVERT(NUMERIC(8,1), NULLIF(amarillas, '')) AS amarillas, TRY_CONVERT(NUMERIC(8,1), NULLIF(rojas, '')) AS rojas,
-           TRY_CONVERT(NUMERIC(8,1), NULLIF(goles_penal, '')) AS goles_penal,
-           TRY_CONVERT(NUMERIC(8,1), NULLIF(goles_en_contra, '')) AS goles_en_contra,
+           importacion.fn_entero(minutos) AS minutos, importacion.fn_entero(goles) AS goles,
+           importacion.fn_entero(asistencias) AS asistencias,
+           importacion.fn_entero(amarillas) AS amarillas, importacion.fn_entero(rojas) AS rojas,
+           importacion.fn_entero(goles_penal) AS goles_penal,
+           importacion.fn_entero(goles_en_contra) AS goles_en_contra,
            CASE WHEN (NULLIF(edad, '') IS NOT NULL AND TRY_CONVERT(INT, edad) IS NULL)
                   OR (NULLIF(anio_nacimiento, '') IS NOT NULL AND TRY_CONVERT(INT, anio_nacimiento) IS NULL)
                   OR (NULLIF(partidos, '') IS NOT NULL AND TRY_CONVERT(INT, partidos) IS NULL)
                   OR (NULLIF(titularidades, '') IS NOT NULL AND TRY_CONVERT(INT, titularidades) IS NULL)
-                  OR (NULLIF(minutos, '') IS NOT NULL AND TRY_CONVERT(NUMERIC(10,1), minutos) IS NULL)
-                  OR (NULLIF(goles, '') IS NOT NULL AND TRY_CONVERT(NUMERIC(8,1), goles) IS NULL)
-                  OR (NULLIF(asistencias, '') IS NOT NULL AND TRY_CONVERT(NUMERIC(8,1), asistencias) IS NULL)
-                  OR (NULLIF(amarillas, '') IS NOT NULL AND TRY_CONVERT(NUMERIC(8,1), amarillas) IS NULL)
-                  OR (NULLIF(rojas, '') IS NOT NULL AND TRY_CONVERT(NUMERIC(8,1), rojas) IS NULL)
+                  OR (NULLIF(minutos, '') IS NOT NULL AND importacion.fn_entero(minutos) IS NULL)
+                  OR (NULLIF(goles, '') IS NOT NULL AND importacion.fn_entero(goles) IS NULL)
+                  OR (NULLIF(asistencias, '') IS NOT NULL AND importacion.fn_entero(asistencias) IS NULL)
+                  OR (NULLIF(amarillas, '') IS NOT NULL AND importacion.fn_entero(amarillas) IS NULL)
+                  OR (NULLIF(rojas, '') IS NOT NULL AND importacion.fn_entero(rojas) IS NULL)
+                  OR (NULLIF(goles_penal, '') IS NOT NULL AND importacion.fn_entero(goles_penal) IS NULL)
+                  OR (NULLIF(goles_en_contra, '') IS NOT NULL AND importacion.fn_entero(goles_en_contra) IS NULL)
                 THEN 0 ELSE 1 END AS numeros_ok
     INTO #jugadores
     FROM #archivo;
@@ -978,7 +1009,7 @@ BEGIN
             IF @seleccion_id IS NULL
                 SET @errores += '- El país ''' + ISNULL(@pais_equipo, '') + ''' no tiene una selección registrada.' + @nl;
             IF EXISTS (SELECT 1 FROM #jugadores WHERE fila = @i AND numeros_ok = 0)
-                SET @errores += '- Uno o más datos numéricos tienen formato inválido.' + @nl;
+                SET @errores += '- Uno o más datos numéricos tienen formato inválido (minutos, goles, asistencias y tarjetas deben ser enteros).' + @nl;
             IF EXISTS (SELECT 1 FROM #jugadores WHERE fila = @i AND (edad < 0 OR partidos < 0 OR minutos < 0))
                 SET @errores += '- La edad, los partidos y los minutos no pueden ser negativos.' + @nl;
             IF @errores <> ''
