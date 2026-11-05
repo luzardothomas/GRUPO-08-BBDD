@@ -1,0 +1,12 @@
+clave;valor;descripcion
+"cambios_extra_alargue";1;"Cambios adicionales habilitados en tiempo suplementario"
+"cambios_max_reglamentarios";5;"Máximo de cambios por equipo en tiempo reglamentario"
+"convocatoria_max_jugadores";26;"Máximo de convocados vigentes por selección"
+"convocatoria_min_jugadores";23;"Mínimo de convocados vigentes exigido para presentar una formación"
+"formacion_max_suplentes";15;"Máximo de suplentes en el banco"
+"formacion_titulares";11;"Cantidad de titulares de una formación"
+"prime_time_hora_desde";19;"Hora local de inicio del prime time (incluida)"
+"prime_time_hora_hasta";23;"Hora local de fin del prime time (excluida)"
+"suspension_partidos_roja";1;"Partidos de suspensión por expulsión (roja directa o doble amarilla)"
+"ventanas_extra_alargue";1;"Ventanas adicionales habilitadas en tiempo suplementario"
+"ventanas_max_reglamentarias";3;"Máximo de ventanas de cambio por equipo en tiempo reglamentario"
