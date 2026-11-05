@@ -190,6 +190,11 @@ INSERT INTO #resultado SELECT '1.1', 'frankfurter: cotizaciones del día',
        CONCAT(insertados + actualizados + sin_cambios, ' cotizaciones')
 FROM importacion.vw_ultimo_lote WHERE proceso = 'publicidad.consultar_api_frankfurter';
 EXEC #informar '1.1';
+-- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
+-- SELECT TOP (1) lote_id, proceso, origen, leidos, insertados, actualizados, sin_cambios, rechazados, estado
+-- FROM importacion.lote WHERE proceso = 'publicidad.consultar_api_frankfurter' ORDER BY lote_id DESC;
+-- SELECT fecha, moneda_base, moneda_cotizada, tipo_cambio, fuente, importado_en FROM publicidad.tipo_cambio
+-- WHERE fecha = (SELECT MAX(fecha) FROM publicidad.tipo_cambio) ORDER BY moneda_cotizada;
 GO
 
 -- -------------------------------------------------------------------------------------
@@ -206,6 +211,11 @@ INSERT INTO #resultado SELECT '1.2', 'frankfurter: histórico por fecha sin pisa
        CONCAT(COUNT(DISTINCT fecha), ' fechas registradas')
 FROM publicidad.tipo_cambio;
 EXEC #informar '1.2';
+-- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
+-- SELECT TOP (1) lote_id, proceso, origen, leidos, insertados, actualizados, sin_cambios, rechazados, estado
+-- FROM importacion.lote WHERE proceso = 'publicidad.consultar_api_frankfurter' ORDER BY lote_id DESC;
+-- SELECT fecha, COUNT(*) AS monedas FROM publicidad.tipo_cambio GROUP BY fecha ORDER BY fecha;
+-- SELECT fecha, moneda_cotizada, tipo_cambio, importado_en FROM publicidad.tipo_cambio WHERE fecha = '2025-06-11' ORDER BY moneda_cotizada;
 GO
 
 -- -------------------------------------------------------------------------------------
@@ -223,6 +233,11 @@ INSERT INTO #resultado SELECT '1.3', 'banco mundial: PBI per cápita 2020-2025',
        CONCAT((SELECT COUNT(*) FROM torneo.pais WHERE pbi_per_capita > 0), ' países con PBI')
 FROM importacion.vw_ultimo_lote WHERE proceso = 'torneo.consultar_api_banco_mundial';
 EXEC #informar '1.3';
+-- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
+-- SELECT TOP (1) lote_id, proceso, origen, leidos, insertados, actualizados, sin_cambios, rechazados, estado
+-- FROM importacion.lote WHERE proceso = 'torneo.consultar_api_banco_mundial' ORDER BY lote_id DESC;
+-- SELECT p.codigo_iso, p.nombre, p.pbi_per_capita AS pbi_vigente FROM torneo.pais p WHERE p.pbi_per_capita IS NOT NULL ORDER BY p.pbi_per_capita DESC;
+-- SELECT anio, COUNT(*) AS paises FROM torneo.indicador_economico GROUP BY anio ORDER BY anio;
 GO
 
 -- -------------------------------------------------------------------------------------
@@ -243,6 +258,12 @@ INSERT INTO #resultado SELECT '1.4', 'banco mundial: histórico 2015-2019 sin pi
        CONCAT(l.insertados + l.actualizados + l.sin_cambios, ' indicadores históricos')
 FROM importacion.vw_ultimo_lote l WHERE l.proceso = 'torneo.consultar_api_banco_mundial';
 EXEC #informar '1.4';
+-- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
+-- SELECT TOP (1) lote_id, proceso, origen, leidos, insertados, actualizados, sin_cambios, rechazados, estado
+-- FROM importacion.lote WHERE proceso = 'torneo.consultar_api_banco_mundial' ORDER BY lote_id DESC;
+-- SELECT p.codigo_iso, i.anio, i.valor, i.importado_en FROM torneo.indicador_economico i JOIN torneo.pais p ON p.pais_id = i.pais_id
+-- WHERE i.anio <= 2019 ORDER BY p.codigo_iso, i.anio;
+-- SELECT p.codigo_iso, p.pbi_per_capita AS pbi_vigente_no_pisado FROM torneo.pais p WHERE p.pbi_per_capita IS NOT NULL ORDER BY p.codigo_iso;
 GO
 
 -- =====================================================================================
@@ -270,6 +291,11 @@ INSERT INTO #resultado SELECT '2.1', 'sedes: 16 sedes, 3 países, 4 husos',
        CONCAT(l.insertados, ' insertadas, ', l.actualizados, ' actualizadas, ', l.sin_cambios, ' sin cambios')
 FROM importacion.vw_ultimo_lote l WHERE l.proceso = 'torneo.importar_sedes';
 EXEC #informar '2.1';
+-- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
+-- SELECT TOP (1) lote_id, proceso, origen, leidos, insertados, actualizados, sin_cambios, rechazados, estado
+-- FROM importacion.lote WHERE proceso = 'torneo.importar_sedes' ORDER BY lote_id DESC;
+-- SELECT s.sede_id, s.nombre AS estadio, s.ciudad, p.codigo_iso AS pais, s.capacidad, s.huso_horario
+-- FROM torneo.sede s JOIN torneo.pais p ON p.pais_id = s.pais_id ORDER BY s.sede_id;
 GO
 
 -- -------------------------------------------------------------------------------------
@@ -298,6 +324,13 @@ INSERT INTO #resultado SELECT '2.2', 'selecciones: 48 en 12 grupos, con tabla fi
        CONCAT(l.insertados, ' insertadas, ', l.actualizados, ' actualizadas, ', l.sin_cambios, ' sin cambios')
 FROM importacion.vw_ultimo_lote l WHERE l.proceso = 'torneo.importar_selecciones';
 EXEC #informar '2.2';
+-- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
+-- SELECT TOP (1) lote_id, proceso, origen, leidos, insertados, actualizados, sin_cambios, rechazados, estado
+-- FROM importacion.lote WHERE proceso = 'torneo.importar_selecciones' ORDER BY lote_id DESC;
+-- SELECT s.seleccion_id, p.codigo_iso, p.nombre AS pais, c.nombre AS confederacion, s.grupo FROM torneo.seleccion s
+-- JOIN torneo.pais p ON p.pais_id = s.pais_id JOIN torneo.confederacion c ON c.confederacion_id = s.confederacion_id ORDER BY s.grupo, p.nombre;
+-- SELECT p.codigo_iso, e.posicion_final, e.partidos, e.ganados, e.empatados, e.perdidos, e.goles_a_favor, e.goles_en_contra, e.puntos, e.importado_en
+-- FROM torneo.seleccion_estadistica e JOIN torneo.seleccion s ON s.seleccion_id = e.seleccion_id JOIN torneo.pais p ON p.pais_id = s.pais_id ORDER BY e.posicion_final;
 GO
 
 -- -------------------------------------------------------------------------------------
@@ -322,6 +355,15 @@ INSERT INTO #resultado SELECT '2.3', 'planteles: 23+ convocados y DT en cada sel
        CONCAT(l.insertados, ' insertados, ', l.sin_cambios, ' sin cambios, ', l.rechazados, ' rechazados')
 FROM importacion.vw_ultimo_lote l WHERE l.proceso = 'plantel.importar_planteles';
 EXEC #informar '2.3';
+-- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
+-- SELECT TOP (1) lote_id, proceso, origen, leidos, insertados, actualizados, sin_cambios, rechazados, estado
+-- FROM importacion.lote WHERE proceso = 'plantel.importar_planteles' ORDER BY lote_id DESC;
+-- SELECT p.codigo_iso, p.nombre AS pais, COUNT(*) AS convocados_vigentes FROM plantel.convocatoria c
+-- JOIN torneo.seleccion s ON s.seleccion_id = c.seleccion_id JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE c.fecha_baja IS NULL GROUP BY p.codigo_iso, p.nombre ORDER BY p.codigo_iso;
+-- SELECT p.codigo_iso AS seleccion, c.dorsal, j.nombre, j.apellido, j.fecha_nacimiento, j.posicion_habitual, j.club_origen FROM plantel.convocatoria c
+-- JOIN plantel.jugador j ON j.jugador_id = c.jugador_id JOIN torneo.seleccion s ON s.seleccion_id = c.seleccion_id JOIN torneo.pais p ON p.pais_id = s.pais_id ORDER BY p.codigo_iso, c.dorsal;
+-- SELECT p.codigo_iso AS seleccion, ct.rol, ct.nombre, ct.apellido FROM plantel.cuerpo_tecnico ct
+-- JOIN torneo.seleccion s ON s.seleccion_id = ct.seleccion_id JOIN torneo.pais p ON p.pais_id = s.pais_id ORDER BY p.codigo_iso;
 GO
 
 -- =====================================================================================
@@ -348,6 +390,11 @@ INSERT INTO #resultado SELECT '3.1', 'kaggle teams.csv: 48 selecciones vinculada
        CONCAT(l.insertados + l.actualizados + l.sin_cambios, ' selecciones')
 FROM importacion.vw_ultimo_lote l WHERE l.proceso = 'torneo.importar_estadisticas_equipos_kaggle_2026';
 EXEC #informar '3.1';
+-- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
+-- SELECT TOP (1) lote_id, proceso, origen, leidos, insertados, actualizados, sin_cambios, rechazados, estado
+-- FROM importacion.lote WHERE proceso = 'torneo.importar_estadisticas_equipos_kaggle_2026' ORDER BY lote_id DESC;
+-- SELECT p.codigo_iso, k.pais_equipo, k.jugadores_usados, k.edad_promedio, k.posesion, k.partidos, k.goles, k.asistencias, k.amarillas, k.rojas, k.archivo_origen, k.importado_en
+-- FROM torneo.seleccion_estadistica_kaggle k JOIN torneo.seleccion s ON s.seleccion_id = k.seleccion_id JOIN torneo.pais p ON p.pais_id = s.pais_id ORDER BY p.codigo_iso;
 GO
 
 -- -------------------------------------------------------------------------------------
@@ -370,6 +417,11 @@ INSERT INTO #resultado SELECT '3.2', 'kaggle players.csv: estadísticas vinculad
        CONCAT((SELECT COUNT(jugador_id) FROM plantel.jugador_estadistica_kaggle), ' de 1248 vinculadas a un jugador')
 FROM importacion.vw_ultimo_lote l WHERE l.proceso = 'plantel.importar_estadisticas_jugadores_kaggle_2026';
 EXEC #informar '3.2';
+-- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
+-- SELECT TOP (1) lote_id, proceso, origen, leidos, insertados, actualizados, sin_cambios, rechazados, estado
+-- FROM importacion.lote WHERE proceso = 'plantel.importar_estadisticas_jugadores_kaggle_2026' ORDER BY lote_id DESC;
+-- SELECT e.jugador, e.pais_equipo, e.jugador_id, e.partidos, e.minutos, e.goles, e.asistencias, e.archivo_origen, e.importado_en
+-- FROM plantel.jugador_estadistica_kaggle e ORDER BY e.pais_equipo, e.jugador;
 GO
 
 -- -------------------------------------------------------------------------------------
@@ -397,6 +449,13 @@ INSERT INTO #resultado SELECT '3.3', 'fixture worldcup.json: 104 partidos finali
        CONCAT(l.insertados + l.actualizados + l.sin_cambios, ' partidos')
 FROM importacion.vw_ultimo_lote l WHERE l.proceso = 'torneo.importar_fixture';
 EXEC #informar '3.3';
+-- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
+-- SELECT TOP (1) lote_id, proceso, origen, leidos, insertados, actualizados, sin_cambios, rechazados, estado
+-- FROM importacion.lote WHERE proceso = 'torneo.importar_fixture' ORDER BY lote_id DESC;
+-- SELECT pa.partido_id, pa.fase, pa.fecha_hora_utc, pl.codigo_iso AS local, pv.codigo_iso AS visitante, pa.goles_local, pa.goles_visitante, pa.estado, se.nombre AS sede
+-- FROM torneo.partido pa JOIN torneo.seleccion sl ON sl.seleccion_id = pa.seleccion_local_id JOIN torneo.pais pl ON pl.pais_id = sl.pais_id
+-- JOIN torneo.seleccion sv ON sv.seleccion_id = pa.seleccion_visitante_id JOIN torneo.pais pv ON pv.pais_id = sv.pais_id
+-- JOIN torneo.sede se ON se.sede_id = pa.sede_id ORDER BY pa.fecha_hora_utc, pa.partido_id;
 GO
 
 -- -------------------------------------------------------------------------------------
@@ -427,6 +486,12 @@ INSERT INTO #resultado SELECT '3.4', 'tarifas XML: 30 piezas convertidas a USD',
        CONCAT('30 piezas, ESP = USD ', @esperado)
 FROM importacion.vw_ultimo_lote l WHERE l.proceso = 'publicidad.importar_tarifas';
 EXEC #informar '3.4';
+-- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
+-- SELECT TOP (1) lote_id, proceso, origen, leidos, insertados, actualizados, sin_cambios, rechazados, estado
+-- FROM importacion.lote WHERE proceso = 'publicidad.importar_tarifas' ORDER BY lote_id DESC;
+-- SELECT a.nombre AS anunciante, c.nombre AS campania, c.fecha_inicio, c.fecha_fin, p.codigo_iso AS mercado, pz.idioma, pz.costo_tarifa AS tarifa_usd
+-- FROM publicidad.pieza_publicitaria pz JOIN publicidad.campania c ON c.campania_id = pz.campania_id JOIN publicidad.anunciante a ON a.anunciante_id = c.anunciante_id
+-- JOIN torneo.pais p ON p.pais_id = pz.pais_mercado_id ORDER BY a.nombre, c.nombre, p.codigo_iso;
 GO
 
 -- =====================================================================================
@@ -455,6 +520,10 @@ INSERT INTO #resultado SELECT '4.1', 'reimportación de sedes: sin altas ni camb
        CONCAT(l.sin_cambios, ' sin cambios; filas: ', @antes, ' -> ', (SELECT COUNT(*) FROM torneo.sede))
 FROM importacion.vw_ultimo_lote l WHERE l.proceso = 'torneo.importar_sedes';
 EXEC #informar '4.1';
+-- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
+-- SELECT TOP (2) lote_id, proceso, origen, leidos, insertados, actualizados, sin_cambios, rechazados, estado
+-- FROM importacion.lote WHERE proceso = 'torneo.importar_sedes' ORDER BY lote_id DESC;
+-- SELECT COUNT(*) AS sedes, (SELECT COUNT(*) FROM (SELECT nombre FROM torneo.sede GROUP BY nombre HAVING COUNT(*) > 1) x) AS sedes_repetidas FROM torneo.sede;
 GO
 
 -- -------------------------------------------------------------------------------------
@@ -474,6 +543,10 @@ INSERT INTO #resultado SELECT '4.2', 'reimportación de selecciones: sin altas n
        CONCAT(l.sin_cambios, ' sin cambios; filas: ', @antes, ' -> ', (SELECT COUNT(*) FROM torneo.seleccion))
 FROM importacion.vw_ultimo_lote l WHERE l.proceso = 'torneo.importar_selecciones';
 EXEC #informar '4.2';
+-- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
+-- SELECT TOP (2) lote_id, proceso, origen, leidos, insertados, actualizados, sin_cambios, rechazados, estado
+-- FROM importacion.lote WHERE proceso = 'torneo.importar_selecciones' ORDER BY lote_id DESC;
+-- SELECT COUNT(*) AS selecciones, (SELECT COUNT(*) FROM (SELECT pais_id FROM torneo.seleccion GROUP BY pais_id HAVING COUNT(*) > 1) x) AS repetidas FROM torneo.seleccion;
 GO
 
 -- -------------------------------------------------------------------------------------
@@ -496,6 +569,10 @@ INSERT INTO #resultado SELECT '4.3', 'reimportación de planteles: sin altas, ba
        CONCAT(l.sin_cambios, ' sin cambios; jugadores/convocatorias/DT: ', @antes)
 FROM importacion.vw_ultimo_lote l WHERE l.proceso = 'plantel.importar_planteles';
 EXEC #informar '4.3';
+-- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
+-- SELECT TOP (2) lote_id, proceso, origen, leidos, insertados, actualizados, sin_cambios, rechazados, estado
+-- FROM importacion.lote WHERE proceso = 'plantel.importar_planteles' ORDER BY lote_id DESC;
+-- SELECT (SELECT COUNT(*) FROM plantel.jugador) AS jugadores, (SELECT COUNT(*) FROM plantel.convocatoria) AS convocatorias, (SELECT COUNT(*) FROM plantel.cuerpo_tecnico) AS cuerpo_tecnico;
 GO
 
 -- -------------------------------------------------------------------------------------
@@ -516,6 +593,10 @@ INSERT INTO #resultado SELECT '4.4', 'reimportación de teams.csv: sin altas ni 
        CONCAT(l.sin_cambios, ' sin cambios; filas: ', @antes, ' -> ', (SELECT COUNT(*) FROM torneo.seleccion_estadistica_kaggle))
 FROM importacion.vw_ultimo_lote l WHERE l.proceso = 'torneo.importar_estadisticas_equipos_kaggle_2026';
 EXEC #informar '4.4';
+-- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
+-- SELECT TOP (2) lote_id, proceso, origen, leidos, insertados, actualizados, sin_cambios, rechazados, estado
+-- FROM importacion.lote WHERE proceso = 'torneo.importar_estadisticas_equipos_kaggle_2026' ORDER BY lote_id DESC;
+-- SELECT COUNT(*) AS filas FROM torneo.seleccion_estadistica_kaggle;
 GO
 
 -- -------------------------------------------------------------------------------------
@@ -536,6 +617,10 @@ INSERT INTO #resultado SELECT '4.5', 'reimportación de players.csv: sin altas n
        CONCAT(l.sin_cambios, ' sin cambios; filas: ', @antes, ' -> ', (SELECT COUNT(*) FROM plantel.jugador_estadistica_kaggle))
 FROM importacion.vw_ultimo_lote l WHERE l.proceso = 'plantel.importar_estadisticas_jugadores_kaggle_2026';
 EXEC #informar '4.5';
+-- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
+-- SELECT TOP (2) lote_id, proceso, origen, leidos, insertados, actualizados, sin_cambios, rechazados, estado
+-- FROM importacion.lote WHERE proceso = 'plantel.importar_estadisticas_jugadores_kaggle_2026' ORDER BY lote_id DESC;
+-- SELECT COUNT(*) AS filas FROM plantel.jugador_estadistica_kaggle;
 GO
 
 -- -------------------------------------------------------------------------------------
@@ -557,6 +642,10 @@ INSERT INTO #resultado SELECT '4.6', 'reimportación de worldcup.json: sin altas
        CONCAT(l.sin_cambios, ' sin cambios; filas: ', @antes, ' -> ', (SELECT COUNT(*) FROM torneo.partido))
 FROM importacion.vw_ultimo_lote l WHERE l.proceso = 'torneo.importar_fixture';
 EXEC #informar '4.6';
+-- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
+-- SELECT TOP (2) lote_id, proceso, origen, leidos, insertados, actualizados, sin_cambios, rechazados, estado
+-- FROM importacion.lote WHERE proceso = 'torneo.importar_fixture' ORDER BY lote_id DESC;
+-- SELECT COUNT(*) AS partidos FROM torneo.partido;
 GO
 
 -- -------------------------------------------------------------------------------------
@@ -577,6 +666,10 @@ INSERT INTO #resultado SELECT '4.7', 'reimportación de tarifas XML: sin altas n
        CONCAT(l.sin_cambios, ' sin cambios; filas: ', @antes, ' -> ', (SELECT COUNT(*) FROM publicidad.pieza_publicitaria))
 FROM importacion.vw_ultimo_lote l WHERE l.proceso = 'publicidad.importar_tarifas';
 EXEC #informar '4.7';
+-- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
+-- SELECT TOP (2) lote_id, proceso, origen, leidos, insertados, actualizados, sin_cambios, rechazados, estado
+-- FROM importacion.lote WHERE proceso = 'publicidad.importar_tarifas' ORDER BY lote_id DESC;
+-- SELECT (SELECT COUNT(*) FROM publicidad.anunciante) AS anunciantes, (SELECT COUNT(*) FROM publicidad.campania) AS campanias, (SELECT COUNT(*) FROM publicidad.pieza_publicitaria) AS piezas;
 GO
 
 -- =====================================================================================
@@ -608,6 +701,13 @@ INSERT INTO #resultado SELECT '5.1', 'kaggle teams CSV: importación parcial',
        CONCAT(l.actualizados, ' actualizada, ', l.sin_cambios, ' sin cambios, ', l.rechazados, ' rechazadas')
 FROM importacion.vw_ultimo_lote l WHERE l.proceso = 'torneo.importar_estadisticas_equipos_kaggle_2026';
 EXEC #informar '5.1';
+-- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
+-- SELECT TOP (1) lote_id, proceso, origen, leidos, insertados, actualizados, sin_cambios, rechazados, estado
+-- FROM importacion.lote WHERE proceso = 'torneo.importar_estadisticas_equipos_kaggle_2026' ORDER BY lote_id DESC;
+-- SELECT e.fila, e.registro, e.numero_error, e.motivo FROM importacion.error e
+-- WHERE e.lote_id = (SELECT MAX(lote_id) FROM importacion.lote WHERE proceso = 'torneo.importar_estadisticas_equipos_kaggle_2026') ORDER BY e.fila;
+-- SELECT p.codigo_iso, k.pais_equipo, k.goles, k.archivo_origen, k.importado_en FROM torneo.seleccion_estadistica_kaggle k
+-- JOIN torneo.seleccion s ON s.seleccion_id = k.seleccion_id JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE k.archivo_origen LIKE '%con_errores%' ORDER BY p.codigo_iso;
 GO
 
 -- -------------------------------------------------------------------------------------
@@ -633,6 +733,12 @@ INSERT INTO #resultado SELECT '5.2', 'kaggle players CSV: importación parcial',
        CONCAT(l.actualizados, ' actualizada, ', l.sin_cambios, ' sin cambios, ', l.rechazados, ' rechazadas')
 FROM importacion.vw_ultimo_lote l WHERE l.proceso = 'plantel.importar_estadisticas_jugadores_kaggle_2026';
 EXEC #informar '5.2';
+-- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
+-- SELECT TOP (1) lote_id, proceso, origen, leidos, insertados, actualizados, sin_cambios, rechazados, estado
+-- FROM importacion.lote WHERE proceso = 'plantel.importar_estadisticas_jugadores_kaggle_2026' ORDER BY lote_id DESC;
+-- SELECT e.fila, e.registro, e.numero_error, e.motivo FROM importacion.error e
+-- WHERE e.lote_id = (SELECT MAX(lote_id) FROM importacion.lote WHERE proceso = 'plantel.importar_estadisticas_jugadores_kaggle_2026') ORDER BY e.fila;
+-- SELECT e.jugador, e.pais_equipo, e.goles, e.archivo_origen, e.importado_en FROM plantel.jugador_estadistica_kaggle e WHERE e.archivo_origen LIKE '%con_errores%' ORDER BY e.jugador;
 GO
 
 -- -------------------------------------------------------------------------------------
@@ -657,6 +763,12 @@ INSERT INTO #resultado SELECT '5.3', 'fixture JSON: importación parcial, finali
        CONCAT(l.sin_cambios, ' sin cambios, ', l.rechazados, ' rechazados')
 FROM importacion.vw_ultimo_lote l WHERE l.proceso = 'torneo.importar_fixture';
 EXEC #informar '5.3';
+-- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
+-- SELECT TOP (1) lote_id, proceso, origen, leidos, insertados, actualizados, sin_cambios, rechazados, estado
+-- FROM importacion.lote WHERE proceso = 'torneo.importar_fixture' ORDER BY lote_id DESC;
+-- SELECT e.fila, e.registro, e.numero_error, e.motivo FROM importacion.error e
+-- WHERE e.lote_id = (SELECT MAX(lote_id) FROM importacion.lote WHERE proceso = 'torneo.importar_fixture') ORDER BY e.fila;
+-- SELECT estado, COUNT(*) AS partidos FROM torneo.partido GROUP BY estado ORDER BY estado;
 GO
 
 -- -------------------------------------------------------------------------------------
@@ -680,6 +792,13 @@ INSERT INTO #resultado SELECT '5.4', 'tarifas XML: importación parcial y valida
        CONCAT(l.insertados + l.sin_cambios, ' registrada, ', l.rechazados, ' rechazadas')
 FROM importacion.vw_ultimo_lote l WHERE l.proceso = 'publicidad.importar_tarifas';
 EXEC #informar '5.4';
+-- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
+-- SELECT TOP (1) lote_id, proceso, origen, leidos, insertados, actualizados, sin_cambios, rechazados, estado
+-- FROM importacion.lote WHERE proceso = 'publicidad.importar_tarifas' ORDER BY lote_id DESC;
+-- SELECT e.fila, e.registro, e.numero_error, e.motivo FROM importacion.error e
+-- WHERE e.lote_id = (SELECT MAX(lote_id) FROM importacion.lote WHERE proceso = 'publicidad.importar_tarifas') ORDER BY e.fila;
+-- SELECT TOP (5) a.nombre AS anunciante, c.nombre AS campania, p.codigo_iso AS mercado, pz.costo_tarifa AS tarifa_usd FROM publicidad.pieza_publicitaria pz
+-- JOIN publicidad.campania c ON c.campania_id = pz.campania_id JOIN publicidad.anunciante a ON a.anunciante_id = c.anunciante_id JOIN torneo.pais p ON p.pais_id = pz.pais_mercado_id ORDER BY pz.pieza_id DESC;
 GO
 
 -- -------------------------------------------------------------------------------------
@@ -703,6 +822,13 @@ INSERT INTO #resultado SELECT '5.5', 'sedes de scraping: importación parcial',
        CONCAT(l.actualizados, ' actualizada, ', l.sin_cambios, ' sin cambios, ', l.rechazados, ' rechazadas')
 FROM importacion.vw_ultimo_lote l WHERE l.proceso = 'torneo.importar_sedes';
 EXEC #informar '5.5';
+-- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
+-- SELECT TOP (1) lote_id, proceso, origen, leidos, insertados, actualizados, sin_cambios, rechazados, estado
+-- FROM importacion.lote WHERE proceso = 'torneo.importar_sedes' ORDER BY lote_id DESC;
+-- SELECT e.fila, e.registro, e.numero_error, e.motivo FROM importacion.error e
+-- WHERE e.lote_id = (SELECT MAX(lote_id) FROM importacion.lote WHERE proceso = 'torneo.importar_sedes') ORDER BY e.fila;
+-- SELECT s.sede_id, s.nombre AS estadio, s.ciudad, p.codigo_iso AS pais, s.capacidad, s.huso_horario
+-- FROM torneo.sede s JOIN torneo.pais p ON p.pais_id = s.pais_id ORDER BY s.sede_id;
 GO
 
 -- -------------------------------------------------------------------------------------
@@ -726,6 +852,11 @@ BEGIN CATCH
     FROM importacion.vw_ultimo_lote l WHERE l.proceso = 'plantel.importar_estadisticas_jugadores_kaggle_2026';
 END CATCH;
 EXEC #informar '5.6';
+-- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
+-- SELECT TOP (1) lote_id, proceso, origen, leidos, insertados, actualizados, sin_cambios, rechazados, estado
+-- FROM importacion.lote WHERE proceso = 'plantel.importar_estadisticas_jugadores_kaggle_2026' ORDER BY lote_id DESC;
+-- SELECT e.fila, e.registro, e.numero_error, e.motivo FROM importacion.error e
+-- WHERE e.lote_id = (SELECT MAX(lote_id) FROM importacion.lote WHERE proceso = 'plantel.importar_estadisticas_jugadores_kaggle_2026') ORDER BY e.fila;
 GO
 
 -- -------------------------------------------------------------------------------------
@@ -748,6 +879,11 @@ BEGIN CATCH
     FROM importacion.vw_ultimo_lote l WHERE l.proceso = 'plantel.importar_planteles';
 END CATCH;
 EXEC #informar '5.7';
+-- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
+-- SELECT TOP (1) lote_id, proceso, origen, leidos, insertados, actualizados, sin_cambios, rechazados, estado
+-- FROM importacion.lote WHERE proceso = 'plantel.importar_planteles' ORDER BY lote_id DESC;
+-- SELECT e.fila, e.registro, e.numero_error, e.motivo FROM importacion.error e
+-- WHERE e.lote_id = (SELECT MAX(lote_id) FROM importacion.lote WHERE proceso = 'plantel.importar_planteles') ORDER BY e.fila;
 GO
 
 -- =====================================================================================

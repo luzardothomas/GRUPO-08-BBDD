@@ -45,10 +45,11 @@ GO
 -- =============================================================
 
 -- Collation CI_AI: ignora mayúsculas/minúsculas y acentos (favorece la deduplicación en
--- importaciones, ej. 'Peru' = 'Perú'). Code page 1252: soporta acentos de Europa occidental.
+-- importaciones, ej. 'Peru' = 'Perú'). Variante UTF8 (_SC_UTF8): los VARCHAR guardan Unicode completo, así
+-- no se pierden caracteres de nombres de jugadores y clubes (ej. 'Győr', 'Đorđe') al importar.
 
 CREATE DATABASE mundial_2026
-    COLLATE Latin1_General_CI_AI;
+    COLLATE Latin1_General_100_CI_AI_SC_UTF8;
 GO
 
 -- Tamaño y crecimiento fijos (no porcentuales): volumen estimado ~1GB, con picos de
