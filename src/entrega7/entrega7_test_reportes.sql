@@ -56,11 +56,11 @@ EXEC evento.reporte_goleadores @resultado = @x OUTPUT;
 
 -- Resumen de lo que devolvió el XML (una fila por prueba, para distinguir cada ejecución).
 SELECT 'R1.1 completo' AS Prueba, @x.value('count(/goleadores/torneo/goleador)', 'INT') AS Goleadores_listados,
-       @x.value('sum(/goleadores/torneo/goleador/@goles)', 'INT') AS Goles_validos,
+       CAST(@x.value('sum(/goleadores/torneo/goleador/@goles)', 'FLOAT') AS INT) AS Goles_validos,
        @x.value('count(/goleadores/por_seleccion/seleccion)', 'INT') AS Selecciones,
        @x.value('count(/goleadores/por_fase/fase)', 'INT') AS Fases;
 
-IF @x.value('sum(/goleadores/torneo/goleador/@goles)', 'INT') = 73
+IF CAST(@x.value('sum(/goleadores/torneo/goleador/@goles)', 'FLOAT') AS INT) = 73
    AND @x.value('count(/goleadores/torneo/goleador[@puesto = 1])', 'INT') = 3
    AND @x.value('(/goleadores/por_seleccion/seleccion/@pais)[1]', 'VARCHAR(80)') = 'Francia'
    AND @x.value('(/goleadores/por_seleccion/seleccion/@goles)[1]', 'INT') = 11
@@ -82,11 +82,11 @@ DECLARE @x XML, @arg INT = (SELECT s.seleccion_id FROM torneo.seleccion s
 EXEC evento.reporte_goleadores @seleccion_id = @arg, @resultado = @x OUTPUT;
 
 SELECT 'R1.2 solo Argentina' AS Prueba, @x.value('count(/goleadores/torneo/goleador)', 'INT') AS Goleadores_listados,
-       @x.value('sum(/goleadores/torneo/goleador/@goles)', 'INT') AS Goles_validos,
+       CAST(@x.value('sum(/goleadores/torneo/goleador/@goles)', 'FLOAT') AS INT) AS Goles_validos,
        @x.value('count(/goleadores/por_seleccion/seleccion)', 'INT') AS Selecciones,
        @x.value('count(/goleadores/por_fase/fase)', 'INT') AS Fases;
 
-IF @x.value('sum(/goleadores/torneo/goleador/@goles)', 'INT') = 10
+IF CAST(@x.value('sum(/goleadores/torneo/goleador/@goles)', 'FLOAT') AS INT) = 10
    AND @x.value('count(/goleadores/por_seleccion/seleccion)', 'INT') = 1
    AND @x.value('count(/goleadores/torneo/goleador[@seleccion != "Argentina"])', 'INT') = 0
     PRINT 'OK - sólo Argentina, 10 goles.';
@@ -102,11 +102,11 @@ DECLARE @x XML;
 EXEC evento.reporte_goleadores @fase = 'semifinal', @resultado = @x OUTPUT;
 
 SELECT 'R1.3 solo semifinal' AS Prueba, @x.value('count(/goleadores/torneo/goleador)', 'INT') AS Goleadores_listados,
-       @x.value('sum(/goleadores/torneo/goleador/@goles)', 'INT') AS Goles_validos,
+       CAST(@x.value('sum(/goleadores/torneo/goleador/@goles)', 'FLOAT') AS INT) AS Goles_validos,
        @x.value('count(/goleadores/por_seleccion/seleccion)', 'INT') AS Selecciones,
        @x.value('count(/goleadores/por_fase/fase)', 'INT') AS Fases;
 
-IF @x.value('sum(/goleadores/torneo/goleador/@goles)', 'INT') = 8
+IF CAST(@x.value('sum(/goleadores/torneo/goleador/@goles)', 'FLOAT') AS INT) = 8
    AND @x.value('count(/goleadores/por_fase/fase)', 'INT') = 1
     PRINT 'OK - 8 goles en semifinales.';
 ELSE
@@ -216,8 +216,20 @@ JOIN plantel.formacion_jugador fj ON fj.formacion_id = f.formacion_id AND fj.tit
 JOIN plantel.jugador j            ON j.jugador_id = fj.jugador_id
 WHERE pl.codigo_iso = 'MAR' AND pv.codigo_iso = 'ARG' AND p.fase = 'grupos';
 
--- Evidencia: la lista de titulares (se muestra siempre) y su verificación.
-SELECT dorsal AS Dorsal, jugador AS Jugador, posicion AS Posicion FROM @titulares ORDER BY dorsal;
+-- Evidencia: la lista de titulares. Si no hay filas, la grilla lo dice en lugar de quedar muda, y el mensaje FALLO da la causa.
+IF EXISTS (SELECT 1 FROM @titulares)
+    SELECT dorsal AS Dorsal, jugador AS Jugador, posicion AS Posicion FROM @titulares ORDER BY dorsal;
+ELSE
+BEGIN
+    SELECT 'Sin titulares' AS Dorsal, 'Ver el mensaje FALLO en la pestaña Messages' AS Jugador, '' AS Posicion;
+    IF NOT EXISTS (SELECT 1 FROM torneo.partido p
+                   JOIN torneo.seleccion sl ON sl.seleccion_id = p.seleccion_local_id JOIN torneo.pais pl ON pl.pais_id = sl.pais_id
+                   JOIN torneo.seleccion sv ON sv.seleccion_id = p.seleccion_visitante_id JOIN torneo.pais pv ON pv.pais_id = sv.pais_id
+                   WHERE pl.codigo_iso = 'MAR' AND pv.codigo_iso = 'ARG' AND p.fase = 'grupos')
+        PRINT 'FALLO - R2.3 sin filas: no existe el partido Marruecos-Argentina; falta la carga de entrega7_carga_datos.sql (ejecutarla sobre la base recién creada) o está incompleta.';
+    ELSE
+        PRINT 'FALLO - R2.3 sin filas: el partido Marruecos-Argentina existe, pero Argentina no tiene titulares cargados en su formación.';
+END;
 
 IF (SELECT COUNT(*) FROM @titulares) = 11
    AND NOT EXISTS (SELECT 1 FROM @titulares WHERE dorsal = 5)
@@ -261,9 +273,9 @@ SELECT 'R3.1 todos los árbitros' AS Prueba, @x.value('count(/designaciones_arbi
 
 IF @x.value('count(/designaciones_arbitrales/arbitro)', 'INT') = 22
    AND @x.value('count(//designacion)', 'INT') = 160
-   AND @x.value('sum(/designaciones_arbitrales/arbitro/@amarillas_mostradas)', 'INT') = 37
+   AND CAST(@x.value('sum(/designaciones_arbitrales/arbitro/@amarillas_mostradas)', 'FLOAT') AS INT) = 37
    AND @x.value('count(//tarjeta[@tipo = "amarilla"]) + count(//tarjeta[@expulsion = "doble_amarilla"])', 'INT') = 37
-   AND @x.value('sum(/designaciones_arbitrales/arbitro/@rojas_mostradas)', 'INT') = 3
+   AND CAST(@x.value('sum(/designaciones_arbitrales/arbitro/@rojas_mostradas)', 'FLOAT') AS INT) = 3
    AND @x.value('count(//tarjeta)', 'INT') = 39
    AND @x.value('count(//informe)', 'INT') = 4
    AND @x.value('count(//informe[@sancion])', 'INT') = 1
@@ -452,8 +464,18 @@ JOIN publicidad.anunciante an         ON an.anunciante_id = c.anunciante_id
 JOIN torneo.pais m                    ON m.pais_id = pz.pais_mercado_id
 WHERE e.partido_id = @partido;
 
-SELECT espacio AS Espacio, anunciante AS Anunciante, mercado AS Mercado, criterio AS Criterio
-FROM @espacios ORDER BY espacio;
+-- Los espacios del partido. Si no hay filas, la grilla lo dice en lugar de quedar muda, y el mensaje FALLO da la causa.
+IF EXISTS (SELECT 1 FROM @espacios)
+    SELECT espacio AS Espacio, anunciante AS Anunciante, mercado AS Mercado, criterio AS Criterio
+    FROM @espacios ORDER BY espacio;
+ELSE
+BEGIN
+    SELECT 'Sin espacios' AS Espacio, 'Ver el mensaje FALLO en la pestaña Messages' AS Anunciante, '' AS Mercado, '' AS Criterio;
+    IF @partido IS NULL
+        PRINT 'FALLO - R5.2 sin filas: no existe el partido Alemania-Corea del Sur; falta la carga de entrega7_carga_datos.sql (ejecutarla sobre la base recién creada) o está incompleta.';
+    ELSE
+        PRINT 'FALLO - R5.2 sin filas: el partido Alemania-Corea del Sur existe, pero no tiene espacios publicitarios asignados.';
+END;
 
 DECLARE @m TABLE (partido_id INT, fecha_utc VARCHAR(16), fase VARCHAR(13), encuentro VARCHAR(60), mercados INT,
                   c06 VARCHAR(2), c07 VARCHAR(2), c08 VARCHAR(2), c09 VARCHAR(2), c10 VARCHAR(2), c11 VARCHAR(2),
