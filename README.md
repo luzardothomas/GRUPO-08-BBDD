@@ -12,10 +12,17 @@
 1. `entrega5_db_definition.sql`
 2. `entrega5_sp_ABM.sql`
 3. `entrega5_sp_logica_negocio.sql`
-4. `entrega5_test.sql`
+4. `entrega5_test_exitosos.sql` (sobre la base recién creada)
+5. `entrega5_test_fallidos.sql` (sobre la base recién creada: repetir antes los pasos 1 a 3)
 
 ### Entrega 6 (`src/entrega6/`)
+0. `python3 src/entrega6/entrega6_scraping.py` (scraping de Wikipedia → `imports/scraping/*.json`)
 1. `entrega6_importacion.sql`
-2. `entrega6_scraping.sql`
-3. `entrega6_apis.sql`
-4. `entrega6_test.sql`
+2. `entrega6_apis.sql`
+3. `entrega6_test.sql`
+
+### Entrega 7 (`src/entrega7/`)
+Sobre la base recién creada con los pasos 1 a 3 de la Entrega 5 (sin ejecutar sus tests):
+1. `entrega7_carga_datos.sql` (juego de datos de la sección IV, cargado con los SP de la Entrega 5)
+2. `entrega7_reportes.sql`
+3. `entrega7_test_reportes.sql` (todas las pruebas deben imprimir `OK`)

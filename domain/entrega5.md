@@ -1,7 +1,7 @@
 # Análisis — Entrega 5 (Base de Datos)
 
 Estado: **implementada** en la carpeta `src/entrega5/`: `entrega5_db_definition.sql`, `entrega5_sp_ABM.sql` y
-`entrega5_sp_logica_negocio.sql` (creación) y `entrega5_test.sql` (pruebas). Este documento resume qué pide el
+`entrega5_sp_logica_negocio.sql` (creación) y `entrega5_test_exitosos.sql` y `entrega5_test_fallidos.sql` (pruebas). Este documento resume qué pide el
 enunciado, cómo se resolvió cada punto y las decisiones de diseño que hay que poder defender en el coloquio.
 
 ## Qué pide el enunciado y dónde está resuelto
@@ -14,7 +14,7 @@ enunciado, cómo se resolvió cada punto y las decisiones de diseño que hay que
 | 4 | Mínimo 10 validaciones, informadas en un único mensaje agrupado por SP y operación | `entrega5_sp_ABM.sql`: 317 condiciones entre todas las tablas (y 62 más en los SP de negocio); ver "Validaciones" |
 | 5 | Sin SQL dinámico, sin CLR, todo en T-SQL | Única excepción: `EXEC('CREATE SCHEMA ...')` (`CREATE SCHEMA` debe ser la primera sentencia de su lote) |
 | 6 | SP de lógica de negocio, multi-tabla y transaccionales, separados de los de ABM | `entrega5_sp_logica_negocio.sql`, sección III (9 procedimientos) |
-| 7 | Testing 1:1, con casos exitosos (con evidencia) y de validaciones fallidas | `entrega5_test.sql`: Parte 1 (ABM) y Parte 2 (negocio) |
+| 7 | Testing 1:1, con casos exitosos (con evidencia) y de validaciones fallidas | `entrega5_test_exitosos.sql` y `entrega5_test_fallidos.sql`: Parte 1 (ABM), Parte 2 (negocio) y Parte 3 (casos detallados por SP) |
 | 8 | Encabezado con fecha, integrantes y descripción | Al inicio de cada archivo |
 | 9 | Dos dígitos numéricos en el nombre del archivo; solución de SSMS | **Pendiente**, ver "Pendientes para la entrega formal" |
 
@@ -29,18 +29,28 @@ Los scripts están en `src/entrega5/`, divididos en secciones:
 | `entrega5_sp_ABM.sql` | II | SP de ABM, agrupados por módulo |
 | `entrega5_sp_logica_negocio.sql` | III | SP de lógica de negocio |
 | | IV | Carga de los parámetros iniciales con `torneo.parametro_cargar_defaults`, que inserta sólo las claves que faltan (no pisa valores ya ajustados) |
-| `entrega5_test.sql` | Parte 1 | Pruebas de los SP de ABM |
-| | Parte 2 | Pruebas de los SP de negocio, incluidos los casos obligatorios de la sección IV del TP |
+| `entrega5_test_exitosos.sql` | Parte 1 | Casos que los SP de ABM deben aceptar, sobre un escenario encadenado (lotes `E-1.x.nn`) |
+| | Parte 2 | Casos válidos de los SP de negocio, incluidos los casos obligatorios de la sección IV del TP (`E-2.x.nn`) |
+| | Parte 3 | Casos válidos detallados por SP: bordes y variantes (`E-3.x.nn`), con sus preparaciones (`P-3.nn`) |
+| `entrega5_test_fallidos.sql` | Parte 1 | Rechazos de los SP de ABM (`F-1.x.nn`), sobre el mismo escenario (que arma con lotes `P-1.x.nn`) |
+| | Parte 2 | Rechazos de los SP de negocio (`F-2.x.nn`) |
+| | Parte 3 | Rechazos detallados por SP: cada condición de error y sus combinaciones (`F-3.x.nn`) |
 
 ### Cómo ejecutarlos
 
 1. Ejecutar, en este orden, `entrega5_db_definition.sql`, `entrega5_sp_ABM.sql` y `entrega5_sp_logica_negocio.sql`.
    El primero elimina la base `mundial_2026` si existe y la recrea desde cero (lo que se pide hacer en vivo en el
    coloquio). Tarda unos segundos.
-2. Ejecutar `entrega5_test.sql` completo, de una vez y en la misma ventana de consulta (usa tablas temporales para
-   pasar los id generados entre lotes). Termina con un resumen: todas las pruebas deben figurar en `OK`.
+2. Ejecutar `entrega5_test_exitosos.sql` completo, de una vez y en la misma ventana de consulta (usa tablas
+   temporales para pasar los id generados entre lotes). Termina con un resumen de pruebas en `OK` y en `FALLO`.
+3. Recrear la base (paso 1) y ejecutar `entrega5_test_fallidos.sql` de la misma forma. Es independiente del
+   anterior: vuelve a armar el escenario con sus lotes de preparación. Cada prueba muestra en Mensajes el mensaje
+   con el que el SP rechaza la entrada (no hay resumen de `OK`/`FALLO`).
 
-El script de pruebas exige la base recién creada: si ya tiene datos avisa y no ejecuta nada.
+Cada archivo exige la base recién creada: si ya tiene datos avisa y no ejecuta nada. Cada lote empieza con
+`PRINT '--- <id> <descripción>'` y un comentario con el resultado esperado y lo que requiere, de modo que también
+se puede ejecutar una prueba puntual (el encabezado de cada archivo tiene el índice de ids y el procedimiento).
+Con el contenedor de `sqlserver-docker/` (local, no versionado), `./entrega5.sh` recrea la base y ejecuta ambos.
 
 ## Norma de nombres de los procedimientos
 
@@ -78,6 +88,18 @@ END;
 - Cuidado al agregar condiciones: concatenar una variable `NULL` anula todo el mensaje; por eso los valores que
   pueden venir nulos se envuelven en `ISNULL(...)`.
 - Las bajas son físicas y se rechazan si hay filas dependientes, indicando cuáles (no se llega al error de FK).
+- Se informan **todas** las condiciones incumplidas. Sólo se omite una condición cuando no se puede evaluar porque
+  depende de un dato que ya es inválido (por ejemplo, el rango del minuto con un período inválido, o si la
+  selección juega el partido cuando la tarjeta no existe).
+- Si un `_modificar` recibe un id inexistente, informa "No existe..." **y además** los errores de los datos
+  recibidos: llama al `_validar` con `@solo_datos = 1`, que omite sólo lo que depende del registro (su partido, su
+  formación, sus jugadores). Lo mismo hacen `registrar_sustitucion`, `registrar_gol` y `registrar_tarjeta` cuando
+  no pueden identificar la formación, el jugador o la persona.
+- No se valida lo que ya garantiza el tipo de dato: un parámetro del mismo largo que la columna no necesita un
+  control de longitud (SQL Server trunca el valor al recibirlo). Sí se controla cuando el parámetro es más largo
+  que la columna (clave, idioma, esquema), para no truncar en silencio.
+- Los formatos fijos usan `DATALENGTH` o patrones `LIKE '%[^...]%'`: `LEN` y `LIKE` con patrón fijo ignoran los
+  espacios finales (`'UTC-03 '` pasaría). Los duplicados se comparan con el valor recortado, que es el que se guarda.
 
 Reglas destacadas, además de las de formato, dominio, existencia y unicidad de cada tabla:
 
@@ -147,24 +169,47 @@ Todos validan primero (un único mensaje agrupado) y después abren la transacci
 
 ## Testing
 
-`entrega5_test.sql` carga todos sus datos a través de los SP (ningún `INSERT` directo a tablas de la base) y
-registra cada comprobación en una tabla temporal; el resumen final debe mostrar 115 comprobaciones en `OK`
-(verificado el 23/10/2026 sobre SQL Server 2025 Express).
-Los rechazos verifican el número de error y, cuando corresponde, la cantidad exacta de condiciones agrupadas.
+Las pruebas están en dos archivos: `entrega5_test_exitosos.sql` (lo que los SP deben aceptar, con evidencia) y
+`entrega5_test_fallidos.sql` (lo que deben rechazar). Ambos cargan sus datos a través de los SP; las únicas
+sentencias directas son las de algunas preparaciones de la Parte 3, que dejan partidos de prueba en estado
+`finalizado`. Exitosos registra cada comprobación en una tabla temporal y termina con un resumen de `OK`/`FALLO`.
+
+En fallidos cada prueba es un comentario con la entrada inválida y la cantidad de errores que debe informar el SP,
+un `PRINT` con su id y la llamada al SP dentro de `TRY...CATCH`, que muestra el mensaje de rechazo:
+
+```sql
+-- F-3.1.01 Clave vacia => 1 error
+PRINT '--- F-3.1.01 torneo.parametro_insertar: Clave vacia';
+BEGIN TRY EXEC torneo.parametro_insertar '', 1, 'Desc'; END TRY BEGIN CATCH PRINT ERROR_MESSAGE(); END CATCH;
+```
+
+- Partes 1 y 2: un escenario encadenado (Argentina, Francia, México y Japón; partidos P1 a P4). En exitosos cada
+  lote verifica su resultado; en fallidos las mismas operaciones se repiten como lotes de preparación (`P-...`) y
+  cada rechazo es un lote propio, en el punto del escenario en que corresponde.
+- Parte 3: casos detallados por SP (bordes, cada condición de error y sus combinaciones), incluidos
+  suspensiones y todo el módulo de arbitraje (árbitros, idiomas, designaciones e informes). En fallidos hay un lote
+  por SP; los casos que necesitan una operación válida previa la hacen en una transacción que se deshace.
+
+Resultado al 27/10/2026 sobre SQL Server 2025 (CU10): exitosos 372 `OK`, sin `FALLO`; en fallidos las 1240 pruebas
+muestran su mensaje de rechazo con la cantidad de errores que indica su comentario.
+Las pruebas F-3.2.23, F-3.8.23, F-3.8.41 y F-3.12.18 detectaron validaciones que dejaban pasar espacios (huso
+`'UTC-03 '`, esquema `'4 -3-3'` y árbitro duplicado con espacios al inicio), ya corregidas en los SP. Las pruebas
+F-3.11.156 a F-3.11.164 verifican que se informen todos los errores juntos (registro inexistente y SP de negocio
+que no identifican al jugador o la persona).
 
 Casos obligatorios de la sección IV del TP cubiertos:
 
 | Caso obligatorio | Prueba |
 |---|---|
-| Cambio por lesión dentro de los primeros 20 minutos | 2.3.a |
-| Partido con roja directa | 2.5.b |
-| Partido con expulsión por doble amonestación | 2.8.b |
-| Suspendido por acumulación de amarillas, fuera de la formación del siguiente partido | 2.8.a y 2.8.d |
-| Prime time simultáneo en más de cuatro mercados, con priorización | 2.6.a |
-| Designación arbitral descartada por conflicto de nacionalidad | 2.9.a |
+| Cambio por lesión dentro de los primeros 20 minutos | E-2.3.01 |
+| Partido con roja directa | E-2.5.02 |
+| Partido con expulsión por doble amonestación | E-2.8.02 |
+| Suspendido por acumulación de amarillas, fuera de la formación del siguiente partido | E-2.8.01 y E-2.8.04; rechazos F-2.8.01 y F-2.8.02 |
+| Prime time simultáneo en más de cuatro mercados, con priorización | E-2.6.01 |
+| Designación arbitral descartada por conflicto de nacionalidad | F-2.9.01 |
 | Importación con errores parciales | Entrega 6 (`entrega6_test.sql`, pruebas 5.1 y 5.2) |
 
-Las pruebas 2.11.a y 2.11.b muestran la atomicidad: una operación que afecta dos tablas se deshace completa, y
+Las pruebas E-2.11.01 y F-2.11.01 muestran la atomicidad: una operación que afecta dos tablas se deshace completa, y
 un error a mitad de una transacción revierte también lo ya hecho.
 
 ## Pendientes para la entrega formal
