@@ -121,6 +121,8 @@ BEGIN
     SET @resultado = (
     SELECT
         -- Ranking general del torneo.
+        -- ISNULL(a.asistencias, 0): un goleador que nunca dio una asistencia no figura en @asistencias (LEFT JOIN);
+        -- se informa 0 asistencias en lugar de dejar el dato en NULL (que se podría interpretar de cualquier manera).
         (SELECT RANK() OVER (ORDER BY SUM(g.goles) DESC, MAX(ISNULL(a.asistencias, 0)) DESC) AS "@puesto",
                 j.nombre + ' ' + j.apellido                                                  AS "@jugador",
                 pa.nombre                                                                    AS "@seleccion",
@@ -182,7 +184,9 @@ GO
 -- suspensiones activas.
 --   * Una fila por persona (jugador o cuerpo técnico) y una fila 'TOTAL SELECCIÓN' por
 --     selección (GROUPING SETS).
---   * Amarillas: filas 'amarilla' (incluye la primera amarilla de una doble amarilla).
+--   * Amarillas: filas 'amarilla' MÁS la segunda amarilla de cada doble amarilla. Esa segunda amarilla se
+--     guarda como una sola fila 'roja' con expulsión 'doble_amarilla', pero fue una amarilla: quien se va
+--     por doble amarilla figura con 2 amarillas y 1 roja por doble amarilla (3 tarjetas mostradas).
 --   * Suspensión activa: su partido afectado sigue 'programado', o todavía no tiene partido
 --     asignado (la selección no tenía más partidos programados al momento de la tarjeta).
 --   * La selección de cada persona sale de plantel.vw_persona_partido (el mismo criterio que
@@ -206,7 +210,8 @@ BEGIN
 
     WITH tarjeta_persona AS (
         SELECT vpp.seleccion_id, t.persona_id,
-               SUM(IIF(t.tipo = 'amarilla', 1, 0))                    AS amarillas,
+               -- la doble amarilla cuenta 2 amarillas: la fila 'amarilla' y la segunda, guardada como roja
+               SUM(IIF(t.tipo = 'amarilla' OR t.tipo_expulsion = 'doble_amarilla', 1, 0)) AS amarillas,
                SUM(IIF(t.tipo_expulsion = 'doble_amarilla', 1, 0))    AS rojas_doble_amarilla,
                SUM(IIF(t.tipo_expulsion = 'roja_directa', 1, 0))      AS rojas_directas
         FROM evento.tarjeta t
@@ -246,7 +251,7 @@ BEGIN
     )
     SELECT seleccion                                              AS Seleccion,
            IIF(GROUPING(persona) = 1, 'TOTAL SELECCIÓN', persona) AS Persona,
-           IIF(GROUPING(persona) = 1, '', rol)                    AS Rol,
+           IIF(GROUPING(persona) = 1, 'No aplica (fila de total)', rol) AS Rol,
            SUM(amarillas)                                         AS Amarillas,
            SUM(rojas_doble_amarilla)                              AS Rojas_doble_amarilla,
            SUM(rojas_directas)                                    AS Rojas_directas,
@@ -256,8 +261,9 @@ BEGIN
                      THEN CAST(SUM(IIF(suspensiones_activas IS NULL, 0, 1)) AS VARCHAR(5)) + ' suspendido(s)'
                 WHEN MAX(ISNULL(suspensiones_activas, '')) <> '' THEN 'SÍ'
                 ELSE 'NO' END                                     AS Suspension_activa,
-           IIF(GROUPING(persona) = 1, NULL,
-               NULLIF(MAX(ISNULL(suspensiones_activas, '')), '')) AS Detalle_suspension
+           CASE WHEN GROUPING(persona) = 1 THEN 'No aplica (fila de total)'
+                WHEN MAX(ISNULL(suspensiones_activas, '')) = '' THEN 'Sin suspensión activa'
+                ELSE MAX(ISNULL(suspensiones_activas, '')) END    AS Detalle_suspension
     FROM detalle
     GROUP BY GROUPING SETS ((seleccion, persona_id, persona, rol), (seleccion))
     ORDER BY seleccion, GROUPING(persona),
@@ -275,6 +281,9 @@ GO
 --         <informes><informe .../></informes>     informes post-partido de esa designación
 -- Las tarjetas las señala el árbitro principal: se le atribuyen sólo a él. Los demás roles
 -- (asistentes, cuarto, VAR) figuran como designaciones sin tarjetas.
+-- amarillas_mostradas cuenta igual que el reporte de tarjetas: la doble amarilla suma 2 (la
+-- segunda amarilla se guarda como una fila 'roja' con expulsión 'doble_amarilla', que además
+-- cuenta en rojas_mostradas). Los elementos <tarjeta> listan las filas guardadas, una por tarjeta.
 -- ========================================================================================
 CREATE OR ALTER PROCEDURE arbitraje.reporte_designaciones
     @arbitro_id INT = NULL,
@@ -303,7 +312,9 @@ BEGIN
             WHERE d.arbitro_id = a.arbitro_id)                               AS "@designaciones",
            (SELECT COUNT(*) FROM arbitraje.designacion_arbitral d
             JOIN evento.tarjeta t ON t.partido_id = d.partido_id
-            WHERE d.arbitro_id = a.arbitro_id AND d.rol = 'principal' AND t.tipo = 'amarilla') AS "@amarillas_mostradas",
+            -- igual que en el reporte de tarjetas: la doble amarilla suma 2 amarillas (la segunda se guarda como roja)
+            WHERE d.arbitro_id = a.arbitro_id AND d.rol = 'principal'
+              AND (t.tipo = 'amarilla' OR t.tipo_expulsion = 'doble_amarilla')) AS "@amarillas_mostradas",
            (SELECT COUNT(*) FROM arbitraje.designacion_arbitral d
             JOIN evento.tarjeta t ON t.partido_id = d.partido_id
             WHERE d.arbitro_id = a.arbitro_id AND d.rol = 'principal' AND t.tipo = 'roja')     AS "@rojas_mostradas",
@@ -390,10 +401,13 @@ BEGIN
         SELECT p.partido_id, p.sede_id, p.fecha_hora_local, p.fase, p.estado,
                pl.nombre + ' vs ' + pv.nombre                                     AS encuentro,
                COUNT(e.pieza_id)                                                  AS ocupados,
-               STRING_AGG(CASE WHEN e.espacio_id IS NULL THEN NULL         -- partido sin espacios registrados
-                               WHEN an.nombre IS NULL THEN CONCAT(e.numero_espacio, ': (vacío)')
-                               ELSE CONCAT(e.numero_espacio, ': ', an.nombre) END, ' | ')
-                   WITHIN GROUP (ORDER BY e.numero_espacio)                       AS anunciantes,
+               -- ISNULL: un partido sin espacios (LEFT JOIN) no tiene nada que agregar. Se informa 'Sin espacios
+               -- registrados' y 0 USD de ingresos, en lugar de NULL, para que el reporte no deje celdas ambiguas.
+               ISNULL(STRING_AGG(CASE WHEN e.espacio_id IS NULL THEN NULL   -- partido sin espacios registrados
+                                      WHEN an.nombre IS NULL THEN CONCAT(e.numero_espacio, ': (vacío)')
+                                      ELSE CONCAT(e.numero_espacio, ': ', an.nombre) END, ' | ')
+                          WITHIN GROUP (ORDER BY e.numero_espacio),
+                      'Sin espacios registrados')                                 AS anunciantes,
                ISNULL(SUM(IIF(e.facturado = 1, e.monto_facturado, 0)), 0)         AS ingreso_facturado,
                ISNULL(SUM(CASE WHEN e.facturado = 1 THEN e.monto_facturado
                                WHEN e.pieza_id IS NOT NULL THEN pz.costo_tarifa
@@ -410,16 +424,18 @@ BEGIN
         WHERE @sede_id IS NULL OR p.sede_id = @sede_id
         GROUP BY p.partido_id, p.sede_id, p.fecha_hora_local, p.fase, p.estado, pl.nombre, pv.nombre
     )
+    -- En las filas de subtotal y total, las columnas que sólo tienen sentido por partido dicen 'No aplica (fila de total)'.
     SELECT IIF(GROUPING(se.nombre) = 1, 'TOTAL GENERAL', se.nombre)        AS Sede,
            IIF(GROUPING(pp.partido_id) = 1,
-               IIF(GROUPING(se.nombre) = 1, '', 'SUBTOTAL SEDE'),
+               IIF(GROUPING(se.nombre) = 1, 'Todos los partidos', 'SUBTOTAL SEDE'),
                MAX(pp.encuentro))                                          AS Partido,
-           pp.partido_id                                                   AS Partido_id,
-           IIF(GROUPING(pp.partido_id) = 1, NULL,
+           IIF(GROUPING(pp.partido_id) = 1, 'No aplica (fila de total)',
+               CAST(pp.partido_id AS VARCHAR(12)))                         AS Partido_id,
+           IIF(GROUPING(pp.partido_id) = 1, 'No aplica (fila de total)',
                MAX(CONVERT(VARCHAR(16), pp.fecha_hora_local, 120)))        AS Fecha_local,
-           IIF(GROUPING(pp.partido_id) = 1, NULL, MAX(pp.fase))            AS Fase,
-           IIF(GROUPING(pp.partido_id) = 1, NULL, MAX(pp.estado))          AS Estado,
-           IIF(GROUPING(pp.partido_id) = 1, NULL, MAX(pp.anunciantes))     AS Anunciantes_por_espacio,
+           IIF(GROUPING(pp.partido_id) = 1, 'No aplica (fila de total)', MAX(pp.fase))   AS Fase,
+           IIF(GROUPING(pp.partido_id) = 1, 'No aplica (fila de total)', MAX(pp.estado)) AS Estado,
+           IIF(GROUPING(pp.partido_id) = 1, 'No aplica (fila de total)', MAX(pp.anunciantes)) AS Anunciantes_por_espacio,
            SUM(pp.ocupados)                                                AS Espacios_ocupados,
            COUNT(*) * 4                                                    AS Espacios_disponibles,
            CAST(100.0 * SUM(pp.ocupados) / (COUNT(*) * 4) AS DECIMAL(5,1)) AS Ocupacion_pct,
@@ -435,20 +451,24 @@ BEGIN
                p.partido_id                                           AS Partido_id,
                CONVERT(VARCHAR(16), p.fecha_hora_local, 120)          AS Fecha_local,
                e.numero_espacio                                       AS Espacio,
-               ISNULL(an.nombre, '(vacío)')                           AS Anunciante,
-               c.nombre                                               AS Campania,
-               m.nombre                                               AS Mercado,
-               pz.idioma                                              AS Idioma,
+               ISNULL(an.nombre, 'Sin pieza asignada (espacio vacío)') AS Anunciante,
+               ISNULL(c.nombre, 'Sin pieza asignada (espacio vacío)')  AS Campania,
+               ISNULL(m.nombre, 'Sin pieza asignada (espacio vacío)')  AS Mercado,
+               ISNULL(pz.idioma, 'Sin pieza asignada (espacio vacío)') AS Idioma,
                CASE e.orden_prioridad WHEN 1 THEN 'país de una selección del partido'
                                       WHEN 2 THEN 'mayor poder adquisitivo'
                                       WHEN 3 THEN 'prime time del mercado'
-                                      WHEN 4 THEN 'desempate por tarifa' END AS Criterio,
+                                      WHEN 4 THEN 'desempate por tarifa'
+                                      ELSE 'Sin criterio (espacio vacío)' END AS Criterio,
                CASE WHEN e.pieza_id IS NULL           THEN 'sin pieza'
                     WHEN e.facturado = 1              THEN 'facturado'
                     WHEN e.fecha_exhibicion IS NOT NULL THEN 'exhibido, pendiente de facturar'
                     ELSE 'asignado' END                               AS Estado,
-               pz.costo_tarifa                                        AS Tarifa_USD,
-               e.monto_facturado                                      AS Monto_facturado_USD
+               ISNULL(CAST(pz.costo_tarifa AS VARCHAR(20)),
+                      'Sin pieza asignada (espacio vacío)')           AS Tarifa_USD,
+               CASE WHEN e.monto_facturado IS NOT NULL THEN CAST(e.monto_facturado AS VARCHAR(20))
+                    WHEN e.fecha_exhibicion IS NOT NULL THEN 'Pendiente de facturar'
+                    ELSE 'Todavía no se exhibió' END                  AS Monto_facturado_USD
         FROM publicidad.espacio_publicitario e
         JOIN torneo.partido p                      ON p.partido_id = e.partido_id
         JOIN torneo.sede se                        ON se.sede_id = p.sede_id
@@ -487,6 +507,7 @@ BEGIN
 
     SELECT @desde = valor FROM torneo.parametro WHERE clave = 'prime_time_hora_desde';
     SELECT @hasta = valor FROM torneo.parametro WHERE clave = 'prime_time_hora_hasta';
+    -- ISNULL: si el parámetro llega en NULL se usa el valor por defecto (1: sólo mercados con piezas).
     SET @solo_mercados_con_piezas = ISNULL(@solo_mercados_con_piezas, 1);
 
     IF @desde IS NULL OR @hasta IS NULL
@@ -638,7 +659,8 @@ BEGIN
 
     SELECT p.partido_id                                                    AS Partido_id,
            p.fase                                                          AS Fase,
-           IIF(p.fase = 'grupos', sl.grupo, NULL)                          AS Grupo,
+           IIF(p.fase = 'grupos', CAST(sl.grupo AS VARCHAR(40)),
+               'No aplica (eliminación directa)')                          AS Grupo,
            CONVERT(VARCHAR(16), p.fecha_hora_local, 120) + ' (' + se.huso_horario + ')' AS Fecha_local,
            CONVERT(VARCHAR(16), p.fecha_hora_utc, 120)                     AS Fecha_UTC,
            se.nombre + ' (' + se.ciudad + ')'                              AS Sede,
@@ -648,17 +670,26 @@ BEGIN
                 WHEN p.goles_local IS NULL OR p.goles_visitante IS NULL THEN 'sin datos'
                 ELSE CONCAT(p.goles_local, ' - ', p.goles_visitante) END   AS Resultado,
            pv.nombre                                                       AS Visitante,
-           IIF(p.estado = 'finalizado' AND p.penales_local IS NOT NULL,
-               CONCAT('(', p.penales_local, '-', p.penales_visitante, ' pen.)'), '') AS Penales,
-           CASE WHEN p.estado <> 'finalizado' OR p.goles_local IS NULL OR p.goles_visitante IS NULL THEN NULL
+           CASE WHEN p.estado = 'finalizado' AND p.penales_local IS NOT NULL
+                     THEN CONCAT('(', p.penales_local, '-', p.penales_visitante, ' pen.)')
+                WHEN p.estado = 'finalizado' THEN 'Sin penales'
+                ELSE 'Todavía no se jugó' END                              AS Penales,
+           CASE WHEN p.estado = 'programado' THEN 'Todavía no se jugó'
+                WHEN p.estado <> 'finalizado' OR p.goles_local IS NULL OR p.goles_visitante IS NULL THEN 'Sin definir'
                 WHEN p.goles_local > p.goles_visitante
                   OR (p.goles_local = p.goles_visitante AND p.penales_local > p.penales_visitante) THEN pl.nombre
                 WHEN p.goles_visitante > p.goles_local
                   OR (p.goles_local = p.goles_visitante AND p.penales_visitante > p.penales_local) THEN pv.nombre
                 ELSE 'empate' END                                          AS Ganador,
-           p.asistencia_publico                                            AS Asistencia,
-           CAST(100.0 * p.asistencia_publico / se.capacidad AS DECIMAL(5,1)) AS Ocupacion_estadio_pct,
-           ISNULL(gl.goles, '')                                            AS Goles
+           CASE WHEN p.asistencia_publico IS NOT NULL THEN CAST(p.asistencia_publico AS VARCHAR(12))
+                WHEN p.estado = 'programado' THEN 'Todavía no se jugó'
+                ELSE 'Sin dato de asistencia' END                          AS Asistencia,
+           CASE WHEN p.asistencia_publico IS NOT NULL
+                     THEN CAST(CAST(100.0 * p.asistencia_publico / se.capacidad AS DECIMAL(5,1)) AS VARCHAR(10))
+                WHEN p.estado = 'programado' THEN 'Todavía no se jugó'
+                ELSE 'Sin dato de asistencia' END                          AS Ocupacion_estadio_pct,
+           CASE WHEN p.estado = 'programado' THEN 'Todavía no se jugó'
+                ELSE ISNULL(gl.goles, 'Sin goles') END                     AS Goles
     FROM torneo.partido p
     JOIN torneo.sede se      ON se.sede_id = p.sede_id
     JOIN torneo.seleccion sl ON sl.seleccion_id = p.seleccion_local_id
@@ -696,6 +727,8 @@ BEGIN
         tabla AS (
             SELECT s.grupo, s.seleccion_id, pa.nombre AS seleccion,
                    COUNT(pt.seleccion_id)                       AS pj,
+                   -- ISNULL(..., 0): una selección que todavía no jugó (LEFT JOIN sin filas) tiene 0 en cada columna,
+                   -- no NULL: 0 partidos ganados, empatados, perdidos y 0 goles a favor y en contra.
                    ISNULL(SUM(IIF(pt.gf > pt.gc, 1, 0)), 0)     AS pg,
                    ISNULL(SUM(IIF(pt.gf = pt.gc, 1, 0)), 0)     AS pe,
                    ISNULL(SUM(IIF(pt.gf < pt.gc, 1, 0)), 0)     AS pp,

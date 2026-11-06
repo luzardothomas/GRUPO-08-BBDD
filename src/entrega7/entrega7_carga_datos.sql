@@ -65,7 +65,8 @@ GO
 
 IF EXISTS (SELECT 1 FROM torneo.seleccion)
 BEGIN
-    RAISERROR('La base ya tiene selecciones cargadas: esta carga se ejecuta sobre la base recién creada con los scripts de la Entrega 5. No se carga nada.', 16, 1);
+    -- Aviso informativo (no un error): la base ya está cargada, así que no se repite la carga ni se intenta insertar nada.
+    PRINT 'AVISO: la base ya tiene selecciones cargadas (la carga ya se hizo). Esta carga se ejecuta sobre la base recién creada con los scripts de la Entrega 5; no se inserta nada.';
     SET NOEXEC ON;
 END;
 GO
@@ -553,11 +554,17 @@ FROM (SELECT a.arbitro_id, ROW_NUMBER() OVER (ORDER BY a.arbitro_id) AS rn
 BEGIN TRY
     EXEC arbitraje.designar_arbitros @partido_id = @partido_id, @principal_id = @arg, @asistente_1_id = @a1,
          @asistente_2_id = @a2, @cuarto_id = @a3, @var_id = @a4;
-    PRINT 'ERROR DE LA CARGA: la designación con conflicto de nacionalidad fue aceptada.';
+    PRINT 'FALLO - la designación con conflicto de nacionalidad debía rechazarse y fue aceptada.';
 END TRY
 BEGIN CATCH
-    PRINT 'Designación descartada, como se esperaba:';
-    PRINT ERROR_MESSAGE();
+    -- Este rechazo es el resultado esperado de la prueba (no es un error de la carga): se informa como OK
+    -- y se muestra el motivo que devolvió el SP, sin su encabezado de "operación rechazada".
+    IF ERROR_NUMBER() = 50002
+        PRINT 'OK - el SP rechazó la designación del árbitro argentino en Argentina-México, como corresponde.'
+              + CHAR(13) + CHAR(10) + 'Motivo informado (conflicto de nacionalidad):'
+              + REPLACE(REPLACE(ERROR_MESSAGE(), 'arbitraje.designar_arbitros - operación rechazada:', ''), '- ', CHAR(13) + CHAR(10) + '  * ');
+    ELSE
+        PRINT 'FALLO - error inesperado al designar: ' + ERROR_MESSAGE();
 END CATCH;
 GO
 
