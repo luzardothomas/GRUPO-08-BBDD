@@ -14,8 +14,9 @@
 --   Crea desde cero la base mundial_2026 y sus objetos estructurales:
 --     0 a H. Base, esquemas, tablas y restricciones (contenido de db_definition.sql).
 --     I.     Tabla de parámetros del reglamento, tipo tabla y vistas de apoyo.
---   Los procedimientos almacenados están en entrega5_sp.sql, y las pruebas en
---   entrega5_test.sql; se ejecutan en ese orden después de este script.
+--   Los procedimientos almacenados están en entrega5_sp_ABM.sql y entrega5_sp_logica_negocio.sql,
+--   y las pruebas en entrega5_test_exitosos.sql y entrega5_test_fallidos.sql; se ejecutan en ese
+--   orden después de este script.
 --   Sin SQL dinámico (la única excepción es el EXEC('CREATE SCHEMA ...'), porque
 --   CREATE SCHEMA debe ser la primera sentencia de su lote), sin CLR y sin cursores.
 -- ============================================================
@@ -44,7 +45,8 @@ GO
 -- =============================================================
 
 -- Collation CI_AI: ignora mayúsculas/minúsculas y acentos (favorece la deduplicación en
--- importaciones, ej. 'Peru' = 'Perú'). Code page 1252: soporta acentos de Europa occidental.
+-- importaciones, ej. 'Peru' = 'Perú'). Variante UTF8 (_SC_UTF8): los VARCHAR guardan Unicode completo, así
+-- no se pierden caracteres de nombres de jugadores y clubes (ej. 'Győr', 'Đorđe') al importar.
 
 CREATE DATABASE mundial_2026
     COLLATE Latin1_General_CI_AI;
