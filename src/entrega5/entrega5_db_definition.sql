@@ -49,7 +49,7 @@ GO
 -- no se pierden caracteres de nombres de jugadores y clubes (ej. 'Győr', 'Đorđe') al importar.
 
 CREATE DATABASE mundial_2026
-    COLLATE Latin1_General_100_CI_AI_SC_UTF8;
+    COLLATE Latin1_General_CI_AI;
 GO
 
 -- Tamaño y crecimiento fijos (no porcentuales): volumen estimado ~1GB, con picos de
