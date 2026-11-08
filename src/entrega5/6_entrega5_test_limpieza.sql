@@ -15,10 +15,13 @@
 --   borrando, solamente, los datos insertados en la preparacion.
 --   El orden va de las tablas hijas a las tablas padre (publicidad -> eventos -> plantel
 --   -> partidos/selecciones/sedes/paises -> confederaciones) para no violar las FK.
+--   Al final se reinician los contadores IDENTITY de las tablas limpiadas, de modo que los
+--   proximos ids continuen a partir del ultimo dato que NO es de prueba.
 --
 -- CÓMO USARLO:
 --   Se ejecuta de una sola vez, luego de terminar todos los testeos.
 --   La limpieza borrara todos los datos de una sola vez.
+--
 -- ============================================================
 
 USE mundial_2026;
@@ -225,4 +228,94 @@ IF NOT EXISTS (SELECT 1 FROM torneo.confederacion WHERE nombre = 'CONCACAF') EXE
 IF NOT EXISTS (SELECT 1 FROM torneo.confederacion WHERE nombre = 'CONMEBOL') EXEC torneo.confederacion_insertar 'CONMEBOL';
 IF NOT EXISTS (SELECT 1 FROM torneo.confederacion WHERE nombre = 'OFC')      EXEC torneo.confederacion_insertar 'OFC';
 IF NOT EXISTS (SELECT 1 FROM torneo.confederacion WHERE nombre = 'UEFA')     EXEC torneo.confederacion_insertar 'UEFA';
+GO
+
+-- Limpieza de arbitraje.* (arbitro, arbitro_idioma, designacion_arbitral, informe_arbitral) (al terminar)
+DROP TABLE IF EXISTS #pp, #sl, #ps, #pt, #ar, #ds;
+SELECT pais_id INTO #pp FROM torneo.pais WHERE codigo_iso LIKE 'ZR[A-H]';
+SELECT seleccion_id INTO #sl FROM torneo.seleccion WHERE pais_id IN (SELECT pais_id FROM #pp);
+SELECT sede_id INTO #ps FROM torneo.sede
+WHERE pais_id IN (SELECT pais_id FROM #pp) OR nombre LIKE 'Test Arb Sede%';
+SELECT partido_id INTO #pt FROM torneo.partido
+WHERE sede_id IN (SELECT sede_id FROM #ps)
+   OR seleccion_local_id IN (SELECT seleccion_id FROM #sl)
+   OR seleccion_visitante_id IN (SELECT seleccion_id FROM #sl);
+SELECT arbitro_id INTO #ar FROM arbitraje.arbitro WHERE pais_id IN (SELECT pais_id FROM #pp);
+SELECT designacion_id INTO #ds FROM arbitraje.designacion_arbitral
+WHERE partido_id IN (SELECT partido_id FROM #pt) OR arbitro_id IN (SELECT arbitro_id FROM #ar);
+
+DELETE FROM arbitraje.informe_arbitral WHERE designacion_id IN (SELECT designacion_id FROM #ds);
+DELETE FROM arbitraje.designacion_arbitral WHERE designacion_id IN (SELECT designacion_id FROM #ds);
+DELETE FROM arbitraje.arbitro_idioma WHERE arbitro_id IN (SELECT arbitro_id FROM #ar);
+DELETE FROM arbitraje.arbitro WHERE arbitro_id IN (SELECT arbitro_id FROM #ar);
+
+DELETE FROM torneo.partido WHERE partido_id IN (SELECT partido_id FROM #pt);
+DELETE FROM torneo.seleccion WHERE seleccion_id IN (SELECT seleccion_id FROM #sl);
+DELETE FROM torneo.sede WHERE sede_id IN (SELECT sede_id FROM #ps);
+DELETE FROM torneo.pais WHERE pais_id IN (SELECT pais_id FROM #pp);
+DROP TABLE #ds, #ar, #pt, #ps, #sl, #pp;
+IF OBJECT_ID('tempdb..##test_arbitraje') IS NOT NULL DROP TABLE ##test_arbitraje;
+GO
+
+
+
+-- =======================================================================================================
+--                          REINICIO DE CONTADORES IDENTITY (al terminar, siempre al final)
+-- =======================================================================================================
+-- Solo se reinician las tablas que tienen limpieza en este script. Cada contador queda en el MAX(id) que
+-- sobrevive a la limpieza (o en 0 si la tabla quedo vacia), asi el proximo alta recibe MAX(id) + 1 (o 1).
+-- Sin limpieza asociada (no se tocan): torneo.parametro y arbitraje.informe_arbitral.
+-- Sin columna IDENTITY (nada que reiniciar): plantel.formacion_jugador, publicidad.campania_pais_interes
+-- y arbitraje.arbitro_idioma.
+
+DECLARE @tablas TABLE (n INT IDENTITY(1, 1), tabla NVARCHAR(128));
+
+INSERT INTO @tablas (tabla) VALUES
+    -- publicidad (hijas -> padre)
+    ('publicidad.espacio_publicitario'), ('publicidad.pieza_publicitaria'),
+    ('publicidad.campania'), ('publicidad.anunciante'),
+
+    -- evento
+    ('evento.gol'), ('evento.sustitucion'), ('evento.suspension'),
+    ('evento.tarjeta'), ('evento.criterio_suspension'),
+
+    -- plantel
+    ('plantel.convocatoria'), ('plantel.formacion'), ('plantel.jugador'),
+    ('plantel.cuerpo_tecnico'), ('plantel.persona'),
+
+    -- arbitraje
+    ('arbitraje.informe_arbitral'), ('arbitraje.designacion_arbitral'),
+    ('arbitraje.arbitro'),
+
+    -- torneo
+    ('torneo.partido'), ('torneo.seleccion'), ('torneo.sede'),
+    ('torneo.pais'), ('torneo.confederacion');
+
+DECLARE @i INT = 1, @max_i INT = (SELECT MAX(n) FROM @tablas),
+        @tabla NVARCHAR(128), @col SYSNAME, @sql NVARCHAR(MAX), @m INT;
+
+WHILE @i <= @max_i
+BEGIN
+    SELECT @tabla = tabla FROM @tablas WHERE n = @i;
+
+    SET @col = (
+        SELECT c.name
+        FROM sys.identity_columns c
+        WHERE c.object_id = OBJECT_ID(@tabla)
+    );
+
+    IF @col IS NOT NULL
+    BEGIN
+        SET @sql = N'SELECT @m = ISNULL(MAX(' + QUOTENAME(@col) + N'), 0) FROM ' + @tabla + N';';
+
+        EXEC sp_executesql
+            @sql,
+            N'@m INT OUTPUT',
+            @m = @m OUTPUT;
+
+        DBCC CHECKIDENT (@tabla, RESEED, @m) WITH NO_INFOMSGS;
+    END;
+
+    SET @i += 1;
+END;
 GO

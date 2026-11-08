@@ -1735,8 +1735,225 @@ GO
 -- 1.12 arbitraje: arbitro, arbitro_idioma, designacion_arbitral e informe_arbitral
 -- ============================================================
 
+-- Verificacion arbitraje.arbitro_insertar
+DECLARE @pa INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'pais_a'),
+        @pb INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'pais_b'),
+        @hoy DATE = CAST(SYSDATETIME() AS DATE), @x INT;
+DECLARE @f18 DATE = DATEADD(YEAR, -18, @hoy),            
+        @f70 DATE = DATEADD(YEAR, -70, @hoy),            
+        @f17 DATE = DATEADD(DAY, 1, DATEADD(YEAR, -18, @hoy)),    -- 17 años y 364 dias
+        @f71 DATE = DATEADD(DAY, -1, DATEADD(YEAR, -70, @hoy));   -- 70 años y 1 dia
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'Ins Uno', @pa, 'FIFA', '1985-05-10', @x OUTPUT; --> Valido
+-- EXEC arbitraje.arbitro_insertar '', 'Ins Err', @pa, 'FIFA', '1985-05-10', @x OUTPUT; --> Nombre vacio
+-- EXEC arbitraje.arbitro_insertar NULL, 'Ins Err', @pa, 'FIFA', '1985-05-10', @x OUTPUT; --> Nombre nulo
+-- EXEC arbitraje.arbitro_insertar '   ', 'Ins Err', @pa, 'FIFA', '1985-05-10', @x OUTPUT; --> Nombre solo espacios
+-- EXEC arbitraje.arbitro_insertar 'Test Arb', '', @pa, 'FIFA', '1985-05-10', @x OUTPUT; --> Apellido vacio
+-- EXEC arbitraje.arbitro_insertar 'Test Arb', NULL, @pa, 'FIFA', '1985-05-10', @x OUTPUT; --> Apellido nulo
+-- EXEC arbitraje.arbitro_insertar 'Test Arb', '   ', @pa, 'FIFA', '1985-05-10', @x OUTPUT; --> Apellido solo espacios
+-- EXEC arbitraje.arbitro_insertar 'Test Arb', 'Ins Err', @pa, 'FIFA', @f17, @x OUTPUT; --> Menor de 18 años (por un dia)
+-- EXEC arbitraje.arbitro_insertar 'Test Arb', 'Ins Err', @pa, 'FIFA', @f71, @x OUTPUT; --> Mayor de 70 años (por un dia)
+-- EXEC arbitraje.arbitro_insertar 'Test Arb', 'Ins Err', 999999, 'FIFA', '1985-05-10', @x OUTPUT; --> Pais inexistente
+-- EXEC arbitraje.arbitro_insertar 'Test Arb', 'Ins Err', NULL, 'FIFA', '1985-05-10', @x OUTPUT; --> Pais nulo (el mensaje dice "(nulo)")
+-- EXEC arbitraje.arbitro_insertar 'Test Arb', 'Ins Err', @pa, 'otra', '1985-05-10', @x OUTPUT; --> Categoria invalida
+-- EXEC arbitraje.arbitro_insertar 'Test Arb', 'Ins Err', @pa, NULL, '1985-05-10', @x OUTPUT; --> Categoria nula
+-- EXEC arbitraje.arbitro_insertar 'Test Arb', 'Ins Err', @pa, '', '1985-05-10', @x OUTPUT; --> Categoria vacia
+-- EXEC arbitraje.arbitro_insertar 'Test Arb', 'Base', @pa, 'FIFA', '1985-05-10', @x OUTPUT; --> Ya existe un arbitro con ese nombre y apellido para ese pais
+-- EXEC arbitraje.arbitro_insertar '', '', @pa, 'FIFA', '1985-05-10', @x OUTPUT; --> 2 errores: nombre y apellido obligatorios
+-- EXEC arbitraje.arbitro_insertar '', 'Ins Err', 999999, 'FIFA', @f17, @x OUTPUT; --> 3 errores: nombre obligatorio, menor de 18 años y pais inexistente
+-- EXEC arbitraje.arbitro_insertar '', '', 999999, 'otra', @f71, @x OUTPUT; --> 5 errores: nombre, apellido, mayor de 70 años, pais inexistente y categoria invalida
+-- EXEC arbitraje.arbitro_insertar NULL, NULL, NULL, NULL, '1985-05-10', @x OUTPUT; --> 4 errores: nombre, apellido, pais (nulo) y categoria
+GO
 
+-- Verificacion arbitraje.arbitro_modificar
+DECLARE @a_mod INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_mod'),
+        @a_prin INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_prin'),
+        @pa INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'pais_a'),
+        @pb INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'pais_b'),
+        @ph INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'pais_h'),
+        @hoy DATE = CAST(SYSDATETIME() AS DATE);
+DECLARE @f17 DATE = DATEADD(DAY, 1, DATEADD(YEAR, -18, @hoy)),
+        @f71 DATE = DATEADD(DAY, -1, DATEADD(YEAR, -70, @hoy));
+EXEC arbitraje.arbitro_modificar @a_mod, 'Test Arb', 'Mod Nuevo', @pa, 'FIFA', '1982-02-02'; --> Modificacion valida
+-- EXEC arbitraje.arbitro_modificar NULL, 'Test Arb', 'Mod Nuevo', @pa, 'FIFA', '1982-02-02'; --> Id nulo
+-- EXEC arbitraje.arbitro_modificar 999999, 'Test Arb', 'Mod Nuevo', @pa, 'FIFA', '1982-02-02'; --> Arbitro inexistente
+-- EXEC arbitraje.arbitro_modificar @a_mod, '', 'Mod Nuevo', @pa, 'FIFA', '1982-02-02'; --> Nombre vacio
+-- EXEC arbitraje.arbitro_modificar @a_mod, NULL, 'Mod Nuevo', @pa, 'FIFA', '1982-02-02'; --> Nombre nulo
+-- EXEC arbitraje.arbitro_modificar @a_mod, 'Test Arb', '', @pa, 'FIFA', '1982-02-02'; --> Apellido vacio
+-- EXEC arbitraje.arbitro_modificar @a_mod, 'Test Arb', '   ', @pa, 'FIFA', '1982-02-02'; --> Apellido solo espacios
+-- EXEC arbitraje.arbitro_modificar @a_mod, 'Test Arb', 'Mod Nuevo', @pa, 'FIFA', @f17; --> Menor de 18 años
+-- EXEC arbitraje.arbitro_modificar @a_mod, 'Test Arb', 'Mod Nuevo', @pa, 'FIFA', @f71; --> Mayor de 70 años
+-- EXEC arbitraje.arbitro_modificar @a_mod, 'Test Arb', 'Mod Nuevo', 999999, 'FIFA', '1982-02-02'; --> Pais inexistente
+-- EXEC arbitraje.arbitro_modificar @a_mod, 'Test Arb', 'Mod Nuevo', NULL, 'FIFA', '1982-02-02'; --> Pais nulo
+-- EXEC arbitraje.arbitro_modificar @a_mod, 'Test Arb', 'Mod Nuevo', @pa, 'otra', '1982-02-02'; --> Categoria invalida
+-- EXEC arbitraje.arbitro_modificar @a_mod, 'Test Arb', 'Mod Nuevo', @pa, NULL, '1982-02-02'; --> Categoria nula
+-- EXEC arbitraje.arbitro_modificar @a_mod, 'Test Arb', 'Base', @pa, 'FIFA', '1982-02-02'; --> Ya existe un arbitro con ese nombre y apellido para ese pais
+-- EXEC arbitraje.arbitro_modificar @a_prin, 'Test Arb', 'Principal', @pb, 'FIFA', '1980-01-01'; --> El nuevo pais coincide con una seleccion de un partido en el que ya esta designado
+-- EXEC arbitraje.arbitro_modificar NULL, '', 'Mod Nuevo', @pa, 'FIFA', '1982-02-02'; --> 2 errores: id obligatorio y nombre obligatorio
+-- EXEC arbitraje.arbitro_modificar 999999, '', 'Mod Nuevo', 999999, 'FIFA', @f17; --> 4 errores: arbitro inexistente, nombre obligatorio, menor de 18 años y pais inexistente
+-- EXEC arbitraje.arbitro_modificar 999999, '', '', 999999, 'otra', @f71; --> 6 errores: arbitro inexistente, nombre, apellido, mayor de 70 años, pais inexistente y categoria invalida
+GO
 
+-- Verificacion arbitraje.arbitro_eliminar
+DECLARE @a_elim INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_elim'),
+        @a_prin INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_prin');
+EXEC arbitraje.arbitro_eliminar @a_elim; --> Baja valida: se elimina junto con sus idiomas. SI SE ELIMINA 2 VECES SEGUIDAS TIRA ERROR (arbitro inexistente)
+-- SELECT * FROM arbitraje.arbitro_idioma WHERE arbitro_id = @a_elim; --> 0 filas (los idiomas se eliminaron con el arbitro)
+-- EXEC arbitraje.arbitro_eliminar 999999; --> Arbitro inexistente
+-- EXEC arbitraje.arbitro_eliminar NULL; --> Id nulo (el mensaje dice "(nulo)")
+-- EXEC arbitraje.arbitro_eliminar @a_prin; --> Tiene designaciones en partidos
+GO
+
+-- Verificacion arbitraje.arbitro_idioma_insertar
+DECLARE @a_idi INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_idi');
+EXEC arbitraje.arbitro_idioma_insertar @a_idi, 'japones'; --> Valido
+-- EXEC arbitraje.arbitro_idioma_insertar @a_idi, ''; --> Idioma vacio
+-- EXEC arbitraje.arbitro_idioma_insertar @a_idi, NULL; --> Idioma nulo
+-- EXEC arbitraje.arbitro_idioma_insertar @a_idi, '   '; --> Idioma solo espacios
+-- EXEC arbitraje.arbitro_idioma_insertar @a_idi, 'abcdefghijk'; --> Idioma de 11 letras (mas de 10)
+-- EXEC arbitraje.arbitro_idioma_insertar @a_idi, 'ruso2'; --> Idioma con numeros
+-- EXEC arbitraje.arbitro_idioma_insertar @a_idi, 'ruso chino'; --> Idioma con espacio
+-- EXEC arbitraje.arbitro_idioma_insertar @a_idi, 'ruso-chino'; --> Idioma con guion
+-- EXEC arbitraje.arbitro_idioma_insertar 999999, 'ruso'; --> Arbitro inexistente
+-- EXEC arbitraje.arbitro_idioma_insertar NULL, 'ruso'; --> Arbitro nulo (el mensaje dice "(nulo)")
+-- EXEC arbitraje.arbitro_idioma_insertar @a_idi, 'ingles'; --> El arbitro ya tiene registrado ese idioma
+-- EXEC arbitraje.arbitro_idioma_insertar 999999, ''; --> 2 errores: arbitro inexistente e idioma obligatorio
+GO
+
+-- Verificacion arbitraje.arbitro_idioma_modificar
+DECLARE @a_idi INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_idi');
+EXEC arbitraje.arbitro_idioma_modificar @a_idi, 'frances', 'portugues'; --> Modificacion valida (SI SE REPITE TIRA ERROR: 'frances' ya no existe)
+-- EXEC arbitraje.arbitro_idioma_modificar @a_idi, 'ingles', 'ingles'; --> Valido: mismo idioma (no es duplicado de si mismo)
+-- EXEC arbitraje.arbitro_idioma_modificar @a_idi, 'italiano', 'Italiano'; --> Valido: se guarda en minusculas
+-- EXEC arbitraje.arbitro_idioma_modificar @a_idi, 'ruso', 'chino'; --> El arbitro no tiene registrado el idioma a reemplazar
+-- EXEC arbitraje.arbitro_idioma_modificar 999999, 'ingles', 'chino'; --> Arbitro sin ese idioma (arbitro inexistente)
+-- EXEC arbitraje.arbitro_idioma_modificar NULL, 'ingles', 'chino'; --> Arbitro nulo
+-- EXEC arbitraje.arbitro_idioma_modificar @a_idi, NULL, 'chino'; --> Idioma a reemplazar nulo
+-- EXEC arbitraje.arbitro_idioma_modificar @a_idi, 'ingles', ''; --> Idioma nuevo vacio
+-- EXEC arbitraje.arbitro_idioma_modificar @a_idi, 'ingles', NULL; --> Idioma nuevo nulo
+-- EXEC arbitraje.arbitro_idioma_modificar @a_idi, 'ingles', '   '; --> Idioma nuevo solo espacios
+-- EXEC arbitraje.arbitro_idioma_modificar @a_idi, 'ingles', 'abcdefghijk'; --> Idioma nuevo de 11 letras
+-- EXEC arbitraje.arbitro_idioma_modificar @a_idi, 'ingles', 'chino2'; --> Idioma nuevo con numeros
+-- EXEC arbitraje.arbitro_idioma_modificar @a_idi, 'ingles', 'italiano'; --> El arbitro ya tiene registrado el idioma nuevo
+-- EXEC arbitraje.arbitro_idioma_modificar @a_idi, 'ruso', ''; --> 2 errores: idioma a reemplazar inexistente e idioma nuevo obligatorio
+-- EXEC arbitraje.arbitro_idioma_modificar @a_idi, 'ruso', 'ingles'; --> 2 errores: idioma a reemplazar inexistente e idioma nuevo ya registrado
+GO
+
+-- Verificacion arbitraje.arbitro_idioma_eliminar
+DECLARE @a_idi INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_idi');
+EXEC arbitraje.arbitro_idioma_eliminar @a_idi, 'aleman'; --> Baja valida (SI SE ELIMINA 2 VECES SEGUIDAS TIRA ERROR)
+-- EXEC arbitraje.arbitro_idioma_eliminar @a_idi, 'ruso'; --> El arbitro no tiene registrado ese idioma
+-- EXEC arbitraje.arbitro_idioma_eliminar 999999, 'ingles'; --> Arbitro inexistente (no tiene registrado ese idioma)
+-- EXEC arbitraje.arbitro_idioma_eliminar NULL, 'ingles'; --> Arbitro nulo
+-- EXEC arbitraje.arbitro_idioma_eliminar @a_idi, NULL; --> Idioma nulo
+-- EXEC arbitraje.arbitro_idioma_eliminar @a_idi, ''; --> Idioma vacio
+GO
+
+-- Verificacion arbitraje.designacion_arbitral_insertar
+-- Los mensajes de ADVERTENCIA no bloquean el alta, se muestran con PRINT y por el parametro @adv.
+DECLARE @p_gr   INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'par_gr'),
+        @p_24   INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'par_24'),
+        @p_fin  INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'par_fin'),
+        @p_elim INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'par_elim'),
+        @a_prin INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_prin'),
+        @a_as1  INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_as1'),
+        @a_ins  INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_ins'),
+        @a_err  INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_err'),
+        @a_conf INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_conf'),
+        @a_g    INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_g'),
+        @d INT, @adv VARCHAR(500);
+EXEC arbitraje.designacion_arbitral_insertar @p_gr, @a_ins, 'var', @d OUTPUT, @adv OUTPUT; --> Valido: fase de grupos, sin advertencia
+-- EXEC arbitraje.designacion_arbitral_insertar 999999, @a_err, 'principal', @d OUTPUT, @adv OUTPUT; --> Partido inexistente
+-- EXEC arbitraje.designacion_arbitral_insertar NULL, @a_err, 'principal', @d OUTPUT, @adv OUTPUT; --> Partido nulo (el mensaje dice "(nulo)")
+-- EXEC arbitraje.designacion_arbitral_insertar @p_fin, @a_err, 'var', @d OUTPUT, @adv OUTPUT; --> El partido ya esta finalizado
+-- EXEC arbitraje.designacion_arbitral_insertar @p_24, 999999, 'cuarto', @d OUTPUT, @adv OUTPUT; --> Arbitro inexistente
+-- EXEC arbitraje.designacion_arbitral_insertar @p_24, NULL, 'cuarto', @d OUTPUT, @adv OUTPUT; --> Arbitro nulo (el mensaje dice "(nulo)")
+-- EXEC arbitraje.designacion_arbitral_insertar @p_24, @a_err, 'juez', @d OUTPUT, @adv OUTPUT; --> Rol invalido
+-- EXEC arbitraje.designacion_arbitral_insertar @p_24, @a_err, NULL, @d OUTPUT, @adv OUTPUT; --> Rol nulo
+-- EXEC arbitraje.designacion_arbitral_insertar @p_gr, @a_err, 'principal', @d OUTPUT, @adv OUTPUT; --> El partido ya tiene designado el rol principal
+-- EXEC arbitraje.designacion_arbitral_insertar @p_gr, @a_as1, 'cuarto', @d OUTPUT, @adv OUTPUT; --> El arbitro ya esta designado en ese partido con otro rol
+-- EXEC arbitraje.designacion_arbitral_insertar @p_24, @a_as1, 'principal', @d OUTPUT, @adv OUTPUT; --> El arbitro ya esta designado en otro partido a menos de 24 horas (par_gr, 18 h antes)
+-- EXEC arbitraje.designacion_arbitral_insertar @p_gr, @a_as1, 'principal', @d OUTPUT, @adv OUTPUT; --> 2 errores: rol principal ya designado y arbitro ya designado con otro rol
+-- EXEC arbitraje.designacion_arbitral_insertar @p_fin, @a_conf, 'juez', @d OUTPUT, @adv OUTPUT; --> 3 errores: partido finalizado, rol invalido y conflicto de nacionalidad (ZRD juega par_fin)
+GO
+
+-- Verificacion arbitraje.designacion_arbitral_modificar
+DECLARE @d_m_prin INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'd_m_prin'),
+        @d_m_as1  INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'd_m_as1'),
+        @d_inf    INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'd_inf'),
+        @d_fin    INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'd_fin'),
+        @a_prin   INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_prin'),
+        @a_m2     INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_m2'),
+        @a_libre  INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_libre'),
+        @a_conf   INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'a_conf'),
+        @adv VARCHAR(500);
+EXEC arbitraje.designacion_arbitral_modificar @d_m_prin, @a_libre, 'principal', @adv OUTPUT; --> Modificacion valida: cambia el arbitro (sin informes cargados)
+-- EXEC arbitraje.designacion_arbitral_modificar @d_m_as1, @a_m2, 'cuarto', @adv OUTPUT; --> Valido: cambia solo el rol
+-- EXEC arbitraje.designacion_arbitral_modificar 999999, @a_libre, 'principal', @adv OUTPUT; --> Designacion inexistente
+-- EXEC arbitraje.designacion_arbitral_modificar NULL, @a_libre, 'principal', @adv OUTPUT; --> Designacion nula (el mensaje dice "(nulo)")
+-- EXEC arbitraje.designacion_arbitral_modificar @d_fin, @a_prin, 'principal', @adv OUTPUT; --> El partido ya esta finalizado
+-- EXEC arbitraje.designacion_arbitral_modificar @d_m_as1, 999999, 'asistente_1', @adv OUTPUT; --> Arbitro inexistente
+-- EXEC arbitraje.designacion_arbitral_modificar @d_m_as1, NULL, 'asistente_1', @adv OUTPUT; --> Arbitro nulo
+-- EXEC arbitraje.designacion_arbitral_modificar @d_m_as1, @a_m2, 'juez', @adv OUTPUT; --> Rol invalido
+-- EXEC arbitraje.designacion_arbitral_modificar @d_m_as1, @a_m2, NULL, @adv OUTPUT; --> Rol nulo
+-- EXEC arbitraje.designacion_arbitral_modificar @d_m_as1, @a_m2, 'principal', @adv OUTPUT; --> El partido ya tiene designado el rol principal
+-- EXEC arbitraje.designacion_arbitral_modificar @d_m_prin, @a_m2, 'principal', @adv OUTPUT; --> El arbitro ya esta designado en ese partido con otro rol
+-- EXEC arbitraje.designacion_arbitral_modificar @d_m_as1, @a_conf, 'asistente_1', @adv OUTPUT; --> Conflicto de nacionalidad (pais ZRD = seleccion que juega par_mod)
+-- EXEC arbitraje.designacion_arbitral_modificar @d_inf, @a_libre, 'asistente_2', @adv OUTPUT; --> No se puede cambiar el arbitro: la designacion ya tiene informes cargados
+-- EXEC arbitraje.designacion_arbitral_modificar @d_fin, @a_prin, 'juez', @adv OUTPUT; --> 2 errores: partido finalizado y rol invalido
+-- EXEC arbitraje.designacion_arbitral_modificar @d_fin, @a_conf, 'principal', @adv OUTPUT; --> 3 errores: partido finalizado, conflicto de nacionalidad (ZRD juega par_fin) y cambio de arbitro con informes
+GO
+
+-- Verificacion arbitraje.designacion_arbitral_eliminar
+DECLARE @d_elim INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'd_elim'),
+        @d_inf  INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'd_inf'),
+        @d_fin  INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'd_fin');
+EXEC arbitraje.designacion_arbitral_eliminar @d_elim; --> Baja valida (SI SE ELIMINA 2 VECES SEGUIDAS TIRA ERROR: designacion inexistente)
+-- EXEC arbitraje.designacion_arbitral_eliminar 999999; --> Designacion inexistente
+-- EXEC arbitraje.designacion_arbitral_eliminar NULL; --> Id nulo (el mensaje dice "(nulo)")
+-- EXEC arbitraje.designacion_arbitral_eliminar @d_inf; --> Tiene informes arbitrales cargados
+-- EXEC arbitraje.designacion_arbitral_eliminar @d_fin; --> 2 errores: partido finalizado (historial arbitral) y tiene informes cargados
+GO
+
+-- Verificacion arbitraje.informe_arbitral_insertar
+DECLARE @d_inf INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'd_inf'), @inf INT;
+EXEC arbitraje.informe_arbitral_insertar @d_inf, '2026-06-15 22:00:00 -03:00', 'Informe de prueba', 'Amonestacion al DT', @inf OUTPUT; --> Valido
+-- EXEC arbitraje.informe_arbitral_insertar @d_inf, '2026-06-15 22:00:00 -03:00', 'Informe sin sancion', NULL, @inf OUTPUT; --> Valido: sin sancion
+-- EXEC arbitraje.informe_arbitral_insertar @d_inf, '2026-06-15 22:00:00 -03:00', 'Informe sancion en blanco', '   ', @inf OUTPUT; --> Valido: la sancion en blanco se guarda como NULL
+-- EXEC arbitraje.informe_arbitral_insertar @d_inf, '2026-06-15 15:00:00 -03:00', 'Informe en el inicio', NULL, @inf OUTPUT; --> Valido: fecha igual al inicio del partido (borde)
+-- EXEC arbitraje.informe_arbitral_insertar @d_inf, '2026-06-15 18:00:00 +00:00', 'Informe mismo instante en UTC', NULL, @inf OUTPUT; --> Valido: mismo instante expresado en UTC (borde)
+-- EXEC arbitraje.informe_arbitral_insertar 999999, '2026-06-15 22:00:00 -03:00', 'Informe', NULL, @inf OUTPUT; --> Designacion inexistente
+-- EXEC arbitraje.informe_arbitral_insertar NULL, '2026-06-15 22:00:00 -03:00', 'Informe', NULL, @inf OUTPUT; --> Designacion nula (el mensaje dice "(nulo)")
+-- EXEC arbitraje.informe_arbitral_insertar @d_inf, NULL, 'Informe', NULL, @inf OUTPUT; --> Fecha nula
+-- EXEC arbitraje.informe_arbitral_insertar @d_inf, '2026-06-15 14:59:00 -03:00', 'Informe', NULL, @inf OUTPUT; --> Fecha anterior al inicio del partido (informe post-partido)
+-- EXEC arbitraje.informe_arbitral_insertar @d_inf, '2026-06-15 22:00:00 -03:00', '', NULL, @inf OUTPUT; --> Contenido vacio
+-- EXEC arbitraje.informe_arbitral_insertar @d_inf, '2026-06-15 22:00:00 -03:00', NULL, NULL, @inf OUTPUT; --> Contenido nulo
+-- EXEC arbitraje.informe_arbitral_insertar @d_inf, '2026-06-15 22:00:00 -03:00', '   ', NULL, @inf OUTPUT; --> Contenido solo espacios
+-- EXEC arbitraje.informe_arbitral_insertar @d_inf, NULL, '', NULL, @inf OUTPUT; --> 2 errores: fecha obligatoria y contenido obligatorio
+-- EXEC arbitraje.informe_arbitral_insertar 999999, NULL, '', NULL, @inf OUTPUT; --> 3 errores: designacion inexistente, fecha obligatoria y contenido obligatorio
+GO
+
+-- Verificacion arbitraje.informe_arbitral_modificar
+-- Con un informe inexistente solo se informa ese error (no se evaluan los demas parametros).
+DECLARE @i_mod INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'i_mod');
+EXEC arbitraje.informe_arbitral_modificar @i_mod, '2026-06-15 23:00:00 -03:00', 'Informe modificado', 'Suspension de un partido'; --> Modificacion valida
+-- EXEC arbitraje.informe_arbitral_modificar @i_mod, '2026-06-15 23:00:00 -03:00', 'Informe modificado sin sancion', NULL; --> Valido: se quita la sancion
+-- EXEC arbitraje.informe_arbitral_modificar @i_mod, '2026-06-15 15:00:00 -03:00', 'Informe en el inicio', NULL; --> Valido: fecha igual al inicio del partido (borde)
+-- EXEC arbitraje.informe_arbitral_modificar 999999, '2026-06-15 23:00:00 -03:00', 'Informe', NULL; --> Informe inexistente
+-- EXEC arbitraje.informe_arbitral_modificar NULL, '2026-06-15 23:00:00 -03:00', 'Informe', NULL; --> Id nulo (el mensaje dice "(nulo)")
+-- EXEC arbitraje.informe_arbitral_modificar @i_mod, NULL, 'Informe', NULL; --> Fecha nula
+-- EXEC arbitraje.informe_arbitral_modificar @i_mod, '2026-06-15 14:59:00 -03:00', 'Informe', NULL; --> Fecha anterior al inicio del partido
+-- EXEC arbitraje.informe_arbitral_modificar @i_mod, '2026-06-15 23:00:00 -03:00', '', NULL; --> Contenido vacio
+-- EXEC arbitraje.informe_arbitral_modificar @i_mod, '2026-06-15 23:00:00 -03:00', NULL, NULL; --> Contenido nulo
+-- EXEC arbitraje.informe_arbitral_modificar @i_mod, '2026-06-15 23:00:00 -03:00', '   ', NULL; --> Contenido solo espacios
+-- EXEC arbitraje.informe_arbitral_modificar @i_mod, NULL, '', NULL; --> 2 errores: fecha obligatoria y contenido obligatorio
+GO
+
+-- Verificacion arbitraje.informe_arbitral_eliminar
+DECLARE @i_elim INT = (SELECT id FROM ##test_arbitraje WHERE clave = 'i_elim');
+EXEC arbitraje.informe_arbitral_eliminar @i_elim; --> Baja valida (SI SE ELIMINA 2 VECES SEGUIDAS TIRA ERROR: informe inexistente)
+-- EXEC arbitraje.informe_arbitral_eliminar 999999; --> Informe inexistente
+-- EXEC arbitraje.informe_arbitral_eliminar NULL; --> Id nulo (el mensaje dice "(nulo)")
+GO
 
 
 -- ============================================================
@@ -2115,94 +2332,3 @@ EXEC publicidad.espacio_publicitario_eliminar @e1; --> Baja valida (espacio no f
 -- EXEC publicidad.espacio_publicitario_eliminar 999999; --> Espacio inexistente
 -- EXEC publicidad.espacio_publicitario_eliminar NULL; --> Id nulo (el mensaje dice "(nulo)")
 -- EXEC publicidad.espacio_publicitario_eliminar @ef; --> Espacio ya facturado (historial de facturacion)
-
-
-
-
--- ============================================================
--- 2.1 plantel.reemplazar_convocado (baja + alta de último momento, en una transacción)
--- ============================================================
-
-
-
-
-
--- ============================================================
--- 2.2 plantel.cargar_formacion (cabecera + titulares + banco, todo o nada)
--- ============================================================
-
-
-
-
-
--- ============================================================
--- 2.3 evento.registrar_sustitucion (por dorsales; ventana automática; reglamento de cambios)
--- ============================================================
-
-
-
-
-
--- ============================================================
--- 2.4 evento.registrar_gol (por dorsales; actualiza el marcador)
--- ============================================================
-
-
-
-
-
--- ============================================================
--- 2.5 evento.registrar_tarjeta (tarjeta + cálculo de suspensión en una transacción)
--- ============================================================
-
-
-
-
-
--- ============================================================
--- 2.6 publicidad.asignar_espacios_partido (los cuatro espacios según los criterios de la sección H)
--- ============================================================
-
-
-
-
-
--- ============================================================
--- 2.7 torneo.registrar_resultado (cierre del partido + pauta exhibida) y facturación
--- ============================================================
-
-
-
-
-
--- ============================================================
--- 2.8 Acumulación de amarillas, doble amarilla y jugador suspendido fuera de la formación
--- ============================================================
-
-
-
-
--- ============================================================
--- 2.9 arbitraje.designar_arbitros (terna completa, con validación de conflicto de nacionalidad)
--- ============================================================
-
-
-
-
-
--- ============================================================
--- 2.10 Partido de eliminación directa completo (P4: Francia vs Japón, dieciseisavos)
--- ============================================================
-
-
-
-
-
--- ============================================================
--- 2.11 Transaccionalidad: todo o nada en operaciones que afectan varias tablas
--- ============================================================
-
-
-
-
-

@@ -662,7 +662,6 @@ UPDATE torneo.partido SET estado = 'finalizado' WHERE partido_id = @p5;
 GO
 
 
-
 -- Preparación de evento.gol_* (ejecutar UNA sola vez, y usar siempre la misma ventana de consulta)
 -- Requiere haber ejecutado antes, en esta misma ventana: plantel.cuerpo_tecnico_* (ZCA/ZCB/ZCC), plantel.jugador_*, plantel.convocatoria_*,
 -- plantel.formacion_* (##test_formacion) y plantel.formacion_jugador_* (##test_fjugador).
@@ -1075,3 +1074,109 @@ EXEC publicidad.espacio_publicitario_insertar @pc, 3, @z4, NULL, @esp OUTPUT;
 EXEC publicidad.espacio_publicitario_insertar @pc, 4, @z5, NULL, @esp OUTPUT;
 GO
 
+-- Preparación de arbitraje.* (ejecutar UNA sola vez, y usar siempre la misma ventana de consulta)
+-- Crea 8 países (ZRA-ZRH), 7 selecciones, 3 sedes, 6 partidos, los árbitros, idiomas, designaciones e informes.
+--   ZRA: árbitros "nacionales" (su selección NO juega ningún partido de prueba, queda "en carrera")
+--   ZRB/ZRC/ZRD/ZRE/ZRF: selecciones que juegan los partidos
+--   ZRG: selección eliminada en octavos (su árbitro no genera advertencia)
+--   ZRH: país libre, sin selección (destino de cambio de país)
+-- Partidos (todos con el mismo grupo A):
+--   par_gr   grupos        15/06 15:00  ZRB vs ZRC  (designaciones, informes, 24 h)
+--   par_24   grupos        16/06 09:00  ZRD vs ZRE  (a 18 h de par_gr: choque de 24 h)
+--   par_fin  grupos        18/06 15:00  ZRB vs ZRD  (finalizado, con designación e informe)
+--   par_mod  grupos        22/06 15:00  ZRC vs ZRD  (modificar designaciones)
+--   par_oct  octavos       28/06 15:00  ZRG vs ZRF  (finalizado: ZRG eliminada)
+--   par_elim dieciseisavos 01/07 15:00  ZRE vs ZRF  (advertencia de nacionalidad)
+IF OBJECT_ID('tempdb..##test_arbitraje') IS NULL
+    CREATE TABLE ##test_arbitraje (clave VARCHAR(12) COLLATE DATABASE_DEFAULT NOT NULL PRIMARY KEY, id INT NOT NULL);
+GO
+IF EXISTS (SELECT 1 FROM ##test_arbitraje)
+    THROW 50000, 'La preparación de arbitraje.* ya fue ejecutada en esta sesión (ver ##test_arbitraje).', 1;
+IF EXISTS (SELECT 1 FROM torneo.pais WHERE codigo_iso LIKE 'ZR[A-H]')
+    THROW 50000, 'Ya hay países ZRA-ZRH (rango reservado para las pruebas de arbitraje): ejecutar antes la limpieza de arbitraje.*.', 1;
+DECLARE @conf INT = (SELECT TOP 1 confederacion_id FROM torneo.confederacion ORDER BY confederacion_id);
+IF @conf IS NULL THROW 50000, 'No hay confederaciones en torneo.confederacion: cargar al menos una con torneo.confederacion_insertar.', 1;
+DECLARE @id INT, @x INT, @d INT,
+        @pa INT, @pb INT, @pc INT, @pd INT, @pe INT, @pf INT, @pg INT, @ph INT,
+        @sa INT, @sb INT, @sc INT, @sd INT, @se INT, @sf INT, @sg INT,
+        @s1 INT, @s2 INT, @s3 INT,
+        @p_gr INT, @p_24 INT, @p_fin INT, @p_mod INT, @p_oct INT, @p_elim INT,
+        @a_prin INT, @a_as1 INT, @a_as2 INT, @a_var INT, @a_m1 INT, @a_m2 INT, @a_conf INT, @a_g INT,
+        @a_mod INT, @a_base INT, @a_elim INT, @a_idi INT, @a_libre INT, @a_ins INT, @a_err INT,
+        @d_inf INT, @d_fin INT;
+
+-- Países y selecciones
+EXEC torneo.pais_insertar 'ZRA', 'Test Arb Pais A', 'UTC-03', 0, @pa OUTPUT; INSERT INTO ##test_arbitraje VALUES ('pais_a', @pa);
+EXEC torneo.pais_insertar 'ZRB', 'Test Arb Pais B', 'UTC-03', 0, @pb OUTPUT; INSERT INTO ##test_arbitraje VALUES ('pais_b', @pb);
+EXEC torneo.pais_insertar 'ZRC', 'Test Arb Pais C', 'UTC-03', 0, @pc OUTPUT; INSERT INTO ##test_arbitraje VALUES ('pais_c', @pc);
+EXEC torneo.pais_insertar 'ZRD', 'Test Arb Pais D', 'UTC-03', 0, @pd OUTPUT; INSERT INTO ##test_arbitraje VALUES ('pais_d', @pd);
+EXEC torneo.pais_insertar 'ZRE', 'Test Arb Pais E', 'UTC-03', 0, @pe OUTPUT; INSERT INTO ##test_arbitraje VALUES ('pais_e', @pe);
+EXEC torneo.pais_insertar 'ZRF', 'Test Arb Pais F', 'UTC-03', 0, @pf OUTPUT; INSERT INTO ##test_arbitraje VALUES ('pais_f', @pf);
+EXEC torneo.pais_insertar 'ZRG', 'Test Arb Pais G', 'UTC-03', 0, @pg OUTPUT; INSERT INTO ##test_arbitraje VALUES ('pais_g', @pg);
+EXEC torneo.pais_insertar 'ZRH', 'Test Arb Pais H', 'UTC-03', 0, @ph OUTPUT; INSERT INTO ##test_arbitraje VALUES ('pais_h', @ph);   -- libre: sin selección
+
+EXEC torneo.seleccion_insertar @pa, @conf, 'A', @sa OUTPUT;   -- en carrera, no juega ningún partido
+EXEC torneo.seleccion_insertar @pb, @conf, 'A', @sb OUTPUT;
+EXEC torneo.seleccion_insertar @pc, @conf, 'A', @sc OUTPUT;
+EXEC torneo.seleccion_insertar @pd, @conf, 'A', @sd OUTPUT;
+EXEC torneo.seleccion_insertar @pe, @conf, 'A', @se OUTPUT;
+EXEC torneo.seleccion_insertar @pf, @conf, 'A', @sf OUTPUT;
+EXEC torneo.seleccion_insertar @pg, @conf, 'A', @sg OUTPUT;   -- eliminada en octavos
+
+-- Sedes y partidos
+EXEC torneo.sede_insertar 'Test Arb Sede 1', 'Ciudad Arb', @pa, 50000, 'UTC-03', @s1 OUTPUT;
+EXEC torneo.sede_insertar 'Test Arb Sede 2', 'Ciudad Arb', @pa, 50000, 'UTC-03', @s2 OUTPUT;
+EXEC torneo.sede_insertar 'Test Arb Sede 3', 'Ciudad Arb', @pa, 50000, 'UTC-03', @s3 OUTPUT;
+
+EXEC torneo.partido_insertar @s1, '2026-06-15 15:00:00 -03:00', 'grupos',        @sb, @sc, NULL, @p_gr   OUTPUT; INSERT INTO ##test_arbitraje VALUES ('par_gr',   @p_gr);
+EXEC torneo.partido_insertar @s2, '2026-06-16 09:00:00 -03:00', 'grupos',        @sd, @se, NULL, @p_24   OUTPUT; INSERT INTO ##test_arbitraje VALUES ('par_24',   @p_24);
+EXEC torneo.partido_insertar @s1, '2026-06-18 15:00:00 -03:00', 'grupos',        @sb, @sd, NULL, @p_fin  OUTPUT; INSERT INTO ##test_arbitraje VALUES ('par_fin',  @p_fin);
+EXEC torneo.partido_insertar @s3, '2026-06-22 15:00:00 -03:00', 'grupos',        @sc, @sd, NULL, @p_mod  OUTPUT; INSERT INTO ##test_arbitraje VALUES ('par_mod',  @p_mod);
+EXEC torneo.partido_insertar @s2, '2026-06-28 15:00:00 -03:00', 'octavos',       @sg, @sf, NULL, @p_oct  OUTPUT; INSERT INTO ##test_arbitraje VALUES ('par_oct',  @p_oct);
+EXEC torneo.partido_insertar @s1, '2026-07-01 15:00:00 -03:00', 'dieciseisavos', @se, @sf, NULL, @p_elim OUTPUT; INSERT INTO ##test_arbitraje VALUES ('par_elim', @p_elim);
+
+-- Árbitros
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'Principal',    @pa, 'FIFA',          '1980-01-01', @a_prin  OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_prin',  @a_prin);   -- designado en par_gr y par_fin
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'Asistente 1',  @pa, 'FIFA',          '1980-01-01', @a_as1   OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_as1',   @a_as1);    -- designado en par_gr (24 h)
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'Asistente 2',  @pa, 'FIFA',          '1980-01-01', @a_as2   OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_as2',   @a_as2);    -- designado en par_gr (con informes)
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'Var',          @pa, 'FIFA',          '1980-01-01', @a_var   OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_var',   @a_var);    -- designado en par_24 (baja válida)
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'Mod Uno',      @pa, 'FIFA',          '1980-01-01', @a_m1    OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_m1',    @a_m1);     -- designado en par_mod (principal)
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'Mod Dos',      @pa, 'FIFA',          '1980-01-01', @a_m2    OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_m2',    @a_m2);     -- designado en par_mod (asistente_1)
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'Conflicto',    @pd, 'FIFA',          '1980-01-01', @a_conf  OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_conf',  @a_conf);   -- país ZRD: su selección juega par_24, par_fin y par_mod
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'Pais G',       @pg, 'FIFA',          '1980-01-01', @a_g     OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_g',     @a_g);      -- país ZRG: selección eliminada
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'Mod',          @pa, 'confederacion', '1980-01-01', @a_mod   OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_mod',   @a_mod);    -- a modificar (con idiomas)
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'Base',         @pa, 'FIFA',          '1980-01-01', @a_base  OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_base',  @a_base);   -- destino de duplicados
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'Elim',         @pa, 'FIFA',          '1980-01-01', @a_elim  OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_elim',  @a_elim);   -- baja válida (con idiomas)
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'Idiomas',      @pa, 'FIFA',          '1980-01-01', @a_idi   OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_idi',   @a_idi);    -- base de arbitro_idioma_*
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'Libre',        @pa, 'FIFA',          '1980-01-01', @a_libre OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_libre', @a_libre);   -- reemplazo en designacion_arbitral_modificar
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'Alta',         @pa, 'FIFA',          '1980-01-01', @a_ins   OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_ins',   @a_ins);    -- alta válida en designacion_arbitral_insertar
+EXEC arbitraje.arbitro_insertar 'Test Arb', 'Error',        @pa, 'FIFA',          '1980-01-01', @a_err   OUTPUT; INSERT INTO ##test_arbitraje VALUES ('a_err',   @a_err);    -- NUNCA se designa en un caso válido (aísla errores)
+
+-- Idiomas
+EXEC arbitraje.arbitro_idioma_insertar @a_idi,  'ingles';
+EXEC arbitraje.arbitro_idioma_insertar @a_idi,  'frances';
+EXEC arbitraje.arbitro_idioma_insertar @a_idi,  'italiano';
+EXEC arbitraje.arbitro_idioma_insertar @a_idi,  'aleman';
+EXEC arbitraje.arbitro_idioma_insertar @a_mod,  'espanol';
+EXEC arbitraje.arbitro_idioma_insertar @a_mod,  'frances';
+EXEC arbitraje.arbitro_idioma_insertar @a_elim, 'espanol';
+EXEC arbitraje.arbitro_idioma_insertar @a_elim, 'ingles';
+
+-- Designaciones
+EXEC arbitraje.designacion_arbitral_insertar @p_gr,  @a_prin, 'principal',   @d OUTPUT;
+EXEC arbitraje.designacion_arbitral_insertar @p_gr,  @a_as1,  'asistente_1', @d OUTPUT;
+EXEC arbitraje.designacion_arbitral_insertar @p_gr,  @a_as2,  'asistente_2', @d_inf OUTPUT; INSERT INTO ##test_arbitraje VALUES ('d_inf',    @d_inf);   -- con informes
+EXEC arbitraje.designacion_arbitral_insertar @p_24,  @a_var,  'var',         @d OUTPUT;     INSERT INTO ##test_arbitraje VALUES ('d_elim',   @d);       -- baja válida
+EXEC arbitraje.designacion_arbitral_insertar @p_fin, @a_prin, 'principal',   @d_fin OUTPUT; INSERT INTO ##test_arbitraje VALUES ('d_fin',    @d_fin);   -- partido finalizado + informe
+EXEC arbitraje.designacion_arbitral_insertar @p_mod, @a_m1,   'principal',   @d OUTPUT;     INSERT INTO ##test_arbitraje VALUES ('d_m_prin', @d);       -- a modificar
+EXEC arbitraje.designacion_arbitral_insertar @p_mod, @a_m2,   'asistente_1', @d OUTPUT;     INSERT INTO ##test_arbitraje VALUES ('d_m_as1',  @d);       -- a modificar
+
+-- Informes (par_gr: arranca 15:00 hora local; par_fin: 18/06 15:00)
+EXEC arbitraje.informe_arbitral_insertar @d_inf, '2026-06-15 20:00:00 -03:00', 'Informe base a modificar', 'Amonestacion',  @id OUTPUT; INSERT INTO ##test_arbitraje VALUES ('i_mod',  @id);
+EXEC arbitraje.informe_arbitral_insertar @d_inf, '2026-06-15 21:00:00 -03:00', 'Informe base a eliminar',  NULL,            @id OUTPUT; INSERT INTO ##test_arbitraje VALUES ('i_elim', @id);
+EXEC arbitraje.informe_arbitral_insertar @d_fin, '2026-06-18 20:00:00 -03:00', 'Informe del partido finalizado', NULL,      @id OUTPUT; INSERT INTO ##test_arbitraje VALUES ('i_fin',  @id);
+
+-- Partidos finalizados (se finalizan al final, porque una designación no se puede crear en un partido finalizado)
+UPDATE torneo.partido SET estado = 'finalizado', goles_local = 1, goles_visitante = 0 WHERE partido_id = @p_fin;
+UPDATE torneo.partido SET estado = 'finalizado', goles_local = 0, goles_visitante = 2 WHERE partido_id = @p_oct;   -- ZRG pierde: queda eliminada
+GO
