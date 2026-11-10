@@ -178,6 +178,7 @@ BEGIN
 
     PRINT CONCAT('torneo.consultar_api_banco_mundial: ', @omitidos,
                  ' registros omitidos (países que el modelo no registra o años sin dato).');
+    DROP TABLE #respuesta, #datos;
     EXEC importacion.lote_cerrar @lote_id, @leidos, @insertados, @actualizados, @sin_cambios, @rechazados;
 END;
 GO
@@ -281,6 +282,7 @@ BEGIN
         SET @i += 1;
     END;
 
+    DROP TABLE #cotizaciones;
     EXEC importacion.lote_cerrar @lote_id, @leidos, @insertados, @actualizados, @sin_cambios, @rechazados;
 END;
 GO

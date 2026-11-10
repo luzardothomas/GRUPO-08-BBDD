@@ -74,6 +74,11 @@
 --     si está igual no se toca (reimportar el mismo archivo no genera duplicados).
 --   * SQL dinámico: sólo para BULK INSERT, que no acepta la ruta del archivo en una
 --     variable.
+--   * Tablas temporales: el archivo se vuelca a tablas temporales locales (#) creadas con
+--     CREATE TABLE explícito y numeradas por fila (fila INT PRIMARY KEY), igual que en
+--     entrega6_apis.sql. El WHILE busca cada fila por su clave primaria (sin recorrer la
+--     tabla entera) y, al terminar, el SP las borra con DROP TABLE. Si el lote se rechaza
+--     antes, SQL Server las borra al salir del SP.
 -- =======================================================================================
 
 -- ============================================================
@@ -656,6 +661,7 @@ BEGIN
     END CATCH;
 
     SELECT @texto = CAST(texto AS NVARCHAR(MAX)) FROM #contenido;
+    DROP TABLE #contenido;
     IF LEFT(@texto, 1) = NCHAR(65279) SET @texto = STUFF(@texto, 1, 1, N'');   -- BOM
 END;
 GO
@@ -808,8 +814,33 @@ BEGIN
         THROW;
     END CATCH;
 
-    SELECT IDENTITY(INT, 1, 1) AS fila,
-           NULLIF(LTRIM(RTRIM(team_country)), '') AS pais_equipo,
+    -- Filas convertidas a sus tipos y numeradas: el WHILE recorre esta tabla por su clave primaria.
+    CREATE TABLE #equipos (
+        fila             INT IDENTITY(1, 1) PRIMARY KEY,
+        pais_equipo      VARCHAR(4000) COLLATE DATABASE_DEFAULT,
+        jugadores_usados INT,
+        edad_promedio    NUMERIC(5,1),
+        posesion         NUMERIC(5,1),
+        partidos         INT,
+        minutos          INT,
+        goles            INT,
+        asistencias      INT,
+        goles_penal      INT,
+        amarillas        INT,
+        rojas            INT,
+        tiros            INT,
+        tiros_al_arco    INT,
+        faltas           INT,
+        offsides         INT,
+        atajadas         INT,
+        vallas_invictas  INT,
+        numeros_ok       BIT
+    );
+
+    INSERT INTO #equipos (pais_equipo, jugadores_usados, edad_promedio, posesion, partidos, minutos, goles,
+                          asistencias, goles_penal, amarillas, rojas, tiros, tiros_al_arco, faltas, offsides,
+                          atajadas, vallas_invictas, numeros_ok)
+    SELECT NULLIF(LTRIM(RTRIM(team_country)), '') AS pais_equipo,
            TRY_CONVERT(INT, NULLIF(players_used, '')) AS jugadores_usados,
            TRY_CONVERT(NUMERIC(5,1), NULLIF(avg_age, '')) AS edad_promedio,
            TRY_CONVERT(NUMERIC(5,1), NULLIF(possession, '')) AS posesion,
@@ -837,7 +868,6 @@ BEGIN
                   OR (NULLIF(cards_red, '') IS NOT NULL AND TRY_CONVERT(INT, cards_red) IS NULL)
                   OR (NULLIF(shots, '') IS NOT NULL AND TRY_CONVERT(INT, shots) IS NULL)
                 THEN 0 ELSE 1 END AS numeros_ok
-    INTO #equipos
     FROM #archivo_equipos;
 
     SELECT @leidos = COUNT(*) FROM #equipos;
@@ -909,6 +939,7 @@ BEGIN
         SET @i += 1;
     END;
 
+    DROP TABLE #archivo_equipos, #equipos;
     EXEC importacion.lote_cerrar @lote_id, @leidos, @insertados, @actualizados, @sin_cambios, @rechazados;
 END;
 GO
@@ -970,8 +1001,30 @@ BEGIN
     END CATCH;
 
     -- Conversión de tipos por conjunto; numeros_ok marca si los textos que venían convirtieron.
-    SELECT IDENTITY(INT, 1, 1) AS fila,
-           NULLIF(LTRIM(RTRIM(jugador)), '') AS jugador, NULLIF(LTRIM(RTRIM(pais_equipo)), '') AS pais_equipo,
+    -- Filas numeradas: el WHILE recorre esta tabla por su clave primaria.
+    CREATE TABLE #jugadores (
+        fila            INT IDENTITY(1, 1) PRIMARY KEY,
+        jugador         VARCHAR(4000) COLLATE DATABASE_DEFAULT,
+        pais_equipo     VARCHAR(4000) COLLATE DATABASE_DEFAULT,
+        posicion        VARCHAR(10) COLLATE DATABASE_DEFAULT,
+        edad            INT,
+        anio_nacimiento INT,
+        club            VARCHAR(120) COLLATE DATABASE_DEFAULT,
+        partidos        INT,
+        titularidades   INT,
+        minutos         INT,
+        goles           INT,
+        asistencias     INT,
+        amarillas       INT,
+        rojas           INT,
+        goles_penal     INT,
+        goles_en_contra INT,
+        numeros_ok      BIT
+    );
+
+    INSERT INTO #jugadores (jugador, pais_equipo, posicion, edad, anio_nacimiento, club, partidos, titularidades,
+                            minutos, goles, asistencias, amarillas, rojas, goles_penal, goles_en_contra, numeros_ok)
+    SELECT NULLIF(LTRIM(RTRIM(jugador)), '') AS jugador, NULLIF(LTRIM(RTRIM(pais_equipo)), '') AS pais_equipo,
            LEFT(NULLIF(posicion, ''), 10) AS posicion, TRY_CONVERT(INT, NULLIF(edad, '')) AS edad,
            TRY_CONVERT(INT, NULLIF(anio_nacimiento, '')) AS anio_nacimiento, LEFT(NULLIF(club, ''), 120) AS club,
            TRY_CONVERT(INT, NULLIF(partidos, '')) AS partidos, TRY_CONVERT(INT, NULLIF(titularidades, '')) AS titularidades,
@@ -992,7 +1045,6 @@ BEGIN
                   OR (NULLIF(goles_penal, '') IS NOT NULL AND importacion.fn_entero(goles_penal) IS NULL)
                   OR (NULLIF(goles_en_contra, '') IS NOT NULL AND importacion.fn_entero(goles_en_contra) IS NULL)
                 THEN 0 ELSE 1 END AS numeros_ok
-    INTO #jugadores
     FROM #archivo;
 
     SELECT @leidos = COUNT(*) FROM #jugadores;
@@ -1075,6 +1127,7 @@ BEGIN
 
     PRINT CONCAT('plantel.importar_estadisticas_jugadores_kaggle_2026: ', @sin_jugador,
                  ' filas sin un jugador del modelo con el mismo nombre (quedan vinculadas sólo a la selección).');
+    DROP TABLE #archivo, #jugadores;
     EXEC importacion.lote_cerrar @lote_id, @leidos, @insertados, @actualizados, @sin_cambios, @rechazados;
 END;
 GO
@@ -1121,8 +1174,27 @@ BEGIN
         THROW;
     END CATCH;
 
-    SELECT CAST(m.[key] AS INT) + 1 AS fila, d.*
-    INTO #partidos
+    -- Un partido por fila, numerado por su posición en el arreglo: el WHILE la recorre por su clave primaria.
+    CREATE TABLE #partidos (
+        fila             INT PRIMARY KEY,
+        ronda            VARCHAR(40)  COLLATE DATABASE_DEFAULT,
+        fecha            VARCHAR(20)  COLLATE DATABASE_DEFAULT,
+        hora             VARCHAR(20)  COLLATE DATABASE_DEFAULT,
+        equipo_local     VARCHAR(100) COLLATE DATABASE_DEFAULT,
+        equipo_visitante VARCHAR(100) COLLATE DATABASE_DEFAULT,
+        sede             VARCHAR(100) COLLATE DATABASE_DEFAULT,
+        gl_90            VARCHAR(10)  COLLATE DATABASE_DEFAULT,
+        gv_90            VARCHAR(10)  COLLATE DATABASE_DEFAULT,
+        gl_120           VARCHAR(10)  COLLATE DATABASE_DEFAULT,
+        gv_120           VARCHAR(10)  COLLATE DATABASE_DEFAULT,
+        pl               VARCHAR(10)  COLLATE DATABASE_DEFAULT,
+        pv               VARCHAR(10)  COLLATE DATABASE_DEFAULT
+    );
+
+    INSERT INTO #partidos (fila, ronda, fecha, hora, equipo_local, equipo_visitante, sede,
+                           gl_90, gv_90, gl_120, gv_120, pl, pv)
+    SELECT CAST(m.[key] AS INT) + 1 AS fila, d.ronda, d.fecha, d.hora, d.equipo_local, d.equipo_visitante, d.sede,
+           d.gl_90, d.gv_90, d.gl_120, d.gv_120, d.pl, d.pv
     FROM OPENJSON(@json, '$.matches') m
     CROSS APPLY OPENJSON(m.value) WITH (
         ronda            VARCHAR(40)  '$.round',
@@ -1256,6 +1328,7 @@ BEGIN
         SET @i += 1;
     END;
 
+    DROP TABLE #partidos;
     EXEC importacion.lote_cerrar @lote_id, @leidos, @insertados, @actualizados, @sin_cambios, @rechazados;
 END;
 GO
@@ -1297,8 +1370,32 @@ BEGIN
         THROW;
     END CATCH;
 
-    SELECT IDENTITY(INT, 1, 1) AS fila,
-           a.n.value('@nombre', 'VARCHAR(150)')       AS anunciante,
+    -- Una pieza por fila (el WHILE la recorre por su clave primaria), los países de interés de cada
+    -- campaña y, en #codigos, los de la campaña de la fila en curso (se vacía en cada vuelta).
+    CREATE TABLE #piezas (
+        fila         INT IDENTITY(1, 1) PRIMARY KEY,
+        anunciante   VARCHAR(150) COLLATE DATABASE_DEFAULT,
+        razon_social VARCHAR(200) COLLATE DATABASE_DEFAULT,
+        contacto     VARCHAR(150) COLLATE DATABASE_DEFAULT,
+        campania     VARCHAR(150) COLLATE DATABASE_DEFAULT,
+        inicio       VARCHAR(20)  COLLATE DATABASE_DEFAULT,
+        fin          VARCHAR(20)  COLLATE DATABASE_DEFAULT,
+        idioma       VARCHAR(30)  COLLATE DATABASE_DEFAULT,
+        mercado      VARCHAR(80)  COLLATE DATABASE_DEFAULT,
+        moneda       VARCHAR(10)  COLLATE DATABASE_DEFAULT,
+        tarifa       VARCHAR(30)  COLLATE DATABASE_DEFAULT
+    );
+    CREATE TABLE #intereses (
+        orden      INT IDENTITY(1, 1) PRIMARY KEY,
+        anunciante VARCHAR(150) COLLATE DATABASE_DEFAULT,
+        campania   VARCHAR(150) COLLATE DATABASE_DEFAULT,
+        codigo     VARCHAR(80)  COLLATE DATABASE_DEFAULT,
+        INDEX ix_intereses_campania (anunciante, campania)
+    );
+    CREATE TABLE #codigos (orden INT PRIMARY KEY, codigo VARCHAR(80) COLLATE DATABASE_DEFAULT);
+
+    INSERT INTO #piezas (anunciante, razon_social, contacto, campania, inicio, fin, idioma, mercado, moneda, tarifa)
+    SELECT a.n.value('@nombre', 'VARCHAR(150)')       AS anunciante,
            a.n.value('@razon_social', 'VARCHAR(200)') AS razon_social,
            a.n.value('@contacto', 'VARCHAR(150)')     AS contacto,
            c.n.value('@nombre', 'VARCHAR(150)')       AS campania,
@@ -1308,14 +1405,13 @@ BEGIN
            p.n.value('@mercado', 'VARCHAR(80)')       AS mercado,
            p.n.value('@moneda', 'VARCHAR(10)')        AS moneda,
            p.n.value('@tarifa', 'VARCHAR(30)')        AS tarifa
-    INTO #piezas
     FROM @xml.nodes('/tarifario/anunciante') a (n)
     CROSS APPLY a.n.nodes('campania') c (n)
     CROSS APPLY c.n.nodes('pieza') p (n);
 
+    INSERT INTO #intereses (anunciante, campania, codigo)
     SELECT a.n.value('@nombre', 'VARCHAR(150)') AS anunciante, c.n.value('@nombre', 'VARCHAR(150)') AS campania,
            i.n.value('@codigo', 'VARCHAR(80)') AS codigo
-    INTO #intereses
     FROM @xml.nodes('/tarifario/anunciante') a (n)
     CROSS APPLY a.n.nodes('campania') c (n)
     CROSS APPLY c.n.nodes('pais_interes') i (n);
@@ -1371,7 +1467,9 @@ BEGIN
                 EXEC publicidad.campania_modificar @campania_id, @anunciante_id, @campania, @inicio, @fin;
 
             -- Países de interés de la campaña que todavía no estén registrados.
-            SELECT IDENTITY(INT, 1, 1) AS orden, codigo INTO #codigos
+            DELETE FROM #codigos;
+            INSERT INTO #codigos (orden, codigo)
+            SELECT ROW_NUMBER() OVER (ORDER BY orden), codigo
             FROM #intereses WHERE anunciante = @anunciante AND campania = @campania;
             SET @j = 1;
             WHILE @j <= (SELECT COUNT(*) FROM #codigos)
@@ -1388,7 +1486,6 @@ BEGIN
                     EXEC publicidad.campania_pais_interes_insertar @campania_id, @interes_id;
                 SET @j += 1;
             END;
-            DROP TABLE #codigos;
 
             SELECT @pieza_id = pieza_id, @costo_actual = costo_tarifa
             FROM publicidad.pieza_publicitaria
@@ -1412,7 +1509,6 @@ BEGIN
         BEGIN CATCH
             SELECT @numero = ERROR_NUMBER(), @mensaje = ERROR_MESSAGE();
             IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
-            IF OBJECT_ID('tempdb..#codigos') IS NOT NULL DROP TABLE #codigos;
             EXEC importacion.error_registrar @lote_id, @i, @registro, @numero, @mensaje;
             SET @rechazados += 1;
         END CATCH;
@@ -1420,6 +1516,7 @@ BEGIN
         SET @i += 1;
     END;
 
+    DROP TABLE #piezas, #intereses, #codigos;
     EXEC importacion.lote_cerrar @lote_id, @leidos, @insertados, @actualizados, @sin_cambios, @rechazados;
 END;
 GO
@@ -1495,8 +1592,18 @@ BEGIN
         THROW;
     END CATCH;
 
-    SELECT CAST(s.[key] AS INT) + 1 AS fila, d.*
-    INTO #sedes
+    -- Una sede por fila, numerada por su posición en el arreglo: el WHILE la recorre por su clave primaria.
+    CREATE TABLE #sedes (
+        fila         INT PRIMARY KEY,
+        estadio      NVARCHAR(200) COLLATE DATABASE_DEFAULT,
+        ciudad       NVARCHAR(200) COLLATE DATABASE_DEFAULT,
+        pais         NVARCHAR(10)  COLLATE DATABASE_DEFAULT,
+        capacidad    NVARCHAR(50)  COLLATE DATABASE_DEFAULT,
+        huso_horario NVARCHAR(10)  COLLATE DATABASE_DEFAULT
+    );
+
+    INSERT INTO #sedes (fila, estadio, ciudad, pais, capacidad, huso_horario)
+    SELECT CAST(s.[key] AS INT) + 1 AS fila, d.estadio, d.ciudad, d.pais, d.capacidad, d.huso_horario
     FROM OPENJSON(@json, '$.sedes') s
     CROSS APPLY OPENJSON(s.value) WITH (
         estadio      NVARCHAR(200) '$.estadio',
@@ -1560,6 +1667,7 @@ BEGIN
         SET @i += 1;
     END;
 
+    DROP TABLE #sedes;
     EXEC importacion.lote_cerrar @lote_id, @leidos, @insertados, @actualizados, @sin_cambios, @rechazados;
 END;
 GO
@@ -1598,10 +1706,39 @@ BEGIN
         THROW;
     END CATCH;
 
-    -- Selecciones clasificadas: confederación y tabla final.
+    -- Selecciones clasificadas (confederación y tabla final), grupo de cada selección y, en
+    -- #selecciones, una por fila: el WHILE la recorre por su clave primaria.
+    CREATE TABLE #clasificados (
+        codigo        NVARCHAR(10) COLLATE DATABASE_DEFAULT,
+        confederacion NVARCHAR(20) COLLATE DATABASE_DEFAULT,
+        posicion      INT,
+        ganados       NVARCHAR(10) COLLATE DATABASE_DEFAULT,
+        empatados     NVARCHAR(10) COLLATE DATABASE_DEFAULT,
+        perdidos      NVARCHAR(10) COLLATE DATABASE_DEFAULT,
+        gf            NVARCHAR(10) COLLATE DATABASE_DEFAULT,
+        gc            NVARCHAR(10) COLLATE DATABASE_DEFAULT
+    );
+    CREATE TABLE #grupos (
+        pais_id INT,
+        grupo   NVARCHAR(5) COLLATE DATABASE_DEFAULT,
+        INDEX ix_grupos_pais CLUSTERED (pais_id)
+    );
+    CREATE TABLE #selecciones (
+        fila          INT PRIMARY KEY,
+        codigo        NVARCHAR(10) COLLATE DATABASE_DEFAULT,
+        confederacion NVARCHAR(20) COLLATE DATABASE_DEFAULT,
+        pais_id       INT,
+        posicion      INT,
+        ganados       NVARCHAR(10) COLLATE DATABASE_DEFAULT,
+        empatados     NVARCHAR(10) COLLATE DATABASE_DEFAULT,
+        perdidos      NVARCHAR(10) COLLATE DATABASE_DEFAULT,
+        gf            NVARCHAR(10) COLLATE DATABASE_DEFAULT,
+        gc            NVARCHAR(10) COLLATE DATABASE_DEFAULT
+    );
+
+    INSERT INTO #clasificados (codigo, confederacion, posicion, ganados, empatados, perdidos, gf, gc)
     SELECT d.codigo, d.confederacion, TRY_CONVERT(INT, d.posicion) AS posicion,
            d.ganados, d.empatados, d.perdidos, d.gf, d.gc
-    INTO #clasificados
     FROM OPENJSON(@json, '$.selecciones') s
     CROSS APPLY OPENJSON(s.value) WITH (
         codigo        NVARCHAR(10) '$.codigo',
@@ -1615,14 +1752,14 @@ BEGIN
     ) d;
 
     -- Grupo de cada selección, por su nombre en la página de planteles.
+    INSERT INTO #grupos (pais_id, grupo)
     SELECT importacion.fn_pais_id(d.equipo) AS pais_id, d.grupo
-    INTO #grupos
     FROM OPENJSON(@json, '$.grupos') g
     CROSS APPLY OPENJSON(g.value) WITH (equipo NVARCHAR(100) '$.equipo', grupo NVARCHAR(5) '$.grupo') d;
 
+    INSERT INTO #selecciones (fila, codigo, confederacion, pais_id, posicion, ganados, empatados, perdidos, gf, gc)
     SELECT ROW_NUMBER() OVER (ORDER BY c.confederacion, c.codigo) AS fila, c.codigo, c.confederacion,
            importacion.fn_pais_id(c.codigo) AS pais_id, c.posicion, c.ganados, c.empatados, c.perdidos, c.gf, c.gc
-    INTO #selecciones
     FROM #clasificados c;
 
     SELECT @leidos = COUNT(*) FROM #selecciones;
@@ -1707,6 +1844,7 @@ BEGIN
         SET @i += 1;
     END;
 
+    DROP TABLE #clasificados, #grupos, #selecciones;
     EXEC importacion.lote_cerrar @lote_id, @leidos, @insertados, @actualizados, @sin_cambios, @rechazados;
 END;
 GO
@@ -1757,11 +1895,49 @@ BEGIN
         THROW;
     END CATCH;
 
+    -- Tablas temporales del proceso: lo leído del archivo, lo transformado (el WHILE de altas la
+    -- recorre por su clave primaria) y los convocados a dar de baja.
+    CREATE TABLE #leidas (
+        fila           INT PRIMARY KEY,
+        equipo         NVARCHAR(100) COLLATE DATABASE_DEFAULT,
+        posicion_txt   NVARCHAR(10)  COLLATE DATABASE_DEFAULT,
+        dorsal_txt     NVARCHAR(10)  COLLATE DATABASE_DEFAULT,
+        jugador        NVARCHAR(200) COLLATE DATABASE_DEFAULT,
+        apellido_orden NVARCHAR(200) COLLATE DATABASE_DEFAULT,
+        fecha_txt      NVARCHAR(20)  COLLATE DATABASE_DEFAULT,
+        club           NVARCHAR(200) COLLATE DATABASE_DEFAULT
+    );
+    CREATE TABLE #filas (
+        fila             INT PRIMARY KEY,
+        equipo           NVARCHAR(100) COLLATE DATABASE_DEFAULT,
+        jugador          NVARCHAR(200) COLLATE DATABASE_DEFAULT,
+        dorsal_txt       NVARCHAR(10)  COLLATE DATABASE_DEFAULT,
+        posicion_txt     NVARCHAR(10)  COLLATE DATABASE_DEFAULT,
+        fecha_txt        NVARCHAR(20)  COLLATE DATABASE_DEFAULT,
+        club             NVARCHAR(200) COLLATE DATABASE_DEFAULT,
+        seleccion_id     INT,
+        es_dt            BIT,
+        dorsal           INT,
+        posicion         VARCHAR(13)  COLLATE DATABASE_DEFAULT,
+        fecha_nacimiento DATE,
+        nombre           VARCHAR(100) COLLATE DATABASE_DEFAULT,
+        apellido         VARCHAR(100) COLLATE DATABASE_DEFAULT,
+        formato_ok       BIT
+    );
+    CREATE TABLE #bajas (
+        orden           INT IDENTITY(1, 1) PRIMARY KEY,
+        convocatoria_id INT,
+        dorsal          INT,
+        fecha_alta      DATE,
+        motivo_alta     VARCHAR(150)  COLLATE DATABASE_DEFAULT,
+        registro        VARCHAR(1000) COLLATE DATABASE_DEFAULT
+    );
+
     -- 1) Lectura: una fila por jugador o director técnico, con su selección.
+    INSERT INTO #leidas (fila, equipo, posicion_txt, dorsal_txt, jugador, apellido_orden, fecha_txt, club)
     SELECT CAST(p.[key] AS INT) + 1 AS fila, d.equipo,
            IIF(d.rol = N'DT', N'DT', d.posicion) AS posicion_txt, d.dorsal AS dorsal_txt, d.jugador,
            d.apellido_orden, d.fecha_txt, d.club
-    INTO #leidas
     FROM OPENJSON(@json, '$.planteles') p
     CROSS APPLY OPENJSON(p.value) WITH (
         equipo         NVARCHAR(100) '$.equipo',
@@ -1777,6 +1953,8 @@ BEGIN
     SELECT @leidos = COUNT(*) FROM #leidas;
 
     -- 2) Transformación por conjunto: selección, dorsal, posición, fecha, nombre y apellido.
+    INSERT INTO #filas (fila, equipo, jugador, dorsal_txt, posicion_txt, fecha_txt, club, seleccion_id, es_dt,
+                        dorsal, posicion, fecha_nacimiento, nombre, apellido)
     SELECT l.fila, l.equipo, l.jugador, l.dorsal_txt, l.posicion_txt, l.fecha_txt, l.club,
            importacion.fn_seleccion_id(l.equipo) AS seleccion_id,
            IIF(l.posicion_txt = N'DT', 1, 0) AS es_dt,
@@ -1786,7 +1964,6 @@ BEGIN
            TRY_CONVERT(DATE, l.fecha_txt, 23) AS fecha_nacimiento,
            CAST(n.nombre AS VARCHAR(100)) COLLATE DATABASE_DEFAULT AS nombre,
            CAST(n.apellido AS VARCHAR(100)) COLLATE DATABASE_DEFAULT AS apellido
-    INTO #filas
     FROM #leidas l
     CROSS APPLY (
         SELECT CASE WHEN l.posicion_txt = N'DT' OR CHARINDEX(N',', ISNULL(l.apellido_orden, N'')) = 0 THEN 1
@@ -1803,16 +1980,15 @@ BEGIN
     ) a
     CROSS APPLY (SELECT ISNULL(a.nombre_pila, a.apellido) AS nombre, a.apellido) n;
 
-    ALTER TABLE #filas ADD formato_ok BIT;
     UPDATE #filas
     SET formato_ok = IIF(seleccion_id IS NOT NULL AND nombre IS NOT NULL
                          AND (es_dt = 1 OR (dorsal BETWEEN 1 AND 99 AND posicion IS NOT NULL AND fecha_nacimiento IS NOT NULL)),
                          1, 0);
 
     -- 3) Bajas de los convocados vigentes que la lista ya no incluye.
-    SELECT IDENTITY(INT, 1, 1) AS orden, c.convocatoria_id, c.dorsal, c.fecha_alta, c.motivo_alta,
+    INSERT INTO #bajas (convocatoria_id, dorsal, fecha_alta, motivo_alta, registro)
+    SELECT c.convocatoria_id, c.dorsal, c.fecha_alta, c.motivo_alta,
            CONCAT(j.nombre, ' ', j.apellido, ' | dorsal ', c.dorsal) AS registro
-    INTO #bajas
     FROM plantel.convocatoria c
     JOIN plantel.jugador j ON j.jugador_id = c.jugador_id
     WHERE c.fecha_baja IS NULL
@@ -1942,6 +2118,7 @@ BEGIN
         SET @i += 1;
     END;
 
+    DROP TABLE #leidas, #filas, #bajas;
     SET @actualizados += @bajas;
     EXEC importacion.lote_cerrar @lote_id, @leidos, @insertados, @actualizados, @sin_cambios, @rechazados;
 END;

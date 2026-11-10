@@ -5,6 +5,47 @@ Al principio siempre va a estar la fecha más actual, y en la misma está la obs
 
 ---
 
+## [6-11-2026]
+
+### Tablas temporales en la importación (Entrega 6)
+
+#### Observación del cliente
+
+El cliente indicó que el script de importación (`1_entrega6_importacion.sql`) no usaba tablas temporales para importar como sí lo hacía el de APIs (`2_entrega6_apis.sql`), que es la forma más eficiente de resolverlo, y que esas tablas tienen que dejar de existir cuando la importación termina.
+
+#### Solución adoptada
+
+Se tomó como modelo `torneo.consultar_api_banco_mundial`, que crea sus tablas temporales con `CREATE TABLE` y numera las filas con una clave primaria (`#datos`). Los importadores ya volcaban el archivo a tablas temporales, pero las armaban con `SELECT ... INTO`. Esas tablas quedaban sin índice, y cada vuelta del `WHILE` recorría la tabla entera para encontrar su fila.
+
+En `1_entrega6_importacion.sql` se aplicó el mismo patrón a los siete importadores (`teams.csv`, `players.csv`, `worldcup.json`, `tarifas_publicidad.xml` y los tres JSON del scraping):
+
+- Cada tabla temporal se crea con `CREATE TABLE` explícito y se carga con `INSERT INTO ... SELECT`. Las tablas que recorre el `WHILE` tienen la fila como clave primaria (`fila INT PRIMARY KEY`), así que cada fila se busca directamente por esa clave.
+- Las columnas de texto se declaran con `COLLATE DATABASE_DEFAULT`, como en el archivo de APIs, para no tener conflictos de intercalación con las tablas del modelo.
+- Al terminar, cada SP borra sus tablas temporales con `DROP TABLE`. Si el lote se rechaza antes, SQL Server las borra al salir del SP.
+- En el tarifario, la tabla con los países de interés de la campaña se crea una sola vez y se vacía en cada pieza. Antes se creaba y se borraba dentro de la transacción de cada pieza.
+- En planteles, la columna `formato_ok` se declara al crear la tabla, en lugar de agregarla después con `ALTER TABLE`.
+- `importacion.archivo_leer_texto`, que lee los archivos JSON, también borra su tabla temporal (`#contenido`) al terminar.
+
+En `2_entrega6_apis.sql` se agregó el mismo `DROP TABLE` al terminar de usar las tablas temporales: `#respuesta` y `#datos` en Banco Mundial, y `#cotizaciones` en Frankfurter.
+
+### Reiniciar los ids crecientes en la Entrega 5
+
+#### Observación del cliente
+
+El cliente sugirió que los ids una vez que se resetean tienen que volver a empezar desde el inicio como cuando es creado el campo e inicializado por primera vez.
+
+#### Solución adoptada
+
+Al script de limpieza de las pruebas (`6_entrega5_test_limpieza.sql`) se le agregó, al final, el reinicio de los contadores `IDENTITY`. Primero se borran los datos de prueba, de las tablas hijas a las tablas padre. Después se recorre, con un `WHILE`, la lista de las 22 tablas que limpia el script. Para cada una:
+
+- Se busca su columna `IDENTITY` en `sys.identity_columns`.
+- Se calcula el mayor id que queda después de la limpieza, o 0 si la tabla quedó vacía. Como el nombre de la tabla y de la columna cambian en cada vuelta, la consulta se arma con `sp_executesql`.
+- Se reinicia el contador en ese valor con `DBCC CHECKIDENT (tabla, RESEED, valor)`.
+
+Así, el próximo alta de una tabla vacía vuelve a recibir el id 1, como cuando la tabla se creó. Si la tabla conserva datos que no son de prueba, el próximo alta recibe el id siguiente al último que quedó, sin dejar el hueco que dejaban los ids de prueba borrados.
+
+No se reinician las tablas sin columna `IDENTITY` (`plantel.formacion_jugador`, `publicidad.campania_pais_interes` y `arbitraje.arbitro_idioma`) ni `torneo.parametro`, que el script no limpia.
+
 ## [23-10-2026]
 
 ### ABM Fallidos y validaciones en sus SPs

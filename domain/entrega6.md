@@ -148,6 +148,11 @@ Entrega 5. Un archivo que no se puede leer o no trae el arreglo esperado deja el
   si está igual no se toca. Para las tablas de estadísticas el cambio se detecta con `EXCEPT`.
 - **SQL dinámico.** Sólo para `BULK INSERT`, que no acepta la ruta en una variable.
 - **Sin cursores.** Las filas se recorren con `WHILE` sobre una tabla temporal numerada, como en la Entrega 5.
+- **Tablas temporales.** El contenido del archivo se vuelca a tablas temporales locales (`#`) creadas con
+  `CREATE TABLE` explícito y con la fila como clave primaria (`fila INT PRIMARY KEY`), igual que
+  `torneo.consultar_api_banco_mundial` en `entrega6_apis.sql`. El `WHILE` busca cada fila por esa clave, sin
+  recorrer la tabla entera. Al terminar, el SP las borra con `DROP TABLE`; si el lote se rechaza antes, las
+  borra SQL Server al salir del SP.
 
 | Proceso | Clave natural |
 |---|---|
