@@ -298,3 +298,29 @@ BEGIN
     EXEC importacion.lote_cerrar @lote_id, @leidos, @insertados, @actualizados, @sin_cambios, @rechazados;
 END;
 GO
+
+-- ==================================================================
+-- 3. Carga inicial de las cotizaciones
+-- ==================================================================
+
+/* Las tarifas publicitarias (publicidad.importar_tarifas) vienen en distintas monedas y se
+ convierten a dólares con publicidad.tipo_cambio. Si la tabla está vacía, esa importación
+ rechaza todas las filas que no están en dólares ("No hay cotización registrada para la
+ moneda..."). Por eso, al crear los objetos de las APIs se cargan las cotizaciones del día.
+ Si la API no responde (por ejemplo, sin conexión a internet), no se interrumpe la creación:
+ se avisa, y las cotizaciones se pueden cargar después con
+ EXEC publicidad.consultar_api_frankfurter. Es rejecutable: si ya hay cotizaciones, no hace nada. */
+
+IF NOT EXISTS (SELECT 1 FROM publicidad.tipo_cambio)
+BEGIN
+    BEGIN TRY
+        EXEC publicidad.consultar_api_frankfurter;
+    END TRY
+    BEGIN CATCH
+        PRINT CONCAT('AVISO: no se pudieron cargar las cotizaciones iniciales (', ERROR_MESSAGE(), ').');
+    END CATCH;
+
+    IF NOT EXISTS (SELECT 1 FROM publicidad.tipo_cambio)
+        PRINT 'AVISO: publicidad.tipo_cambio quedó vacía. Ejecutar publicidad.consultar_api_frankfurter antes de importar las tarifas.';
+END;
+GO
