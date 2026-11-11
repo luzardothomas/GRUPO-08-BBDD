@@ -114,7 +114,7 @@ BEGIN
         SET @errores += '- No existe el parámetro ''' + ISNULL(@clave, '(nulo)') + '''.' + @nl;
     IF @clave IN ('convocatoria_min_jugadores', 'convocatoria_max_jugadores', 'formacion_titulares',
                   'formacion_max_suplentes', 'cambios_max_reglamentarios', 'ventanas_max_reglamentarias',
-                  'cambios_extra_alargue', 'ventanas_extra_alargue', 'suspension_partidos_roja',
+                  'cambios_extra_alargue', 'ventanas_extra_alargue',
                   'prime_time_hora_desde', 'prime_time_hora_hasta')
         SET @errores += '- El parámetro es requerido por la lógica de negocio: se puede modificar, no eliminar.' + @nl;
 
@@ -2121,8 +2121,8 @@ BEGIN
 
         IF @tipo IS NULL OR @tipo NOT IN ('amarilla', 'roja')
             SET @errores += '- El tipo de tarjeta debe ser amarilla o roja.' + @nl;
-        IF @tipo = 'amarilla' AND @tipo_expulsion IS NOT NULL
-            SET @errores += '- Una tarjeta amarilla no lleva tipo de expulsión.' + @nl;
+        IF @tipo = 'amarilla' AND ISNULL(@tipo_expulsion, 'sin_expulsar') <> 'sin_expulsar'
+            SET @errores += '- Una tarjeta amarilla no expulsa: su tipo de expulsión es sin_expulsar.' + @nl;
         IF @tipo = 'roja' AND (@tipo_expulsion IS NULL OR @tipo_expulsion NOT IN ('doble_amarilla', 'roja_directa'))
             SET @errores += '- Una tarjeta roja debe indicar si es doble_amarilla o roja_directa.' + @nl;
 
@@ -2148,7 +2148,7 @@ CREATE OR ALTER PROCEDURE evento.tarjeta_insertar
     @periodo        VARCHAR(25),
     @tipo           VARCHAR(10),
     @motivo         VARCHAR(150) = NULL,
-    @tipo_expulsion VARCHAR(20) = NULL,
+    @tipo_expulsion VARCHAR(20) = 'sin_expulsar',
     @tarjeta_id     INT = NULL OUTPUT
 AS
 BEGIN
@@ -2165,7 +2165,7 @@ BEGIN
     END;
 
     INSERT INTO evento.tarjeta (partido_id, persona_id, minuto, periodo, tipo, motivo, tipo_expulsion)
-    VALUES (@partido_id, @persona_id, @minuto, @periodo, @tipo, NULLIF(LTRIM(RTRIM(@motivo)), ''), @tipo_expulsion);
+    VALUES (@partido_id, @persona_id, @minuto, @periodo, @tipo, NULLIF(LTRIM(RTRIM(@motivo)), ''), ISNULL(@tipo_expulsion, 'sin_expulsar'));
 
     SET @tarjeta_id = SCOPE_IDENTITY();
 END;
@@ -2248,18 +2248,18 @@ BEGIN
     IF @criterio_id IS NOT NULL
        AND NOT EXISTS (SELECT 1 FROM evento.criterio_suspension WHERE criterio_id = @criterio_id)
         SET @errores += '- No existe el criterio con id ' + CAST(@criterio_id AS VARCHAR(12)) + '.' + @nl;
-    IF @fase_aplicable IS NOT NULL AND @fase_aplicable NOT IN
+    IF @fase_aplicable IS NULL OR @fase_aplicable NOT IN
        ('grupos', 'dieciseisavos', 'octavos', 'cuartos', 'semifinal', 'tercer_puesto', 'final')
-        SET @errores += '- La fase aplicable no es válida (NULL = todas las fases).' + @nl;
-    IF @tipo_persona_aplicable IS NOT NULL AND @tipo_persona_aplicable NOT IN ('jugador', 'cuerpo_tecnico')
-        SET @errores += '- El tipo de persona aplicable debe ser jugador o cuerpo_tecnico (NULL = ambos).' + @nl;
-    IF @cantidad_amarillas IS NULL OR @cantidad_amarillas <= 0
-        SET @errores += '- La cantidad de amarillas debe ser mayor a cero.' + @nl;
+        SET @errores += '- La fase aplicable es obligatoria y debe ser grupos, dieciseisavos, octavos, cuartos, semifinal, tercer_puesto o final.' + @nl;
+    IF @tipo_persona_aplicable IS NULL OR @tipo_persona_aplicable NOT IN ('jugador', 'cuerpo_tecnico')
+        SET @errores += '- El tipo de persona aplicable es obligatorio y debe ser jugador o cuerpo_tecnico.' + @nl;
+    IF @cantidad_amarillas IS NULL OR @cantidad_amarillas < 0
+        SET @errores += '- La cantidad de amarillas no puede ser negativa (0 = criterio de expulsión, mayor a 0 = acumulación).' + @nl;
     IF @partidos_suspension IS NULL OR @partidos_suspension <= 0
         SET @errores += '- Los partidos de suspensión deben ser mayores a cero.' + @nl;
     IF EXISTS (SELECT 1 FROM evento.criterio_suspension
-               WHERE ISNULL(fase_aplicable, '') = ISNULL(@fase_aplicable, '')
-                 AND ISNULL(tipo_persona_aplicable, '') = ISNULL(@tipo_persona_aplicable, '')
+               WHERE fase_aplicable = @fase_aplicable
+                 AND tipo_persona_aplicable = @tipo_persona_aplicable
                  AND cantidad_amarillas = @cantidad_amarillas
                  AND (@criterio_id IS NULL OR criterio_id <> @criterio_id))
         SET @errores += '- Ya existe un criterio para esa fase, tipo de persona y cantidad de amarillas.' + @nl;
@@ -2293,6 +2293,43 @@ BEGIN
         (@fase_aplicable, @tipo_persona_aplicable, @cantidad_amarillas, @partidos_suspension, ISNULL(@activo, 1));
 
     SET @criterio_id = SCOPE_IDENTITY();
+END;
+GO
+
+/* Carga un criterio para las siete fases de un tipo de persona (lo que antes se expresaba con fase NULL = todas):
+ una fila por fase, todas o ninguna. */
+
+CREATE OR ALTER PROCEDURE evento.criterio_suspension_insertar_todas_las_fases
+    @cantidad_amarillas     INT,
+    @partidos_suspension    INT,
+    @tipo_persona_aplicable VARCHAR(20),
+    @activo                 BIT = 1
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    DECLARE @i INT = 1, @fase VARCHAR(13), @tran_propia BIT = IIF(@@TRANCOUNT = 0, 1, 0);
+    DECLARE @fases TABLE (n INT IDENTITY(1, 1) PRIMARY KEY, fase VARCHAR(13) NOT NULL);
+
+    INSERT INTO @fases (fase)
+    VALUES ('grupos'), ('dieciseisavos'), ('octavos'), ('cuartos'), ('semifinal'), ('tercer_puesto'), ('final');
+
+    BEGIN TRY
+        IF @tran_propia = 1 BEGIN TRANSACTION;
+        WHILE @i <= 7
+        BEGIN
+            SELECT @fase = fase FROM @fases WHERE n = @i;
+            EXEC evento.criterio_suspension_insertar @cantidad_amarillas = @cantidad_amarillas,
+                 @partidos_suspension = @partidos_suspension, @fase_aplicable = @fase,
+                 @tipo_persona_aplicable = @tipo_persona_aplicable, @activo = @activo;
+            SET @i += 1;
+        END;
+        IF @tran_propia = 1 COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @tran_propia = 1 AND @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
 END;
 GO
 
@@ -2365,11 +2402,12 @@ AS
 BEGIN
     SET NOCOUNT ON;
     DECLARE @nl CHAR(2) = CHAR(13) + CHAR(10), @persona_id INT, @partido_origen_id INT,
-            @tipo VARCHAR(8), @seleccion_id INT, @fecha_origen DATETIMEOFFSET;
+            @tipo VARCHAR(8), @tipo_expulsion VARCHAR(14), @cantidad_criterio INT,
+            @seleccion_id INT, @fecha_origen DATETIMEOFFSET;
     SET @errores = ISNULL(@errores, '');
 
     SELECT @persona_id = t.persona_id, @partido_origen_id = t.partido_id, @tipo = t.tipo,
-           @fecha_origen = p.fecha_hora_utc
+           @tipo_expulsion = t.tipo_expulsion, @fecha_origen = p.fecha_hora_utc
     FROM evento.tarjeta t
     JOIN torneo.partido p ON p.partido_id = t.partido_id
     WHERE t.tarjeta_id = @tarjeta_id;
@@ -2380,13 +2418,18 @@ BEGIN
 
     IF @persona_id IS NULL
         SET @errores += '- No existe la tarjeta con id ' + ISNULL(CAST(@tarjeta_id AS VARCHAR(12)), '(nulo)') + '.' + @nl;
-    IF @criterio_id IS NOT NULL
-       AND NOT EXISTS (SELECT 1 FROM evento.criterio_suspension WHERE criterio_id = @criterio_id)
+    IF @criterio_id IS NULL
+        SET @errores += '- El criterio de suspensión aplicado es obligatorio.' + @nl;
+    ELSE IF NOT EXISTS (SELECT 1 FROM evento.criterio_suspension WHERE criterio_id = @criterio_id)
         SET @errores += '- No existe el criterio con id ' + CAST(@criterio_id AS VARCHAR(12)) + '.' + @nl;
-    IF @criterio_id IS NULL AND @tipo = 'amarilla'
-        SET @errores += '- Una suspensión originada en una amarilla debe indicar el criterio de acumulación aplicado.' + @nl;
-    IF @criterio_id IS NOT NULL AND @tipo = 'roja'
-        SET @errores += '- Una suspensión por expulsión no lleva criterio de acumulación.' + @nl;
+    ELSE IF @persona_id IS NOT NULL
+    BEGIN
+        SELECT @cantidad_criterio = cantidad_amarillas FROM evento.criterio_suspension WHERE criterio_id = @criterio_id;
+        IF @tipo = 'amarilla' AND @cantidad_criterio = 0
+            SET @errores += '- Una suspensión originada en una amarilla debe usar un criterio de acumulación (más de 0 amarillas).' + @nl;
+        IF @tipo = 'roja' AND @cantidad_criterio <> 0
+            SET @errores += '- Una suspensión por expulsión (' + @tipo_expulsion + ') debe usar el criterio de expulsión (0 amarillas).' + @nl;
+    END;
     IF NULLIF(LTRIM(RTRIM(@motivo)), '') IS NULL
         SET @errores += '- El motivo es obligatorio.' + @nl;
 
