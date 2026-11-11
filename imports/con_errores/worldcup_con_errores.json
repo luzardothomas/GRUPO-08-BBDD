@@ -1,0 +1,15 @@
+{
+  "name": "Archivo de prueba: 5 partidos, 4 con errores (importación parcial)",
+  "matches": [
+    { "round": "Matchday 1", "date": "2026-06-11", "time": "13:00 UTC-6", "team1": "Mexico", "team2": "South Africa",
+      "score": { "ft": [2, 0], "ht": [1, 0] }, "group": "Group A", "ground": "Mexico City" },
+    { "round": "Matchday 1", "date": "2026-06-11", "time": "13:00 UTC-6", "team1": "Mexico", "team2": "South Africa",
+      "score": { "ft": [5, 0] }, "group": "Group A", "ground": "Mexico City" },
+    { "round": "Matchday 2", "date": "2026-06-18", "time": "15:00 UTC-4", "team1": "Atlantis", "team2": "Argentina",
+      "score": { "ft": [0, 3] }, "group": "Group J", "ground": "Atlanta" },
+    { "round": "Round of 32", "date": "2026-06-29", "time": "15hs", "team1": "Argentina", "team2": "Brazil",
+      "ground": "Buenos Aires" },
+    { "round": "Friendly", "date": "2026-31-12", "time": "20:00 UTC-4", "team1": "Argentina", "team2": "Uruguay",
+      "ground": "Miami (Miami Gardens)" }
+  ]
+}

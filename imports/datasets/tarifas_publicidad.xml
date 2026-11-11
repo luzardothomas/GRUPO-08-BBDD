@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Tarifario de pauta publicitaria del Mundial 2026 (área comercial del Comité Organizador).
+  Tarifa por partido de cada pieza, expresada en la moneda del mercado al que se dirige.
+  La importación (publicidad.importar_tarifas) convierte cada tarifa a USD con la
+  cotización de la fecha de inicio de la campaña.
+  Anunciantes y campañas argentinas: tomados de dossiermundial.netlify.app.
+-->
+<tarifario fecha="2026-06-01">
+  <anunciante nombre="Quilmes" razon_social="Cervecería y Maltería Quilmes S.A.I.C.A. y G.">
+    <campania nombre="Mesa de astros" inicio="2026-06-11" fin="2026-07-19">
+      <pais_interes codigo="ARG"/>
+      <pais_interes codigo="URY"/>
+      <pais_interes codigo="PRY"/>
+      <pieza idioma="espanol" mercado="ARG" moneda="USD" tarifa="18000.00"/>
+      <pieza idioma="espanol" mercado="URY" moneda="USD" tarifa="9500.00"/>
+      <pieza idioma="espanol" mercado="PRY" moneda="USD" tarifa="7000.00"/>
+    </campania>
+  </anunciante>
+  <anunciante nombre="YPF" razon_social="YPF S.A.">
+    <campania nombre="Simbiosis" inicio="2026-06-11" fin="2026-07-19">
+      <pais_interes codigo="ARG"/>
+      <pieza idioma="espanol" mercado="ARG" moneda="USD" tarifa="21000.00"/>
+    </campania>
+  </anunciante>
+  <anunciante nombre="Coca-Cola" razon_social="The Coca-Cola Company">
+    <campania nombre="Conferencia" inicio="2026-06-11" fin="2026-07-19">
+      <pais_interes codigo="ARG"/>
+      <pais_interes codigo="MEX"/>
+      <pais_interes codigo="BRA"/>
+      <pais_interes codigo="ESP"/>
+      <pais_interes codigo="USA"/>
+      <pieza idioma="espanol" mercado="ARG" moneda="USD" tarifa="25000.00"/>
+      <pieza idioma="espanol" mercado="MEX" moneda="MXN" tarifa="520000.00"/>
+      <pieza idioma="portugues" mercado="BRA" moneda="BRL" tarifa="140000.00"/>
+      <pieza idioma="espanol" mercado="ESP" moneda="EUR" tarifa="26000.00"/>
+      <pieza idioma="ingles" mercado="USA" moneda="USD" tarifa="45000.00"/>
+    </campania>
+  </anunciante>
+  <anunciante nombre="Visa" razon_social="Visa Inc.">
+    <campania nombre="Centro Argentino de Cábalas" inicio="2026-06-11" fin="2026-07-19">
+      <pais_interes codigo="ARG"/>
+      <pais_interes codigo="USA"/>
+      <pais_interes codigo="GBR"/>
+      <pieza idioma="espanol" mercado="ARG" moneda="USD" tarifa="20000.00"/>
+      <pieza idioma="ingles" mercado="USA" moneda="USD" tarifa="40000.00"/>
+      <pieza idioma="ingles" mercado="GBR" moneda="GBP" tarifa="27000.00"/>
+    </campania>
+  </anunciante>
+  <anunciante nombre="Michelob ULTRA" razon_social="Anheuser-Busch InBev">
+    <campania nombre="The Superior Match" inicio="2026-06-11" fin="2026-07-19">
+      <pais_interes codigo="USA"/>
+      <pais_interes codigo="CAN"/>
+      <pais_interes codigo="MEX"/>
+      <pieza idioma="ingles" mercado="USA" moneda="USD" tarifa="48000.00"/>
+      <pieza idioma="ingles" mercado="CAN" moneda="CAD" tarifa="52000.00"/>
+      <pieza idioma="espanol" mercado="MEX" moneda="MXN" tarifa="450000.00"/>
+    </campania>
+  </anunciante>
+  <anunciante nombre="Santander" razon_social="Banco Santander S.A.">
+    <campania nombre="Seguro de sedes" inicio="2026-06-11" fin="2026-07-19">
+      <pais_interes codigo="ARG"/>
+      <pais_interes codigo="ESP"/>
+      <pais_interes codigo="GBR"/>
+      <pais_interes codigo="BRA"/>
+      <pieza idioma="espanol" mercado="ARG" moneda="USD" tarifa="15000.00"/>
+      <pieza idioma="espanol" mercado="ESP" moneda="EUR" tarifa="22000.00"/>
+      <pieza idioma="ingles" mercado="GBR" moneda="GBP" tarifa="19000.00"/>
+      <pieza idioma="portugues" mercado="BRA" moneda="BRL" tarifa="95000.00"/>
+    </campania>
+  </anunciante>
+  <anunciante nombre="Netflix" razon_social="Netflix, Inc.">
+    <campania nombre="Caíste en la promo" inicio="2026-06-11" fin="2026-07-19">
+      <pais_interes codigo="ARG"/>
+      <pais_interes codigo="JPN"/>
+      <pais_interes codigo="KOR"/>
+      <pais_interes codigo="DEU"/>
+      <pieza idioma="espanol" mercado="ARG" moneda="USD" tarifa="16000.00"/>
+      <pieza idioma="japones" mercado="JPN" moneda="JPY" tarifa="4200000"/>
+      <pieza idioma="coreano" mercado="KOR" moneda="KRW" tarifa="31000000"/>
+      <pieza idioma="aleman" mercado="DEU" moneda="EUR" tarifa="24000.00"/>
+    </campania>
+  </anunciante>
+  <anunciante nombre="Despegar" razon_social="Despegar.com Corp.">
+    <campania nombre="Temporada de OOO" inicio="2026-06-11" fin="2026-07-19">
+      <pais_interes codigo="ARG"/>
+      <pais_interes codigo="MEX"/>
+      <pais_interes codigo="COL"/>
+      <pieza idioma="espanol" mercado="ARG" moneda="USD" tarifa="12000.00"/>
+      <pieza idioma="espanol" mercado="MEX" moneda="MXN" tarifa="210000.00"/>
+      <pieza idioma="espanol" mercado="COL" moneda="USD" tarifa="8000.00"/>
+    </campania>
+  </anunciante>
+  <anunciante nombre="Emirates" razon_social="Emirates Airline">
+    <campania nombre="Fly Better Mundial 2026" inicio="2026-06-01" fin="2026-07-19">
+      <pais_interes codigo="ARE"/>
+      <pais_interes codigo="FRA"/>
+      <pais_interes codigo="ENG"/>
+      <pais_interes codigo="AUS"/>
+      <pieza idioma="ingles" mercado="ARE" moneda="USD" tarifa="30000.00"/>
+      <pieza idioma="frances" mercado="FRA" moneda="EUR" tarifa="28000.00"/>
+      <pieza idioma="ingles" mercado="ENG" moneda="GBP" tarifa="25000.00"/>
+      <pieza idioma="ingles" mercado="AUS" moneda="AUD" tarifa="41000.00"/>
+    </campania>
+  </anunciante>
+</tarifario>
