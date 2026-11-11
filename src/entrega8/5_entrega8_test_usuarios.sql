@@ -102,7 +102,8 @@ GO
 
 PRINT '--- 1.2 usr_administrador: lo que puede hacer';
 -- Da de alta una sede y la borra, ve la convocatoria con los motivos descifrados, ejecuta dos reportes
--- (uno con SQL dinámico), consulta la API de cambio y llama a la importación de sedes.json.
+-- (uno con SQL dinámico), consulta la API de cambio, llama a la importación de sedes.json y hace un ABM completo de
+-- una convocatoria (alta, modificación y baja con fecha y motivo), mostrando lo que queda guardado en cada paso.
 -- Resultado esperado: todo se ejecuta. La importación recibe la ruta relativa del repositorio, que el servidor
 -- no resuelve: se ejecuta (tiene permiso) y la rechaza su validación (error 50003), sin cambios.
 DECLARE @r TABLE (sp VARCHAR(100), esperado VARCHAR(12), error INT);
@@ -112,6 +113,9 @@ DECLARE @pais INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ARG'),
         @sede INT = (SELECT MIN(sede_id) FROM torneo.sede),
         @id INT, @x VARCHAR(200);
 DECLARE @sedes_json VARCHAR(500) = 'imports/scraping/sedes.json';   -- ruta relativa del repositorio
+DECLARE @conv INT, @jug INT, @cupo INT = (SELECT valor FROM torneo.parametro WHERE clave = 'convocatoria_max_jugadores');
+DECLARE @c TABLE (convocatoria_id INT, seleccion VARCHAR(200), dorsal INT, nombre VARCHAR(200), apellido VARCHAR(200),
+                  fecha_alta DATE, motivo_alta VARCHAR(400), fecha_baja DATE, motivo_baja VARCHAR(400));
 EXECUTE AS LOGIN = 'usr_administrador';
 PRINT CONCAT('Sesión: ', SUSER_SNAME());
 BEGIN TRY
@@ -196,6 +200,53 @@ BEGIN CATCH
     PRINT CONCAT(IIF(ERROR_NUMBER() = 229, '  NO PUEDE   ', '  PUEDE      '), 'torneo.importar_sedes',
                  IIF(ERROR_NUMBER() = 229, ' -> permiso denegado (error 229)',
                      ' -> se ejecutó y lo rechazó su validación, sin cambios: '
+                     + LEFT(REPLACE(REPLACE(ERROR_MESSAGE(), CHAR(13), ''), CHAR(10), ' '), 140)));
+END CATCH;
+-- ABM de una convocatoria dentro de una transacción que se deshace al final (no deja cambios). La selección ya
+-- tiene el cupo completo: el administrador sube el cupo en 1, da de alta un jugador y su convocatoria, la modifica
+-- y la da de baja con fecha y motivo (baja lógica). Después de cada paso se consulta, con los motivos descifrados.
+BEGIN TRY
+    BEGIN TRANSACTION;
+    DECLARE @cupo_nuevo INT = @cupo + 1;
+    EXEC torneo.parametro_modificar 'convocatoria_max_jugadores', @cupo_nuevo;
+    EXEC plantel.jugador_insertar 'Jugador', 'De Prueba', '2000-01-01', 'delantero', 'Club de prueba', @jug OUTPUT;
+    EXEC plantel.convocatoria_insertar @seleccion, @jug, 99, '2026-06-02', 'Alta de prueba', @conv OUTPUT;
+    DELETE FROM @c;
+    INSERT INTO @c EXEC plantel.consultar_convocatoria @seleccion_id = @seleccion;
+    SELECT 'ALTA' AS paso, convocatoria_id, seleccion, dorsal, nombre, apellido, fecha_alta, motivo_alta, fecha_baja, motivo_baja
+    FROM @c WHERE convocatoria_id = @conv;
+    PRINT CONCAT('  PUEDE      plantel.convocatoria_insertar -> alta de la convocatoria ', @conv, ' (dorsal 99, sin fecha de baja)');
+
+    EXEC plantel.convocatoria_modificar @conv, 98, '2026-06-02', 'Alta de prueba modificada', NULL, NULL;
+    DELETE FROM @c;
+    INSERT INTO @c EXEC plantel.consultar_convocatoria @seleccion_id = @seleccion;
+    SELECT 'MODIFICACIÓN' AS paso, convocatoria_id, seleccion, dorsal, nombre, apellido, fecha_alta, motivo_alta, fecha_baja, motivo_baja
+    FROM @c WHERE convocatoria_id = @conv;
+    PRINT '  PUEDE      plantel.convocatoria_modificar -> dorsal 98 y motivo de alta modificados';
+
+    EXEC plantel.convocatoria_modificar @conv, 98, '2026-06-02', 'Alta de prueba modificada', '2026-06-20', 'Baja de prueba';
+    DELETE FROM @c;
+    INSERT INTO @c EXEC plantel.consultar_convocatoria @seleccion_id = @seleccion;
+    SELECT 'BAJA' AS paso, convocatoria_id, seleccion, dorsal, nombre, apellido, fecha_alta, motivo_alta, fecha_baja, motivo_baja
+    FROM @c WHERE convocatoria_id = @conv;
+    PRINT '  PUEDE      plantel.convocatoria_modificar -> baja con fecha (2026-06-20) y motivo';
+
+    ROLLBACK TRANSACTION;
+    DELETE FROM @c;
+    INSERT INTO @c EXEC plantel.consultar_convocatoria @seleccion_id = @seleccion;
+    DECLARE @sigue BIT = IIF(EXISTS (SELECT 1 FROM @c WHERE convocatoria_id = @conv), 1, 0),
+            @vigentes INT = (SELECT COUNT(*) FROM @c WHERE fecha_baja IS NULL);
+    PRINT CONCAT('  (transacción deshecha: la convocatoria de prueba ', IIF(@sigue = 1, 'sigue', 'ya no existe'),
+                 ' y la selección vuelve a tener ', @vigentes, ' convocados)');
+    INSERT INTO @r VALUES ('torneo.parametro_modificar', 'ok', 0), ('plantel.jugador_insertar', 'ok', 0),
+                          ('plantel.convocatoria_insertar', 'ok', 0), ('plantel.convocatoria_modificar', 'ok', 0);
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+    INSERT INTO @r VALUES ('plantel.convocatoria (alta, modificación y baja)', 'ok', ERROR_NUMBER());
+    PRINT CONCAT(IIF(ERROR_NUMBER() = 229, '  NO PUEDE   ', '  PUEDE      '), 'plantel.convocatoria (alta, modificación y baja)',
+                 IIF(ERROR_NUMBER() = 229, ' -> permiso denegado (error 229)',
+                     ' -> se ejecutó y lo rechazó su validación: '
                      + LEFT(REPLACE(REPLACE(ERROR_MESSAGE(), CHAR(13), ''), CHAR(10), ' '), 140)));
 END CATCH;
 REVERT;
@@ -313,8 +364,8 @@ GO
 -- ============================================================
 
 PRINT '--- 2.2 usr_gestor_publicidad: lo que puede hacer';
--- Da de alta un anunciante con su contacto, lo consulta (ve el contacto descifrado) y lo borra; ejecuta los
--- dos reportes de publicidad; pide la asignación de espacios de un partido inexistente (validación).
+-- ABM de un anunciante: lo da de alta con su contacto, lo modifica y lo borra, y después de cada paso lo consulta
+-- (ve el contacto descifrado); ejecuta los dos reportes de publicidad; pide la asignación de espacios de un partido inexistente (validación).
 -- Resultado esperado: todo se ejecuta; la asignación la rechaza su validación, sin cambios.
 DECLARE @r TABLE (sp VARCHAR(100), esperado VARCHAR(12), error INT);
 DECLARE @pais INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ARG'),
@@ -322,6 +373,7 @@ DECLARE @pais INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ARG'),
         @partido INT = (SELECT MIN(partido_id) FROM torneo.partido WHERE fase = 'final'),
         @sede INT = (SELECT MIN(sede_id) FROM torneo.sede),
         @id INT, @x VARCHAR(200);
+DECLARE @a TABLE (anunciante_id INT, nombre VARCHAR(200), razon_social VARCHAR(200), contacto VARCHAR(400));
 EXECUTE AS LOGIN = 'usr_gestor_publicidad';
 PRINT CONCAT('Sesión: ', SUSER_SNAME());
 BEGIN TRY
@@ -337,7 +389,9 @@ BEGIN CATCH
                      + LEFT(REPLACE(REPLACE(ERROR_MESSAGE(), CHAR(13), ''), CHAR(10), ' '), 140)));
 END CATCH;
 BEGIN TRY
-    EXEC publicidad.consultar_anunciante @anunciante_id = @id;
+    DELETE FROM @a;
+    INSERT INTO @a EXEC publicidad.consultar_anunciante @anunciante_id = @id;
+    SELECT 'ALTA' AS paso, * FROM @a;
     INSERT INTO @r VALUES ('publicidad.consultar_anunciante', 'ok', 0);
     PRINT CONCAT('  PUEDE      publicidad.consultar_anunciante', ' -> ve el contacto descifrado');
 END TRY
@@ -349,9 +403,27 @@ BEGIN CATCH
                      + LEFT(REPLACE(REPLACE(ERROR_MESSAGE(), CHAR(13), ''), CHAR(10), ' '), 140)));
 END CATCH;
 BEGIN TRY
+    EXEC publicidad.anunciante_modificar @id, 'Anunciante de prueba modificado', 'Prueba S.A. (modificada)', 'nuevo.contacto@prueba.com';
+    DELETE FROM @a;
+    INSERT INTO @a EXEC publicidad.consultar_anunciante @anunciante_id = @id;
+    SELECT 'MODIFICACIÓN' AS paso, * FROM @a;
+    INSERT INTO @r VALUES ('publicidad.anunciante_modificar', 'ok', 0);
+    PRINT CONCAT('  PUEDE      publicidad.anunciante_modificar', ' -> nombre, razón social y contacto modificados');
+END TRY
+BEGIN CATCH
+    INSERT INTO @r VALUES ('publicidad.anunciante_modificar', 'ok', ERROR_NUMBER());
+    PRINT CONCAT(IIF(ERROR_NUMBER() = 229, '  NO PUEDE   ', '  PUEDE      '), 'publicidad.anunciante_modificar',
+                 IIF(ERROR_NUMBER() = 229, ' -> permiso denegado (error 229)',
+                     ' -> se ejecutó y lo rechazó su validación, sin cambios: '
+                     + LEFT(REPLACE(REPLACE(ERROR_MESSAGE(), CHAR(13), ''), CHAR(10), ' '), 140)));
+END CATCH;
+BEGIN TRY
     EXEC publicidad.anunciante_eliminar @id;
     INSERT INTO @r VALUES ('publicidad.anunciante_eliminar', 'ok', 0);
-    PRINT CONCAT('  PUEDE      publicidad.anunciante_eliminar', ' -> anunciante de prueba borrado');
+    DELETE FROM @a;
+    INSERT INTO @a EXEC publicidad.consultar_anunciante @anunciante_id = @id;
+    SELECT 'BAJA' AS paso, COUNT(*) AS filas_del_anunciante FROM @a;
+    PRINT CONCAT('  PUEDE      publicidad.anunciante_eliminar', ' -> anunciante de prueba borrado (ya no figura en la consulta)');
 END TRY
 BEGIN CATCH
     INSERT INTO @r VALUES ('publicidad.anunciante_eliminar', 'ok', ERROR_NUMBER());
@@ -448,6 +520,30 @@ BEGIN CATCH
                      + LEFT(REPLACE(REPLACE(ERROR_MESSAGE(), CHAR(13), ''), CHAR(10), ' '), 140)));
 END CATCH;
 BEGIN TRY
+    EXEC plantel.convocatoria_insertar @seleccion, -1, 99, '2026-06-02', 'Alta de prueba';
+    INSERT INTO @r VALUES ('plantel.convocatoria_insertar', 'denegado', 0);
+    PRINT CONCAT('  PUEDE      plantel.convocatoria_insertar', '');
+END TRY
+BEGIN CATCH
+    INSERT INTO @r VALUES ('plantel.convocatoria_insertar', 'denegado', ERROR_NUMBER());
+    PRINT CONCAT(IIF(ERROR_NUMBER() = 229, '  NO PUEDE   ', '  PUEDE      '), 'plantel.convocatoria_insertar',
+                 IIF(ERROR_NUMBER() = 229, ' -> permiso denegado (error 229)',
+                     ' -> se ejecutó y lo rechazó su validación, sin cambios: '
+                     + LEFT(REPLACE(REPLACE(ERROR_MESSAGE(), CHAR(13), ''), CHAR(10), ' '), 140)));
+END CATCH;
+BEGIN TRY
+    EXEC plantel.convocatoria_modificar -1, 98, '2026-06-02', 'Alta de prueba', '2026-06-20', 'Baja de prueba';
+    INSERT INTO @r VALUES ('plantel.convocatoria_modificar', 'denegado', 0);
+    PRINT CONCAT('  PUEDE      plantel.convocatoria_modificar', '');
+END TRY
+BEGIN CATCH
+    INSERT INTO @r VALUES ('plantel.convocatoria_modificar', 'denegado', ERROR_NUMBER());
+    PRINT CONCAT(IIF(ERROR_NUMBER() = 229, '  NO PUEDE   ', '  PUEDE      '), 'plantel.convocatoria_modificar',
+                 IIF(ERROR_NUMBER() = 229, ' -> permiso denegado (error 229)',
+                     ' -> se ejecutó y lo rechazó su validación, sin cambios: '
+                     + LEFT(REPLACE(REPLACE(ERROR_MESSAGE(), CHAR(13), ''), CHAR(10), ' '), 140)));
+END CATCH;
+BEGIN TRY
     EXEC torneo.reporte_resultados @fase = 'final', @tabla_posiciones = 0;
     INSERT INTO @r VALUES ('torneo.reporte_resultados', 'denegado', 0);
     PRINT CONCAT('  PUEDE      torneo.reporte_resultados', '');
@@ -534,8 +630,8 @@ GO
 -- ============================================================
 
 PRINT '--- 3.2 usr_comite_arbitral: lo que puede hacer';
--- Da de alta un árbitro con su fecha de nacimiento, le agrega un idioma, consulta su ficha (ve la fecha
--- descifrada) y lo borra; ejecuta el reporte de designaciones; designa los árbitros de un partido
+-- ABM de un árbitro: lo da de alta con su fecha de nacimiento, le agrega un idioma, lo modifica y lo borra, y
+-- después de cada paso consulta su ficha (ve la fecha descifrada); ejecuta el reporte de designaciones; designa los árbitros de un partido
 -- inexistente (validación).
 -- Resultado esperado: todo se ejecuta; la designación la rechaza su validación, sin cambios.
 DECLARE @r TABLE (sp VARCHAR(100), esperado VARCHAR(12), error INT);
@@ -544,6 +640,7 @@ DECLARE @pais INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ARG'),
         @partido INT = (SELECT MIN(partido_id) FROM torneo.partido WHERE fase = 'final'),
         @sede INT = (SELECT MIN(sede_id) FROM torneo.sede),
         @id INT, @x VARCHAR(200);
+DECLARE @a TABLE (arbitro_id INT, nombre VARCHAR(200), apellido VARCHAR(200), pais VARCHAR(200), categoria VARCHAR(50), fecha_nacimiento DATE);
 EXECUTE AS LOGIN = 'usr_comite_arbitral';
 PRINT CONCAT('Sesión: ', SUSER_SNAME());
 BEGIN TRY
@@ -571,13 +668,30 @@ BEGIN CATCH
                      + LEFT(REPLACE(REPLACE(ERROR_MESSAGE(), CHAR(13), ''), CHAR(10), ' '), 140)));
 END CATCH;
 BEGIN TRY
-    EXEC arbitraje.consultar_arbitro @arbitro_id = @id;
+    DELETE FROM @a;
+    INSERT INTO @a EXEC arbitraje.consultar_arbitro @arbitro_id = @id;
+    SELECT 'ALTA' AS paso, * FROM @a;
     INSERT INTO @r VALUES ('arbitraje.consultar_arbitro', 'ok', 0);
     PRINT CONCAT('  PUEDE      arbitraje.consultar_arbitro', ' -> ve la fecha de nacimiento descifrada');
 END TRY
 BEGIN CATCH
     INSERT INTO @r VALUES ('arbitraje.consultar_arbitro', 'ok', ERROR_NUMBER());
     PRINT CONCAT(IIF(ERROR_NUMBER() = 229, '  NO PUEDE   ', '  PUEDE      '), 'arbitraje.consultar_arbitro',
+                 IIF(ERROR_NUMBER() = 229, ' -> permiso denegado (error 229)',
+                     ' -> se ejecutó y lo rechazó su validación, sin cambios: '
+                     + LEFT(REPLACE(REPLACE(ERROR_MESSAGE(), CHAR(13), ''), CHAR(10), ' '), 140)));
+END CATCH;
+BEGIN TRY
+    EXEC arbitraje.arbitro_modificar @id, 'Árbitro', 'De Prueba Modificado', @pais, 'FIFA', '1986-04-16';
+    DELETE FROM @a;
+    INSERT INTO @a EXEC arbitraje.consultar_arbitro @arbitro_id = @id;
+    SELECT 'MODIFICACIÓN' AS paso, * FROM @a;
+    INSERT INTO @r VALUES ('arbitraje.arbitro_modificar', 'ok', 0);
+    PRINT CONCAT('  PUEDE      arbitraje.arbitro_modificar', ' -> apellido y fecha de nacimiento modificados');
+END TRY
+BEGIN CATCH
+    INSERT INTO @r VALUES ('arbitraje.arbitro_modificar', 'ok', ERROR_NUMBER());
+    PRINT CONCAT(IIF(ERROR_NUMBER() = 229, '  NO PUEDE   ', '  PUEDE      '), 'arbitraje.arbitro_modificar',
                  IIF(ERROR_NUMBER() = 229, ' -> permiso denegado (error 229)',
                      ' -> se ejecutó y lo rechazó su validación, sin cambios: '
                      + LEFT(REPLACE(REPLACE(ERROR_MESSAGE(), CHAR(13), ''), CHAR(10), ' '), 140)));
@@ -597,7 +711,10 @@ END CATCH;
 BEGIN TRY
     EXEC arbitraje.arbitro_eliminar @id;
     INSERT INTO @r VALUES ('arbitraje.arbitro_eliminar', 'ok', 0);
-    PRINT CONCAT('  PUEDE      arbitraje.arbitro_eliminar', ' -> árbitro de prueba borrado');
+    DELETE FROM @a;
+    INSERT INTO @a EXEC arbitraje.consultar_arbitro @arbitro_id = @id;
+    SELECT 'BAJA' AS paso, COUNT(*) AS filas_del_arbitro FROM @a;
+    PRINT CONCAT('  PUEDE      arbitraje.arbitro_eliminar', ' -> árbitro de prueba borrado (ya no figura en la consulta)');
 END TRY
 BEGIN CATCH
     INSERT INTO @r VALUES ('arbitraje.arbitro_eliminar', 'ok', ERROR_NUMBER());
@@ -665,6 +782,18 @@ END TRY
 BEGIN CATCH
     INSERT INTO @r VALUES ('publicidad.anunciante_insertar', 'denegado', ERROR_NUMBER());
     PRINT CONCAT(IIF(ERROR_NUMBER() = 229, '  NO PUEDE   ', '  PUEDE      '), 'publicidad.anunciante_insertar',
+                 IIF(ERROR_NUMBER() = 229, ' -> permiso denegado (error 229)',
+                     ' -> se ejecutó y lo rechazó su validación, sin cambios: '
+                     + LEFT(REPLACE(REPLACE(ERROR_MESSAGE(), CHAR(13), ''), CHAR(10), ' '), 140)));
+END CATCH;
+BEGIN TRY
+    EXEC publicidad.anunciante_modificar -1, 'Anunciante de prueba', NULL, NULL;
+    INSERT INTO @r VALUES ('publicidad.anunciante_modificar', 'denegado', 0);
+    PRINT CONCAT('  PUEDE      publicidad.anunciante_modificar', '');
+END TRY
+BEGIN CATCH
+    INSERT INTO @r VALUES ('publicidad.anunciante_modificar', 'denegado', ERROR_NUMBER());
+    PRINT CONCAT(IIF(ERROR_NUMBER() = 229, '  NO PUEDE   ', '  PUEDE      '), 'publicidad.anunciante_modificar',
                  IIF(ERROR_NUMBER() = 229, ' -> permiso denegado (error 229)',
                      ' -> se ejecutó y lo rechazó su validación, sin cambios: '
                      + LEFT(REPLACE(REPLACE(ERROR_MESSAGE(), CHAR(13), ''), CHAR(10), ' '), 140)));
@@ -768,9 +897,11 @@ GO
 -- ============================================================
 
 PRINT '--- 4.2 usr_var: lo que puede hacer';
--- Ejecuta sus reportes; las correcciones (anular o corregir un gol, corregir o anular una tarjeta, agregar una
--- tarjeta que no se vio, cargar el informe de la revisión) se piden sobre goles, tarjetas y designaciones
--- inexistentes: el VAR puede ejecutarlas y las rechaza su validación, sin cambios.
+-- Ejecuta sus reportes y corrige de verdad un gol y una tarjeta (corregir y anular), mostrando lo que queda
+-- guardado antes y después de cada corrección. Como todos los partidos están finalizados y el motor no deja
+-- corregir un partido finalizado, el DBA lo reabre dentro de una transacción que se deshace al final. Las demás
+-- correcciones (tarjeta que no se vio, informe de la revisión) se piden sobre datos inexistentes: el VAR puede
+-- ejecutarlas y las rechaza su validación, sin cambios.
 -- Resultado esperado: los reportes se ejecutan; las correcciones, rechazadas por validación (no por permisos).
 DECLARE @r TABLE (sp VARCHAR(100), esperado VARCHAR(12), error INT);
 DECLARE @pais INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ARG'),
@@ -778,6 +909,18 @@ DECLARE @pais INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ARG'),
         @partido INT = (SELECT MIN(partido_id) FROM torneo.partido WHERE fase = 'final'),
         @sede INT = (SELECT MIN(sede_id) FROM torneo.sede),
         @id INT, @x VARCHAR(200);
+DECLARE @gol INT, @g_min INT, @g_tipo VARCHAR(15), @g_per VARCHAR(20), @g_asi INT, @g_partido INT,
+        @tj INT, @t_min INT, @t_per VARCHAR(25), @t_partido INT;
+SELECT TOP 1 @gol = g.gol_id, @g_min = g.minuto, @g_tipo = g.tipo_gol, @g_per = g.periodo,
+             @g_asi = g.asistencia_jugador_id, @g_partido = vf.partido_id
+FROM evento.gol g JOIN plantel.vw_formacion vf ON vf.formacion_id = g.formacion_id
+WHERE g.periodo IN ('PT', 'ST') AND g.tipo_gol = 'jugada' ORDER BY g.gol_id;
+SELECT TOP 1 @tj = t.tarjeta_id, @t_min = t.minuto, @t_per = t.periodo, @t_partido = t.partido_id
+FROM evento.tarjeta t
+WHERE NOT EXISTS (SELECT 1 FROM evento.suspension s WHERE s.tarjeta_id = t.tarjeta_id)
+  AND NOT EXISTS (SELECT 1 FROM evento.tarjeta r WHERE r.partido_id = t.partido_id AND r.persona_id = t.persona_id
+                  AND r.tipo_expulsion = 'doble_amarilla')
+ORDER BY t.tarjeta_id;
 EXECUTE AS LOGIN = 'usr_var';
 PRINT CONCAT('Sesión: ', SUSER_SNAME());
 BEGIN TRY
@@ -877,6 +1020,55 @@ BEGIN CATCH
                      + LEFT(REPLACE(REPLACE(ERROR_MESSAGE(), CHAR(13), ''), CHAR(10), ' '), 140)));
 END CATCH;
 REVERT;
+-- Corrección de un gol y de una tarjeta, dentro de una transacción que se deshace (no deja cambios).
+BEGIN TRY
+    IF @gol IS NULL OR @tj IS NULL
+        THROW 50000, 'No hay goles o tarjetas cargados: ejecutar antes 1_entrega7_carga_datos.sql.', 1;
+    BEGIN TRANSACTION;
+    UPDATE torneo.partido SET estado = 'programado' WHERE partido_id IN (@g_partido, @t_partido);   -- lo hace el DBA
+    SELECT 'GOL ANTES' AS paso, gol_id, minuto, tipo_gol, periodo FROM evento.gol WHERE gol_id = @gol;
+
+    EXECUTE AS LOGIN = 'usr_var';
+    EXEC evento.gol_modificar @gol, @g_min, 'cabezazo', @g_per, @g_asi;
+    REVERT;
+    SELECT 'GOL CORREGIDO' AS paso, gol_id, minuto, tipo_gol, periodo FROM evento.gol WHERE gol_id = @gol;
+    PRINT '  PUEDE      evento.gol_modificar -> tipo de gol corregido a cabezazo';
+
+    EXECUTE AS LOGIN = 'usr_var';
+    EXEC evento.gol_eliminar @gol;
+    REVERT;
+    SELECT 'GOL ANULADO' AS paso, COUNT(*) AS filas_del_gol FROM evento.gol WHERE gol_id = @gol;
+    PRINT '  PUEDE      evento.gol_eliminar -> gol anulado';
+
+    SELECT 'TARJETA ANTES' AS paso, tarjeta_id, tipo, minuto, periodo, motivo FROM evento.tarjeta WHERE tarjeta_id = @tj;
+    EXECUTE AS LOGIN = 'usr_var';
+    EXEC evento.tarjeta_modificar @tj, @t_min, @t_per, 'Motivo corregido por el VAR';
+    REVERT;
+    SELECT 'TARJETA CORREGIDA' AS paso, tarjeta_id, tipo, minuto, periodo, motivo FROM evento.tarjeta WHERE tarjeta_id = @tj;
+    PRINT '  PUEDE      evento.tarjeta_modificar -> motivo de la tarjeta corregido';
+
+    EXECUTE AS LOGIN = 'usr_var';
+    EXEC evento.tarjeta_eliminar @tj;
+    REVERT;
+    SELECT 'TARJETA ANULADA' AS paso, COUNT(*) AS filas_de_la_tarjeta FROM evento.tarjeta WHERE tarjeta_id = @tj;
+    PRINT '  PUEDE      evento.tarjeta_eliminar -> tarjeta anulada';
+
+    ROLLBACK TRANSACTION;
+    DECLARE @sigue_gol INT = (SELECT COUNT(*) FROM evento.gol WHERE gol_id = @gol),
+            @sigue_tarjeta INT = (SELECT COUNT(*) FROM evento.tarjeta WHERE tarjeta_id = @tj);
+    PRINT CONCAT('  (transacción deshecha: el gol vuelve a existir = ', @sigue_gol, ', la tarjeta vuelve a existir = ', @sigue_tarjeta, ')');
+    INSERT INTO @r VALUES ('evento.gol_modificar (real)', 'ok', 0), ('evento.gol_eliminar (real)', 'ok', 0),
+                          ('evento.tarjeta_modificar (real)', 'ok', 0), ('evento.tarjeta_eliminar (real)', 'ok', 0);
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;   -- primero se deshace la transacción: con ella dañada, REVERT falla
+    REVERT;
+    INSERT INTO @r VALUES ('corrección real de un gol y una tarjeta', 'ok', ERROR_NUMBER());
+    PRINT CONCAT(IIF(ERROR_NUMBER() = 229, '  NO PUEDE   ', '  PUEDE      '), 'corrección real de un gol y una tarjeta',
+                 IIF(ERROR_NUMBER() = 229, ' -> permiso denegado (error 229)',
+                     ' -> se ejecutó y lo rechazó su validación: '
+                     + LEFT(REPLACE(REPLACE(ERROR_MESSAGE(), CHAR(13), ''), CHAR(10), ' '), 200)));
+END CATCH;
 
 INSERT INTO #resultado
 SELECT '4.2', 'VAR: lo que puede hacer',
@@ -912,6 +1104,18 @@ END TRY
 BEGIN CATCH
     INSERT INTO @r VALUES ('arbitraje.arbitro_insertar', 'denegado', ERROR_NUMBER());
     PRINT CONCAT(IIF(ERROR_NUMBER() = 229, '  NO PUEDE   ', '  PUEDE      '), 'arbitraje.arbitro_insertar',
+                 IIF(ERROR_NUMBER() = 229, ' -> permiso denegado (error 229)',
+                     ' -> se ejecutó y lo rechazó su validación, sin cambios: '
+                     + LEFT(REPLACE(REPLACE(ERROR_MESSAGE(), CHAR(13), ''), CHAR(10), ' '), 140)));
+END CATCH;
+BEGIN TRY
+    EXEC arbitraje.arbitro_modificar -1, 'Árbitro', 'De Prueba', @pais, 'FIFA', '1985-03-15';
+    INSERT INTO @r VALUES ('arbitraje.arbitro_modificar', 'denegado', 0);
+    PRINT CONCAT('  PUEDE      arbitraje.arbitro_modificar', '');
+END TRY
+BEGIN CATCH
+    INSERT INTO @r VALUES ('arbitraje.arbitro_modificar', 'denegado', ERROR_NUMBER());
+    PRINT CONCAT(IIF(ERROR_NUMBER() = 229, '  NO PUEDE   ', '  PUEDE      '), 'arbitraje.arbitro_modificar',
                  IIF(ERROR_NUMBER() = 229, ' -> permiso denegado (error 229)',
                      ' -> se ejecutó y lo rechazó su validación, sin cambios: '
                      + LEFT(REPLACE(REPLACE(ERROR_MESSAGE(), CHAR(13), ''), CHAR(10), ' '), 140)));

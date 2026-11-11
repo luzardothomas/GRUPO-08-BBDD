@@ -223,15 +223,17 @@ más permisos: así se ve la diferencia entre roles. Cada intento se informa en 
 
 | Parte | Usuario | n.2 Lo que puede hacer | n.3 Lo que no puede hacer |
 |---|---|---|---|
-| 1 | `usr_administrador` (109 SP) | Alta y baja de una sede, convocatoria con los motivos descifrados, reportes (uno con SQL dinámico), API de cambio e importación de `sedes.json` (con la ruta relativa del repositorio: se ejecuta y la rechaza su validación) | Crear usuarios (DBA), SP auxiliares, tablas |
-| 2 | `usr_gestor_publicidad` (20 SP) | Alta de un anunciante, su contacto descifrado y su baja; reportes de publicidad; asignación de espacios | Lo que hizo el administrador: alta de sede, convocatoria, reporte de resultados, API; tablas |
-| 3 | `usr_comite_arbitral` (16 SP) | Alta de un árbitro con idioma, su fecha de nacimiento descifrada y su baja; reporte de designaciones; designación | Lo que hizo el gestor de publicidad: anunciantes, contacto, reportes y asignación; tablas |
-| 4 | `usr_var` (11 SP) | Reportes; anular o corregir goles, corregir o anular tarjetas, registrar una tarjeta, cargar un informe | Lo que hizo el comité arbitral: árbitros, su ficha, designar, borrar informes; tablas |
+| 1 | `usr_administrador` (109 SP) | Alta y baja de una sede; ABM de una convocatoria (alta, modificación y baja con fecha y motivo, con los motivos descifrados, en una transacción que se deshace); reportes (uno con SQL dinámico), API de cambio e importación de `sedes.json` (con la ruta relativa del repositorio: se ejecuta y la rechaza su validación) | Crear usuarios (DBA), SP auxiliares, tablas |
+| 2 | `usr_gestor_publicidad` (20 SP) | ABM de un anunciante (alta, modificación y baja, con el contacto descifrado después de cada paso); reportes de publicidad; asignación de espacios | Lo que hizo el administrador: alta de sede, convocatoria, reporte de resultados, API; tablas |
+| 3 | `usr_comite_arbitral` (16 SP) | ABM de un árbitro (alta con idioma, modificación y baja, con la fecha de nacimiento descifrada después de cada paso); reporte de designaciones; designación | Lo que hizo el gestor de publicidad: anunciantes, contacto, reportes y asignación; tablas |
+| 4 | `usr_var` (11 SP) | Reportes; corrige y anula un gol y una tarjeta de verdad, mostrando antes y después (el DBA reabre el partido en una transacción que se deshace); registrar una tarjeta y cargar un informe (rechazados por validación) | Lo que hizo el comité arbitral: árbitros, su ficha, designar, borrar informes; tablas |
 | 5 | `usr_planillero` (9 SP) | Reportes; cargar formación, gol, tarjeta, cambio y resultado | Lo que hizo el VAR: anular o corregir goles y tarjetas, informes, reporte de designaciones; tablas |
 | 6 | `usr_consulta` (7 SP) | Los siete reportes | Lo que hizo el planillero: toda la carga del partido; tablas |
 
-Cada parte empieza con el inicio de sesión (n.1): con qué usuario y en qué rol queda la sesión. Las altas, consultas y
-reportes se ejecutan de verdad, y lo que se da de alta se borra en el mismo lote. Los SP que necesitan un partido en
+Cada parte empieza con el inicio de sesión (n.1): con qué usuario y en qué rol queda la sesión. Los ABM, consultas y
+reportes se ejecutan de verdad, y no queda ningún cambio en la base: lo que se da de alta se borra en el mismo lote o
+la transacción se deshace. El planillero y el rol de consulta no tienen ABM: el planillero sólo registra eventos de un
+partido en juego y consulta sólo lee. Los SP que necesitan un partido en
 juego se llaman con un partido inexistente: se ejecutan (hay permiso) y los rechaza su validación, sin cambios.
 
 La parte 7 compara a los seis usuarios:
