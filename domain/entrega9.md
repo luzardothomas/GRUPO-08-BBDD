@@ -1,5 +1,26 @@
 # Análisis — Entrega 9 (Cierre: BI, visualización y aplicación)
 
+Estado: **BI en curso** (plataforma elegida: **Power BI Desktop**). Los scripts y la guía están en `src/entrega9/`; falta
+armar y guardar el archivo `.pbix`. La aplicación ABM y la pantalla de importación quedan para una tanda siguiente.
+
+| Archivo (`src/entrega9/`) | Qué hace |
+|---|---|
+| `1_entrega9_sede_coordenadas.sql` | Modifica `torneo.sede`: agrega `latitud` y `longitud` y carga las 16 sedes (mapa opcional) |
+| `2_entrega9_vistas_bi.sql` | Esquema `bi` con 4 vistas (`vw_goles`, `vw_ocupacion_publicitaria`, `vw_partidos`, `vw_sedes`), rol `bi_lector` y usuario `usr_bi` |
+| `3_entrega9_test_bi.sql` | 5 pruebas: `usr_bi` lee las vistas, las vistas coinciden con los reportes de la Entrega 7, sedes con coordenadas, `usr_bi` no lee tablas ni ejecuta SP |
+| `guia_power_bi.md` | Conexión, modelo, medidas DAX y diseño de la página del dashboard |
+
+Decisiones tomadas:
+
+- **Origen de datos:** vistas de sólo lectura en un esquema `bi`, y no los SP de la Entrega 7: Power BI no lee bien los
+  reportes XML (goleadores, tarjetas, designaciones, plantillas) ni las filas de subtotal. Las vistas entregan lo mismo
+  en forma de tabla, y el test comprueba que los totales coinciden con los reportes.
+- **Seguridad:** Power BI se conecta con `usr_bi`, no con una cuenta de administrador. El rol `bi_lector` sólo tiene
+  `SELECT` sobre `bi`; las vistas leen las tablas por encadenamiento de propiedad (igual que los SP de la Entrega 8).
+  Se llama `bi_lector` y no `rol_...` porque `seguridad.crear_roles` borra los `rol_...` que no figuran en su cuadro.
+- **Mapa:** se agregan `latitud` y `longitud` a `sede` (nulas, para no tocar los SP de la Entrega 5). Las coordenadas
+  son las de cada estadio, y conviene que el grupo las verifique antes de la entrega.
+
 ## Qué pide el enunciado
 
 1. Repasar la sección "2. Alcance / To-Be" del TP y asegurarse de que **todas** las consultas necesarias para
