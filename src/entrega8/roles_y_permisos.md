@@ -59,6 +59,76 @@ registran tarjetas, porque una roja puede salir de la cancha o de la revisión d
 | Importaciones y APIs (9 SP) y `EXECUTE ANY EXTERNAL ENDPOINT` | ✅ | | | | | |
 | `ADMINISTER BULK OPERATIONS` (permiso de servidor, en su inicio de sesión) | ✅ | | | | | |
 
+## Los SP de cada rol
+
+**ABM** = tres SP por entidad: alta (`_insertar`), modificación (`_modificar`) y baja (`_eliminar`).
+
+### `rol_administrador` — 109 SP
+
+| Grupo | SP | Qué incluye |
+|---|---:|---|
+| ABM de `torneo` | 18 | sedes, países, confederaciones, selecciones, partidos y parámetros |
+| ABM de `plantel` | 18 | personas, jugadores, convocatorias, cuerpo técnico, formaciones y jugadores de la formación |
+| ABM de `evento` | 15 | goles, tarjetas, sustituciones, suspensiones y criterios de suspensión |
+| ABM de `arbitraje` | 12 | árbitros, idiomas de los árbitros, designaciones e informes arbitrales |
+| ABM de `publicidad` | 15 | anunciantes, campañas, países de interés, piezas publicitarias y espacios publicitarios |
+| Lógica de negocio | 11 | `cargar_formacion`, `reemplazar_convocado`, `registrar_gol`, `registrar_sustitucion`, `registrar_tarjeta`, `registrar_resultado`, `partido_actualizar_marcador`, `designar_arbitros`, `asignar_espacios_partido`, `facturar_espacios_partido`, `parametro_cargar_defaults` |
+| Reportes | 7 | goleadores, tarjetas, resultados, plantillas, designaciones arbitrales, ocupación publicitaria y matriz de prime time |
+| Consultas de datos cifrados | 4 | `consultar_convocatoria`, `consultar_arbitro`, `consultar_informes`, `consultar_anunciante` |
+| Importación y APIs | 9 | `importar_sedes`, `importar_selecciones`, `importar_planteles`, `importar_fixture`, `importar_tarifas`, `importar_estadisticas_equipos_kaggle_2026`, `importar_estadisticas_jugadores_kaggle_2026`, `consultar_api_banco_mundial`, `consultar_api_frankfurter` |
+| **Total** | **109** | 78 de ABM (26 entidades × 3) + 11 + 7 + 4 + 9 |
+
+Además del `EXECUTE` sobre esos SP, el administrador tiene `EXECUTE` sobre el tipo `plantel.tt_formacion_jugador`,
+`EXECUTE ANY EXTERNAL ENDPOINT` en la base y `ADMINISTER BULK OPERATIONS` en el servidor. No tiene ninguno de los SP
+auxiliares (`_validar`, utilidades de `importacion` y de `seguridad`, `convertir_moneda`).
+
+### `rol_gestor_publicidad` — 20 SP
+
+| Grupo | SP | Qué incluye |
+|---|---:|---|
+| ABM de `publicidad` | 15 | anunciantes, campañas, países de interés, piezas publicitarias y espacios publicitarios |
+| Lógica de negocio | 2 | `asignar_espacios_partido`, `facturar_espacios_partido` |
+| Reportes | 2 | ocupación publicitaria y matriz de prime time |
+| Consulta de datos cifrados | 1 | `consultar_anunciante` |
+| **Total** | **20** | 5 entidades × 3 + 2 + 2 + 1 |
+
+### `rol_comite_arbitral` — 16 SP
+
+| Grupo | SP | Qué incluye |
+|---|---:|---|
+| ABM de `arbitraje` | 12 | árbitros, idiomas de los árbitros, designaciones e informes arbitrales |
+| Lógica de negocio | 1 | `designar_arbitros` |
+| Reportes | 1 | designaciones arbitrales |
+| Consultas de datos cifrados | 2 | `consultar_arbitro`, `consultar_informes` |
+| **Total** | **16** | 4 entidades × 3 + 1 + 1 + 2 |
+
+### `rol_var` — 11 SP
+
+| Grupo | SP | Qué incluye |
+|---|---:|---|
+| Correcciones de goles y tarjetas (sólo modificación y baja, sin alta) | 4 | `gol_modificar`, `gol_eliminar`, `tarjeta_modificar`, `tarjeta_eliminar` |
+| Alta de lo que no se vio | 2 | `registrar_tarjeta`, `informe_arbitral_insertar` (informe de la revisión) |
+| Reportes | 5 | goleadores, tarjetas, resultados, plantillas y designaciones arbitrales |
+| **Total** | **11** | 4 + 2 + 5 |
+
+### `rol_planillero` — 9 SP
+
+| Grupo | SP | Qué incluye |
+|---|---:|---|
+| Carga del partido | 5 | `cargar_formacion`, `registrar_gol`, `registrar_tarjeta`, `registrar_sustitucion`, `registrar_resultado` |
+| Reportes | 4 | goleadores, tarjetas, resultados y plantillas |
+| **Total** | **9** | 5 + 4, más `EXECUTE` sobre el tipo `plantel.tt_formacion_jugador` (parámetro de `cargar_formacion`) |
+
+### `rol_consulta` — 7 SP
+
+| Grupo | SP | Qué incluye |
+|---|---:|---|
+| Reportes | 7 | goleadores, tarjetas, resultados, plantillas, designaciones arbitrales, ocupación publicitaria y matriz de prime time |
+| **Total** | **7** | los siete reportes de la Entrega 7 |
+
+Ninguno de estos cinco roles tiene importaciones, APIs ni ABM fuera de lo indicado, ni `EXECUTE ANY EXTERNAL ENDPOINT`
+ni `ADMINISTER BULK OPERATIONS`.
+
 ## Casos especiales
 
 | Caso | Por qué no alcanza con `EXECUTE` sobre el SP | Cómo se resolvió |
