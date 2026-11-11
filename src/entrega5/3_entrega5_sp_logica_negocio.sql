@@ -496,7 +496,8 @@ END;
 GO
 
 /* Registra una tarjeta y, en la misma transacción, la suspensión que origine:
-   * Roja (directa o por doble amarilla): suspensión por 'suspension_partidos_roja' partidos.
+   * Roja (directa o por doble amarilla): suspensión por los partidos del criterio de expulsión
+     (evento.criterio_suspension con cantidad_amarillas = 0) de la fase y del tipo de persona.
    * Amarilla: se cuenta la acumulación vigente de la persona (amarillas en partidos
      distintos, posteriores a su última suspensión por acumulación, sin contar las de
      partidos donde terminó expulsada por doble amarilla). Si alcanza la cantidad del
@@ -517,7 +518,7 @@ CREATE OR ALTER PROCEDURE evento.registrar_tarjeta
     @persona_id             INT = NULL,
     @condicion              VARCHAR(15) = NULL,
     @dorsal                 INT = NULL,
-    @tipo_expulsion         VARCHAR(20) = NULL,
+    @tipo_expulsion         VARCHAR(20) = 'sin_expulsar',
     @tarjeta_id             INT = NULL OUTPUT,
     @suspensiones_generadas INT = NULL OUTPUT
 AS
@@ -552,8 +553,10 @@ BEGIN
        AND EXISTS (SELECT 1 FROM evento.tarjeta
                    WHERE partido_id = @partido_id AND persona_id = @persona_id AND tipo = 'amarilla')
         SELECT @tipo = 'roja', @tipo_expulsion = 'doble_amarilla';
-    IF @tipo = 'roja' AND @tipo_expulsion IS NULL
+    IF @tipo = 'roja' AND ISNULL(@tipo_expulsion, 'sin_expulsar') = 'sin_expulsar'
         SET @tipo_expulsion = 'roja_directa';
+    IF @tipo = 'amarilla'
+        SET @tipo_expulsion = ISNULL(@tipo_expulsion, 'sin_expulsar');
 
     BEGIN TRY
         IF @tran_propia = 1 BEGIN TRANSACTION;
@@ -571,8 +574,13 @@ BEGIN
         -- 2) ¿Corresponde suspensión?
         IF @tipo = 'roja'
         BEGIN
-            SELECT @partidos = valor FROM torneo.parametro WHERE clave = 'suspension_partidos_roja';
-            SET @partidos = ISNULL(@partidos, 1);
+            SELECT TOP (1) @criterio_aplicado = criterio_id, @partidos = partidos_suspension
+            FROM evento.criterio_suspension
+            WHERE activo = 1 AND cantidad_amarillas = 0
+              AND fase_aplicable = @fase AND tipo_persona_aplicable = @tipo_persona;
+
+            IF @criterio_aplicado IS NULL
+                THROW 50002, 'evento.registrar_tarjeta - operación rechazada: no hay un criterio de suspensión activo para este tipo de expulsión.', 1;
             SET @motivo_suspension = IIF(@tipo_expulsion = 'doble_amarilla',
                                          'Expulsión por doble amarilla', 'Expulsión por roja directa');
         END
@@ -581,18 +589,17 @@ BEGIN
             SELECT TOP (1) @criterio_id = criterio_id, @umbral = cantidad_amarillas,
                            @partidos_criterio = partidos_suspension
             FROM evento.criterio_suspension
-            WHERE activo = 1
-              AND (fase_aplicable IS NULL OR fase_aplicable = @fase)
-              AND (tipo_persona_aplicable IS NULL OR tipo_persona_aplicable = @tipo_persona)
-            ORDER BY IIF(fase_aplicable IS NULL, 0, 1) + IIF(tipo_persona_aplicable IS NULL, 0, 1) DESC,
-                     cantidad_amarillas ASC;
+            WHERE activo = 1 AND cantidad_amarillas > 0
+              AND fase_aplicable = @fase AND tipo_persona_aplicable = @tipo_persona
+            ORDER BY cantidad_amarillas ASC;
 
             IF @criterio_id IS NOT NULL
             BEGIN
                 SELECT @ultima_disparadora = ISNULL(MAX(s.tarjeta_id), 0)
                 FROM evento.suspension s
                 JOIN evento.tarjeta t ON t.tarjeta_id = s.tarjeta_id
-                WHERE t.persona_id = @persona_id AND s.criterio_id IS NOT NULL;
+                JOIN evento.criterio_suspension c ON c.criterio_id = s.criterio_id
+                WHERE t.persona_id = @persona_id AND c.cantidad_amarillas > 0;
 
                 SELECT @acumuladas = COUNT(*)
                 FROM evento.tarjeta a
@@ -1005,11 +1012,19 @@ BEGIN
         ('ventanas_max_reglamentarias', 3, N'Máximo de ventanas de cambio por equipo en tiempo reglamentario'),
         ('cambios_extra_alargue',       1, N'Cambios adicionales habilitados en tiempo suplementario'),
         ('ventanas_extra_alargue',      1, N'Ventanas adicionales habilitadas en tiempo suplementario'),
-        ('suspension_partidos_roja',    1, N'Partidos de suspensión por expulsión (roja directa o doble amarilla)'),
         ('prime_time_hora_desde',      19, N'Hora local de inicio del prime time (incluida)'),
         ('prime_time_hora_hasta',      23, N'Hora local de fin del prime time (excluida)')
     ) AS d (clave, valor, descripcion)
     WHERE NOT EXISTS (SELECT 1 FROM torneo.parametro p WHERE p.clave = d.clave);
+
+    -- Regla de expulsión (0 amarillas: roja directa o doble amarilla): toda suspensión responde a un criterio.
+    -- La acumulación de amarillas la define cada carga.
+    IF NOT EXISTS (SELECT 1 FROM evento.criterio_suspension WHERE cantidad_amarillas = 0 AND tipo_persona_aplicable = 'jugador')
+        EXEC evento.criterio_suspension_insertar_todas_las_fases @cantidad_amarillas = 0, @partidos_suspension = 1,
+             @tipo_persona_aplicable = 'jugador';
+    IF NOT EXISTS (SELECT 1 FROM evento.criterio_suspension WHERE cantidad_amarillas = 0 AND tipo_persona_aplicable = 'cuerpo_tecnico')
+        EXEC evento.criterio_suspension_insertar_todas_las_fases @cantidad_amarillas = 0, @partidos_suspension = 1,
+             @tipo_persona_aplicable = 'cuerpo_tecnico';
 END
 GO
 

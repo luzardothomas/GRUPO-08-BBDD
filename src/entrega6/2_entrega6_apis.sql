@@ -176,8 +176,20 @@ BEGIN
         SET @i += 1;
     END;
 
+    -- Países del modelo para los que la fuente no trajo ningún dato (ej: Inglaterra y Escocia, que el Banco Mundial
+    -- no publica por separado): dato faltante, se reporta en importacion.error. No corresponde a una fila del archivo.
+    INSERT INTO importacion.error (lote_id, fila, registro, numero_error, motivo)
+    SELECT @lote_id, NULL, CONCAT(p.codigo_iso, ' | ', p.nombre), 50004,
+           'Dato faltante en la fuente: el Banco Mundial no devolvió el PBI per cápita de '
+           + p.nombre + ' (' + p.codigo_iso + ').'
+    FROM torneo.pais p
+    WHERE NOT EXISTS (SELECT 1 FROM #datos d WHERE d.pais_id = p.pais_id);
+    SET @omitidos = @@ROWCOUNT;
+    SET @leidos += @omitidos;
+    SET @rechazados += @omitidos;
+
     PRINT CONCAT('torneo.consultar_api_banco_mundial: ', @omitidos,
-                 ' registros omitidos (países que el modelo no registra o años sin dato).');
+                 ' países del modelo sin dato en la fuente (registrados en importacion.error).');
     DROP TABLE #respuesta, #datos;
     EXEC importacion.lote_cerrar @lote_id, @leidos, @insertados, @actualizados, @sin_cambios, @rechazados;
 END;

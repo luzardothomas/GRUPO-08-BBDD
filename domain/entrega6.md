@@ -188,6 +188,16 @@ Entrega 5. Un archivo que no se puede leer o no trae el arreglo esperado deja el
    `importacion.pais_equivalencia`, `torneo.indicador_economico`, `publicidad.tipo_cambio`,
    `torneo.seleccion_estadistica`, `torneo.seleccion_estadistica_kaggle` y `plantel.jugador_estadistica_kaggle`.
    Conviene sumarlas al DER.
+7. **Dato faltante en la fuente.** Si una fila no trae un dato que la tabla destino necesita, se rechaza y queda en
+   `importacion.error` (importación parcial: se cargan los registros válidos y se reportan los demás):
+   - *Estadísticas de jugadores (Kaggle):* el cruce con el plantel es por nombre exacto dentro de la selección; si no
+     coincide ("Flaco López" frente a "José Manuel López"), se rechaza como error de coincidencia y no se fuerza el cruce.
+     Los blancos de un jugador con 0 partidos se cargan como 0, y un club en blanco se completa con el del plantel.
+   - *Banco Mundial:* los países del modelo sin ningún dato en la fuente (Inglaterra y Escocia) se reportan como dato faltante.
+   - *Excepciones, no obligatorios en la importación:* `anunciante.contacto` (el XML de tarifas no lo trae) y
+     `partido.asistencia_publico` (el JSON de partidos no lo trae). Ninguna de las dos fuentes provee esos datos, así que
+     exigirlos rechazaría todos los registros. Se completan por otro camino (la carga manual de la Entrega 7 y el
+     registro del resultado), y mientras tanto quedan en NULL.
 
 ## Cambios respecto del boceto anterior (`HEAD` — `branch_eksztein`)
 

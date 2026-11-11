@@ -1673,26 +1673,28 @@ GO
 -- Verificacion evento.criterio_suspension_insertar
 DECLARE @id INT;
 EXEC evento.criterio_suspension_insertar 92, 1, 'grupos', 'jugador', 1, @id OUTPUT; --> Valido: criterio con fase y tipo de persona
--- EXEC evento.criterio_suspension_insertar 95, 1, 'grupos', NULL, 1, @id OUTPUT; --> Valido: fase grupos
--- EXEC evento.criterio_suspension_insertar 95, 1, 'dieciseisavos', NULL, 1, @id OUTPUT; --> Valido: fase dieciseisavos
--- EXEC evento.criterio_suspension_insertar 95, 1, 'semifinal', NULL, 1, @id OUTPUT; --> Valido: fase semifinal
--- EXEC evento.criterio_suspension_insertar 95, 1, 'tercer_puesto', NULL, 1, @id OUTPUT; --> Valido: fase tercer_puesto
--- EXEC evento.criterio_suspension_insertar 95, 1, 'final', NULL, 1, @id OUTPUT; --> Valido: fase final
--- EXEC evento.criterio_suspension_insertar 98, 1, 'preliminar', NULL, 1, @id OUTPUT; --> Fase invalida
--- EXEC evento.criterio_suspension_insertar 98, 1, '', NULL, 1, @id OUTPUT; --> Fase vacia (vacio no es NULL: es invalida)
+-- EXEC evento.criterio_suspension_insertar 95, 1, 'grupos', 'jugador', 1, @id OUTPUT; --> Valido: fase grupos
+-- EXEC evento.criterio_suspension_insertar 95, 1, 'dieciseisavos', 'jugador', 1, @id OUTPUT; --> Valido: fase dieciseisavos
+-- EXEC evento.criterio_suspension_insertar 95, 1, 'semifinal', 'jugador', 1, @id OUTPUT; --> Valido: fase semifinal
+-- EXEC evento.criterio_suspension_insertar 95, 1, 'tercer_puesto', 'jugador', 1, @id OUTPUT; --> Valido: fase tercer_puesto
+-- EXEC evento.criterio_suspension_insertar 95, 1, 'final', 'jugador', 1, @id OUTPUT; --> Valido: fase final
+-- EXEC evento.criterio_suspension_insertar 98, 1, 'preliminar', 'jugador', 1, @id OUTPUT; --> Fase invalida
+-- EXEC evento.criterio_suspension_insertar 98, 1, '', 'jugador', 1, @id OUTPUT; --> Fase vacia (invalida)
+-- EXEC evento.criterio_suspension_insertar 98, 1, NULL, 'jugador', 1, @id OUTPUT; --> Fase obligatoria (ya no existe 'todas las fases')
+-- EXEC evento.criterio_suspension_insertar 98, 1, 'grupos', NULL, 1, @id OUTPUT; --> Tipo de persona obligatorio (ya no existe 'ambos')
 -- EXEC evento.criterio_suspension_insertar 98, 1, 'grupos', 'arbitro', 1, @id OUTPUT; --> Tipo de persona invalido
 -- EXEC evento.criterio_suspension_insertar 98, 1, 'grupos', 'jugadores', 1, @id OUTPUT; --> Tipo de persona invalido (plural)
 -- EXEC evento.criterio_suspension_insertar NULL, 1, 'grupos', 'jugador', 1, @id OUTPUT; --> Cantidad de amarillas nula
--- EXEC evento.criterio_suspension_insertar 0, 1, 'grupos', 'jugador', 1, @id OUTPUT; --> Cantidad de amarillas 0 (borde)
+-- EXEC evento.criterio_suspension_insertar 0, 1, 'grupos', 'jugador', 1, @id OUTPUT; --> Duplicado del criterio de expulsion (0 amarillas) cargado con los parametros iniciales
 -- EXEC evento.criterio_suspension_insertar -1, 1, 'grupos', 'jugador', 1, @id OUTPUT; --> Cantidad de amarillas negativa
 -- EXEC evento.criterio_suspension_insertar 98, NULL, 'grupos', 'jugador', 1, @id OUTPUT; --> Partidos de suspension nulos
 -- EXEC evento.criterio_suspension_insertar 98, -1, 'grupos', 'jugador', 1, @id OUTPUT; --> Partidos de suspension negativos
 -- EXEC evento.criterio_suspension_insertar 90, 1, 'semifinal', 'jugador', 1, @id OUTPUT; --> Duplicado de 'dup'
--- EXEC evento.criterio_suspension_insertar 90, 1, NULL, NULL, 1, @id OUTPUT; --> Duplicado de 'base_null' (fase y tipo NULL)
--- EXEC evento.criterio_suspension_insertar 0, 0, 'preliminar', 'arbitro', 1, @id OUTPUT; --> 4 errores: fase, tipo, cantidad y partidos
+-- EXEC evento.criterio_suspension_insertar 90, 1, 'final', 'jugador', 1, @id OUTPUT; --> Duplicado de 'dup2'
+-- EXEC evento.criterio_suspension_insertar 0, 0, 'preliminar', 'arbitro', 1, @id OUTPUT; --> 3 errores: fase, tipo y partidos (0 amarillas es valido: criterio de expulsion)
 -- EXEC evento.criterio_suspension_insertar 90, 0, 'semifinal', 'jugador', 1, @id OUTPUT; --> 2 errores: partidos de suspension y duplicado de 'dup'
--- EXEC evento.criterio_suspension_insertar 90, 0, '', NULL, 1, @id OUTPUT; --> 3 errores: fase invalida, partidos y duplicado de 'base_null'
--- EXEC evento.criterio_suspension_insertar 90, 0, '', '', 1, @id OUTPUT; --> 4 errores: fase, tipo, partidos y duplicado de 'base_null'
+-- EXEC evento.criterio_suspension_insertar 90, 0, '', 'jugador', 1, @id OUTPUT; --> 2 errores: fase invalida y partidos
+-- EXEC evento.criterio_suspension_insertar 90, 0, '', '', 1, @id OUTPUT; --> 3 errores: fase, tipo y partidos
 GO
 
 -- Verificacion evento.criterio_suspension_modificar
@@ -1704,20 +1706,20 @@ EXEC evento.criterio_suspension_modificar @cm, 90, 3, 'grupos', 'jugador', 1; --
 -- EXEC evento.criterio_suspension_modificar @cm, 80, 1, 'octavos', 'jugador', 1; --> Valido: cambia la fase
 -- EXEC evento.criterio_suspension_modificar NULL, 85, 1, 'grupos', 'jugador', 1; --> Id nulo
 -- EXEC evento.criterio_suspension_modificar 999999, 85, 1, 'grupos', 'jugador', 1; --> Criterio inexistente
--- EXEC evento.criterio_suspension_modificar @cm, 80, 1, 'preliminar', NULL, 1; --> Fase invalida
--- EXEC evento.criterio_suspension_modificar @cm, 80, 1, '', NULL, 1; --> Fase vacia (vacio no es NULL: es invalida)
+-- EXEC evento.criterio_suspension_modificar @cm, 80, 1, 'preliminar', 'jugador', 1; --> Fase invalida
+-- EXEC evento.criterio_suspension_modificar @cm, 80, 1, '', 'jugador', 1; --> Fase vacia (invalida)
 -- EXEC evento.criterio_suspension_modificar @cm, 80, 1, 'grupos', 'arbitro', 1; --> Tipo de persona invalido
 -- EXEC evento.criterio_suspension_modificar @cm, NULL, 1, 'grupos', 'jugador', 1; --> Cantidad de amarillas nula
--- EXEC evento.criterio_suspension_modificar @cm, 0, 1, 'grupos', 'jugador', 1; --> Cantidad de amarillas 0 (borde)
+-- EXEC evento.criterio_suspension_modificar @cm, 0, 1, 'grupos', 'jugador', 1; --> Duplicado del criterio de expulsion (0 amarillas) de grupos para jugadores
 -- EXEC evento.criterio_suspension_modificar @cm, -1, 1, 'grupos', 'jugador', 1; --> Cantidad de amarillas negativa
 -- EXEC evento.criterio_suspension_modificar @cm, 80, NULL, 'grupos', 'jugador', 1; --> Partidos de suspension nulos
 -- EXEC evento.criterio_suspension_modificar @cm, 80, 0, 'grupos', 'jugador', 1; --> Partidos de suspension 0 (borde)
 -- EXEC evento.criterio_suspension_modificar @cm, 80, -1, 'grupos', 'jugador', 1; --> Partidos de suspension negativos
 -- EXEC evento.criterio_suspension_modificar @cm, 90, 5, 'semifinal', 'jugador', 0; --> Duplicado de 'dup' (distintos partidos y activo no evitan el duplicado)
--- EXEC evento.criterio_suspension_modificar NULL, NULL, NULL, NULL, NULL, NULL; --> 3 errores: id nulo, cantidad y partidos (todo nulo)
--- EXEC evento.criterio_suspension_modificar 999999, 0, 0, 'preliminar', 'arbitro', 1; --> 5 errores: criterio inexistente, fase, tipo, cantidad y partidos
+-- EXEC evento.criterio_suspension_modificar NULL, NULL, NULL, NULL, NULL, NULL; --> 5 errores: id nulo, fase, tipo de persona, cantidad y partidos (todo nulo)
+-- EXEC evento.criterio_suspension_modificar 999999, 0, 0, 'preliminar', 'arbitro', 1; --> 4 errores: criterio inexistente, fase, tipo y partidos
 -- EXEC evento.criterio_suspension_modificar @cm, 90, 0, 'semifinal', 'jugador', 1; --> 2 errores: partidos y duplicado de 'dup'
--- EXEC evento.criterio_suspension_modificar @cm, 90, 0, '', '', 1; --> 4 errores: fase, tipo, partidos y duplicado de 'base_null'
+-- EXEC evento.criterio_suspension_modificar @cm, 90, 0, '', '', 1; --> 3 errores: fase, tipo y partidos
 GO
 
 -- Verificacion evento.criterio_suspension_eliminar

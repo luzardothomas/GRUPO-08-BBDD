@@ -262,8 +262,9 @@ IF OBJECT_ID('torneo.seleccion_estadistica_kaggle', 'U') IS NULL
 GO
 
 -- Estadísticas de jugadores de Kaggle (swaptr, datos de FBref): minutos, goles, tarjetas...
--- Se guardan tal como los publica la fuente, vinculadas a la selección y, cuando el nombre
--- coincide, al jugador del modelo.
+-- Se guardan tal como los publica la fuente, vinculadas a la selección y al jugador del modelo.
+-- Si el nombre no coincide con ningún convocado de esa selección, la fila se rechaza (error de
+-- coincidencia en importacion.error): las fuentes usan nombres distintos y no hay que forzar el cruce.
 
 IF OBJECT_ID('plantel.jugador_estadistica_kaggle', 'U') IS NULL
     CREATE TABLE plantel.jugador_estadistica_kaggle (
@@ -271,20 +272,20 @@ IF OBJECT_ID('plantel.jugador_estadistica_kaggle', 'U') IS NULL
         jugador                VARCHAR(120) NOT NULL,
         pais_equipo            VARCHAR(100) NOT NULL,
         seleccion_id           INT NOT NULL,
-        jugador_id             INT,                      -- NULL si el nombre no coincide con plantel.jugador
-        posicion_fuente        VARCHAR(10),
-        edad                   INT,
-        anio_nacimiento        INT,
-        club                   VARCHAR(120),
-        partidos               INT,
-        titularidades          INT,
-        minutos                INT,
-        goles                  INT,
-        asistencias            INT,
-        amarillas              INT,
-        rojas                  INT,
-        goles_penal            INT,
-        goles_en_contra        INT,
+        jugador_id             INT NOT NULL,             -- sólo se importan jugadores que coinciden con plantel.jugador
+        posicion_fuente        VARCHAR(10) NOT NULL,
+        edad                   INT NOT NULL,
+        anio_nacimiento        INT NOT NULL,
+        club                   VARCHAR(120) NOT NULL,
+        partidos               INT NOT NULL,
+        titularidades          INT NOT NULL,
+        minutos                INT NOT NULL,             -- 0 si el jugador no jugó (la fuente lo deja en blanco)
+        goles                  INT NOT NULL,
+        asistencias            INT NOT NULL,
+        amarillas              INT NOT NULL,
+        rojas                  INT NOT NULL,
+        goles_penal            INT NOT NULL,
+        goles_en_contra        INT NOT NULL,
         archivo_origen         VARCHAR(500) NOT NULL,
         importado_en           DATETIMEOFFSET NOT NULL DEFAULT SYSDATETIMEOFFSET(),
 
@@ -958,9 +959,9 @@ BEGIN
     SET NOCOUNT ON;
     DECLARE @lote_id INT, @mensaje VARCHAR(2100), @numero INT, @nl CHAR(2) = CHAR(13) + CHAR(10),
             @errores VARCHAR(2000), @leidos INT = 0, @insertados INT = 0, @actualizados INT = 0,
-            @sin_cambios INT = 0, @rechazados INT = 0, @sin_jugador INT = 0, @i INT = 1,
+            @sin_cambios INT = 0, @rechazados INT = 0, @i INT = 1,
             @registro VARCHAR(1000), @jugador VARCHAR(120), @pais_equipo VARCHAR(100), @seleccion_id INT,
-            @jugador_id INT, @id INT;
+            @jugador_id INT, @club_plantel VARCHAR(120), @id INT;
 
     -- Las 72 columnas del archivo, en su orden original.
     CREATE TABLE #archivo (
@@ -1028,11 +1029,18 @@ BEGIN
            LEFT(NULLIF(posicion, ''), 10) AS posicion, TRY_CONVERT(INT, NULLIF(edad, '')) AS edad,
            TRY_CONVERT(INT, NULLIF(anio_nacimiento, '')) AS anio_nacimiento, LEFT(NULLIF(club, ''), 120) AS club,
            TRY_CONVERT(INT, NULLIF(partidos, '')) AS partidos, TRY_CONVERT(INT, NULLIF(titularidades, '')) AS titularidades,
-           importacion.fn_entero(minutos) AS minutos, importacion.fn_entero(goles) AS goles,
-           importacion.fn_entero(asistencias) AS asistencias,
-           importacion.fn_entero(amarillas) AS amarillas, importacion.fn_entero(rojas) AS rojas,
-           importacion.fn_entero(goles_penal) AS goles_penal,
-           importacion.fn_entero(goles_en_contra) AS goles_en_contra,
+           CASE WHEN NULLIF(minutos, '') IS NULL AND TRY_CONVERT(INT, NULLIF(partidos, '')) = 0 THEN 0
+                ELSE importacion.fn_entero(minutos) END AS minutos, CASE WHEN NULLIF(goles, '') IS NULL AND TRY_CONVERT(INT, NULLIF(partidos, '')) = 0 THEN 0
+                ELSE importacion.fn_entero(goles) END AS goles,
+           CASE WHEN NULLIF(asistencias, '') IS NULL AND TRY_CONVERT(INT, NULLIF(partidos, '')) = 0 THEN 0
+                ELSE importacion.fn_entero(asistencias) END AS asistencias,
+           CASE WHEN NULLIF(amarillas, '') IS NULL AND TRY_CONVERT(INT, NULLIF(partidos, '')) = 0 THEN 0
+                ELSE importacion.fn_entero(amarillas) END AS amarillas, CASE WHEN NULLIF(rojas, '') IS NULL AND TRY_CONVERT(INT, NULLIF(partidos, '')) = 0 THEN 0
+                ELSE importacion.fn_entero(rojas) END AS rojas,
+           CASE WHEN NULLIF(goles_penal, '') IS NULL AND TRY_CONVERT(INT, NULLIF(partidos, '')) = 0 THEN 0
+                ELSE importacion.fn_entero(goles_penal) END AS goles_penal,
+           CASE WHEN NULLIF(goles_en_contra, '') IS NULL AND TRY_CONVERT(INT, NULLIF(partidos, '')) = 0 THEN 0
+                ELSE importacion.fn_entero(goles_en_contra) END AS goles_en_contra,
            CASE WHEN (NULLIF(edad, '') IS NOT NULL AND TRY_CONVERT(INT, edad) IS NULL)
                   OR (NULLIF(anio_nacimiento, '') IS NOT NULL AND TRY_CONVERT(INT, anio_nacimiento) IS NULL)
                   OR (NULLIF(partidos, '') IS NOT NULL AND TRY_CONVERT(INT, partidos) IS NULL)
@@ -1052,7 +1060,7 @@ BEGIN
     WHILE @i <= @leidos
     BEGIN
         SELECT @jugador = jugador, @pais_equipo = pais_equipo, @registro = CONCAT(jugador, ' | ', pais_equipo),
-               @errores = '', @id = NULL, @jugador_id = NULL
+               @errores = '', @id = NULL, @jugador_id = NULL, @club_plantel = NULL
         FROM #jugadores WHERE fila = @i;
 
         BEGIN TRY
@@ -1064,18 +1072,30 @@ BEGIN
                 SET @errores += '- Uno o más datos numéricos tienen formato inválido (minutos, goles, asistencias y tarjetas deben ser enteros).' + @nl;
             IF EXISTS (SELECT 1 FROM #jugadores WHERE fila = @i AND (edad < 0 OR partidos < 0 OR minutos < 0))
                 SET @errores += '- La edad, los partidos y los minutos no pueden ser negativos.' + @nl;
+
+            -- Jugador del modelo: convocado de esa selección con el mismo nombre completo (cruce exacto).
+            SELECT TOP 1 @jugador_id = j.jugador_id, @club_plantel = j.club_origen
+            FROM plantel.jugador j
+            JOIN plantel.convocatoria c ON c.jugador_id = j.jugador_id AND c.seleccion_id = @seleccion_id
+            WHERE j.nombre + ' ' + j.apellido = @jugador OR (j.nombre = j.apellido AND j.nombre = @jugador);
+            IF @jugador_id IS NULL AND @jugador IS NOT NULL AND @seleccion_id IS NOT NULL
+                SET @errores += '- Error de coincidencia: el jugador no coincide con ningún convocado de la selección (la fuente y el plantel usan nombres distintos).' + @nl;
+
+            -- El club en blanco en la fuente se completa con el del plantel (mismo jugador, ya identificado).
+            IF @jugador_id IS NOT NULL
+                UPDATE #jugadores SET club = ISNULL(club, LEFT(@club_plantel, 120)) WHERE fila = @i;
+
+            IF EXISTS (SELECT 1 FROM #jugadores WHERE fila = @i AND numeros_ok = 1
+                       AND (posicion IS NULL OR edad IS NULL OR anio_nacimiento IS NULL OR club IS NULL OR partidos IS NULL
+                            OR titularidades IS NULL OR minutos IS NULL OR goles IS NULL OR asistencias IS NULL
+                            OR amarillas IS NULL OR rojas IS NULL OR goles_penal IS NULL OR goles_en_contra IS NULL))
+                SET @errores += '- Datos incompletos: faltan posición, edad, año de nacimiento, club, partidos o estadísticas.' + @nl;
+
             IF @errores <> ''
             BEGIN
                 SET @errores = 'Fila rechazada:' + @nl + @errores;
                 THROW 50004, @errores, 1;
             END;
-
-            -- Jugador del modelo: convocado de esa selección con el mismo nombre completo.
-            SELECT TOP 1 @jugador_id = j.jugador_id
-            FROM plantel.jugador j
-            JOIN plantel.convocatoria c ON c.jugador_id = j.jugador_id AND c.seleccion_id = @seleccion_id
-            WHERE j.nombre + ' ' + j.apellido = @jugador OR (j.nombre = j.apellido AND j.nombre = @jugador);
-            IF @jugador_id IS NULL SET @sin_jugador += 1;
 
             SELECT @id = jugador_estadistica_id FROM plantel.jugador_estadistica_kaggle
             WHERE pais_equipo = @pais_equipo AND jugador = @jugador;
@@ -1125,8 +1145,6 @@ BEGIN
         SET @i += 1;
     END;
 
-    PRINT CONCAT('plantel.importar_estadisticas_jugadores_kaggle_2026: ', @sin_jugador,
-                 ' filas sin un jugador del modelo con el mismo nombre (quedan vinculadas sólo a la selección).');
     DROP TABLE #archivo, #jugadores;
     EXEC importacion.lote_cerrar @lote_id, @leidos, @insertados, @actualizados, @sin_cambios, @rechazados;
 END;

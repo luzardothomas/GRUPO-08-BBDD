@@ -911,11 +911,11 @@ IF EXISTS (SELECT 1 FROM evento.criterio_suspension WHERE cantidad_amarillas BET
     THROW 50000, 'Ya hay criterios con cantidad_amarillas entre 70 y 99 (rango reservado para las pruebas): ejecutar antes la limpieza de evento.criterio_suspension_*.', 1;
 DECLARE @id INT;
 EXEC evento.criterio_suspension_insertar 90, 1, 'grupos',        'jugador',        1, @id OUTPUT; INSERT INTO ##test_criterio VALUES ('mod',       @id);  -- a modificar
-EXEC evento.criterio_suspension_insertar 90, 1, 'octavos',       NULL,             1, @id OUTPUT; INSERT INTO ##test_criterio VALUES ('mod2',      @id);  -- destino de duplicados
+EXEC evento.criterio_suspension_insertar 90, 1, 'octavos',       'cuerpo_tecnico', 1, @id OUTPUT; INSERT INTO ##test_criterio VALUES ('mod2',      @id);  -- destino de duplicados
 EXEC evento.criterio_suspension_insertar 90, 1, 'semifinal',     'jugador',        1, @id OUTPUT; INSERT INTO ##test_criterio VALUES ('dup',       @id);  -- destino de duplicados
-EXEC evento.criterio_suspension_insertar 90, 1, NULL,            NULL,             1, @id OUTPUT; INSERT INTO ##test_criterio VALUES ('base_null', @id);  -- destino de duplicados (todas las fases, ambos tipos)
+EXEC evento.criterio_suspension_insertar 90, 1, 'final',         'jugador',        1, @id OUTPUT; INSERT INTO ##test_criterio VALUES ('dup2',      @id);  -- destino de duplicados
 EXEC evento.criterio_suspension_insertar 90, 1, 'cuartos',       'cuerpo_tecnico', 1, @id OUTPUT; INSERT INTO ##test_criterio VALUES ('elim',      @id);  -- baja valida
-EXEC evento.criterio_suspension_insertar 91, 1, NULL,            NULL,             0, @id OUTPUT; INSERT INTO ##test_criterio VALUES ('elim2',     @id);  -- baja valida (inactivo)
+EXEC evento.criterio_suspension_insertar 91, 1, 'final',         'cuerpo_tecnico', 0, @id OUTPUT; INSERT INTO ##test_criterio VALUES ('elim2',     @id);  -- baja valida (inactivo)
 EXEC evento.criterio_suspension_insertar 90, 1, 'tercer_puesto', 'jugador',        1, @id OUTPUT; INSERT INTO ##test_criterio VALUES ('usado',     @id);  -- RESERVADO para evento.suspension_*
 GO
 

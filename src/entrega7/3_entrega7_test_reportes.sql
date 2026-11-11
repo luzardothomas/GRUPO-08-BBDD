@@ -18,9 +18,14 @@
 --     Rn.2..   filtros opcionales.
 --     Rn.V     validaciones: parámetros inválidos => THROW 50002 con un único mensaje que agrupa
 --              todos los errores.
---   Cada prueba es un lote: un comentario "PRUEBA <id>" con el "Resultado esperado", un
---   PRINT '--- <id> ...' que la identifica en Mensajes y, cuando se puede verificar
---   automáticamente, un PRINT 'OK ...' o 'FALLO ...'.
+--   Misma dinámica que la entrega 5: cada prueba es un lote con un comentario "PRUEBA <id>" y su
+--   "Resultado esperado", un PRINT '--- <id> ...' que la identifica en Mensajes, la evidencia
+--   (el reporte o las tablas de la base que se están verificando) y un INSERT en #resultado con OK o FALLO.
+--   Al final, el RESUMEN lista todas las pruebas: deben figurar todas con resultado OK.
+--   Para el reporte de tarjetas (R2) se agrega el SEGUIMIENTO de cada jugador con suspensión (R2.4): se
+--   muestran las tablas originales (evento.tarjeta, evento.suspension y torneo.partido unido a
+--   plantel.formacion_jugador) para ver en qué partido recibió la tarjeta, qué partido perdió y que no lo jugó.
+--   La conclusión se saca mirando esas tablas; el OK/FALLO sólo la confirma, no la reemplaza.
 --   Los reportes XML se verifican con XQuery sobre su parámetro OUTPUT @resultado; los tabulares,
 --   capturando el resultado con INSERT ... EXEC.
 --
@@ -35,6 +40,20 @@ USE mundial_2026;
 GO
 
 SET NOCOUNT ON;
+GO
+
+-- El script necesita la carga de entrega7_carga_datos.sql: si la base está vacía, no ejecuta nada.
+
+IF NOT EXISTS (SELECT 1 FROM torneo.partido)
+BEGIN
+    RAISERROR('La base no tiene partidos: ejecutar primero entrega7_carga_datos.sql y entrega7_reportes.sql. No se ejecuta ninguna prueba.', 16, 1);
+    SET NOEXEC ON;
+END;
+GO
+
+IF OBJECT_ID('tempdb..#resultado') IS NOT NULL DROP TABLE #resultado;
+CREATE TABLE #resultado (orden INT IDENTITY(1, 1), prueba VARCHAR(10), descripcion VARCHAR(120),
+                         resultado VARCHAR(5), detalle VARCHAR(2100));
 GO
 
 -- ============================================================
@@ -68,9 +87,9 @@ IF CAST(@x.value('sum(/goleadores/torneo/goleador/@goles)', 'FLOAT') AS INT) = 7
    AND @x.value('(/goleadores/por_fase/fase/@nombre)[1]', 'VARCHAR(13)') = 'grupos'
    AND @x.value('(/goleadores/por_fase/fase/@nombre)[2]', 'VARCHAR(13)') = 'cuartos'
    AND @x.value('(/goleadores/por_fase/fase/@nombre)[3]', 'VARCHAR(13)') = 'semifinal'
-    PRINT 'OK - 73 goles, 3 goleadores en el puesto 1, Francia encabeza por selección, fases en orden.';
+    INSERT INTO #resultado VALUES ('R1.1', 'evento.reporte_goleadores (completo)', 'OK', '73 goles, 3 goleadores en el puesto 1, Francia encabeza por selección, fases en orden.');
 ELSE
-    PRINT 'FALLO - los totales del reporte de goleadores no coinciden con lo esperado.';
+    INSERT INTO #resultado VALUES ('R1.1', 'evento.reporte_goleadores (completo)', 'FALLO', 'los totales del reporte de goleadores no coinciden con lo esperado.');
 GO
 
 /* PRUEBA R1.2 - Filtro por selección (Argentina)
@@ -89,9 +108,9 @@ SELECT 'R1.2 solo Argentina' AS Prueba, @x.value('count(/goleadores/torneo/golea
 IF CAST(@x.value('sum(/goleadores/torneo/goleador/@goles)', 'FLOAT') AS INT) = 10
    AND @x.value('count(/goleadores/por_seleccion/seleccion)', 'INT') = 1
    AND @x.value('count(/goleadores/torneo/goleador[@seleccion != "Argentina"])', 'INT') = 0
-    PRINT 'OK - sólo Argentina, 10 goles.';
+    INSERT INTO #resultado VALUES ('R1.2', 'evento.reporte_goleadores @seleccion_id = Argentina', 'OK', 'sólo Argentina, 10 goles.');
 ELSE
-    PRINT 'FALLO - el filtro por selección no devolvió sólo los 10 goles de Argentina.';
+    INSERT INTO #resultado VALUES ('R1.2', 'evento.reporte_goleadores @seleccion_id = Argentina', 'FALLO', 'el filtro por selección no devolvió sólo los 10 goles de Argentina.');
 GO
 
 /* PRUEBA R1.3 - Filtro por fase (semifinal)
@@ -108,9 +127,9 @@ SELECT 'R1.3 solo semifinal' AS Prueba, @x.value('count(/goleadores/torneo/golea
 
 IF CAST(@x.value('sum(/goleadores/torneo/goleador/@goles)', 'FLOAT') AS INT) = 8
    AND @x.value('count(/goleadores/por_fase/fase)', 'INT') = 1
-    PRINT 'OK - 8 goles en semifinales.';
+    INSERT INTO #resultado VALUES ('R1.3', 'evento.reporte_goleadores @fase = semifinal', 'OK', '8 goles en semifinales.');
 ELSE
-    PRINT 'FALLO - el filtro por fase no devolvió los 8 goles de las semifinales.';
+    INSERT INTO #resultado VALUES ('R1.3', 'evento.reporte_goleadores @fase = semifinal', 'FALLO', 'el filtro por fase no devolvió los 8 goles de las semifinales.');
 GO
 
 /* PRUEBA R1.V - Validaciones
@@ -120,10 +139,11 @@ GO
 PRINT '--- R1.V evento.reporte_goleadores con parámetros inválidos';
 BEGIN TRY
     EXEC evento.reporte_goleadores @seleccion_id = -1, @fase = 'octavo';
-    PRINT 'FALLO - la consulta debía rechazarse.';
+    INSERT INTO #resultado VALUES ('R1.V', 'evento.reporte_goleadores con parámetros inválidos', 'FALLO', 'No se rechazó');
 END TRY
 BEGIN CATCH
-    PRINT IIF(ERROR_NUMBER() = 50002, 'OK - rechazada: ', 'FALLO - error inesperado: ') + ERROR_MESSAGE();
+    PRINT ERROR_MESSAGE();
+    INSERT INTO #resultado VALUES ('R1.V', 'evento.reporte_goleadores con parámetros inválidos', IIF(ERROR_NUMBER() = 50002, 'OK', 'FALLO'), ERROR_MESSAGE());
 END CATCH;
 GO
 
@@ -168,9 +188,9 @@ IF (SELECT COUNT(*) FROM @r WHERE persona <> 'TOTAL SELECCIÓN') = 27
    AND (SELECT COUNT(*) FROM @r WHERE suspension = 'SÍ') = 2
    AND EXISTS (SELECT 1 FROM @r WHERE persona = 'Mamadou Camara' AND suspension = 'SÍ' AND detalle LIKE '%(final%')
    AND EXISTS (SELECT 1 FROM @r WHERE persona = 'Danilo Rocha' AND suspension = 'SÍ' AND detalle LIKE '%(tercer_puesto%')
-    PRINT 'OK - 27 personas, 40 tarjetas (37 amarillas + 1 roja por doble amarilla + 2 directas), doble amarilla = 2 amarillas y las 2 suspensiones activas esperadas.';
+    INSERT INTO #resultado VALUES ('R2.1', 'evento.reporte_tarjetas (completo)', 'OK', '27 personas, 40 tarjetas (37 amarillas + 1 roja por doble amarilla + 2 directas), doble amarilla = 2 amarillas y las 2 suspensiones activas esperadas.');
 ELSE
-    PRINT 'FALLO - el reporte de tarjetas no coincide con lo esperado.';
+    INSERT INTO #resultado VALUES ('R2.1', 'evento.reporte_tarjetas (completo)', 'FALLO', 'el reporte de tarjetas no coincide con lo esperado.');
 GO
 
 /* PRUEBA R2.2 - Filtro por selección (Francia)
@@ -194,9 +214,9 @@ IF (SELECT COUNT(*) FROM @r) = 3
                  AND suspension = 'SÍ' AND detalle LIKE '%(final%')
    AND EXISTS (SELECT 1 FROM @r WHERE persona = 'TOTAL SELECCIÓN' AND amarillas = 4
                  AND suspension = '1 suspendido(s)' AND detalle = 'No aplica (fila de total)')
-    PRINT 'OK - Francia: 2 personas con 2 amarillas, Mamadou Camara suspendido para la final y total de 4 amarillas.';
+    INSERT INTO #resultado VALUES ('R2.2', 'evento.reporte_tarjetas @seleccion_id = Francia', 'OK', 'Francia: 2 personas con 2 amarillas, Mamadou Camara suspendido para la final y total de 4 amarillas.');
 ELSE
-    PRINT 'FALLO - el filtro por selección del reporte de tarjetas no coincide con lo esperado.';
+    INSERT INTO #resultado VALUES ('R2.2', 'evento.reporte_tarjetas @seleccion_id = Francia', 'FALLO', 'el filtro por selección del reporte de tarjetas no coincide con lo esperado.');
 GO
 
 /* PRUEBA R2.3 - Evidencia: el suspendido por acumulación quedó afuera de la formación siguiente
@@ -235,9 +255,529 @@ IF (SELECT COUNT(*) FROM @titulares) = 11
    AND NOT EXISTS (SELECT 1 FROM @titulares WHERE dorsal = 5)
    AND EXISTS (SELECT 1 FROM @titulares WHERE dorsal = 13)
    AND (SELECT COUNT(*) FROM @titulares WHERE dorsal BETWEEN 1 AND 4 OR dorsal BETWEEN 6 AND 11) = 10
-    PRINT 'OK - 11 titulares (dorsales 1 a 4, 6 a 11 y 13): el suspendido (dorsal 5) quedó afuera y entró el 13.';
+    INSERT INTO #resultado VALUES ('R2.3', 'Titulares de Argentina en Marruecos-Argentina (suspendido por acumulación)', 'OK', '11 titulares (dorsales 1 a 4, 6 a 11 y 13): el suspendido (dorsal 5) quedó afuera y entró el 13.');
 ELSE
-    PRINT 'FALLO - los titulares de Argentina no coinciden: el suspendido debía quedar afuera.';
+    INSERT INTO #resultado VALUES ('R2.3', 'Titulares de Argentina en Marruecos-Argentina (suspendido por acumulación)', 'FALLO', 'los titulares de Argentina no coinciden: el suspendido debía quedar afuera.');
+GO
+
+/* PRUEBA R2.4.a - Seguimiento de Moritz Krüger (Alemania) sobre las tablas originales
+   Resultado esperado: la doble amarilla del partido 11 (Brasil-Alemania) le hizo perder el siguiente partido de Alemania, que ya se jugó: la suspensión se cumplió (por eso R2.1 la muestra como NO activa).
+   Las cuatro grillas son las tablas de la base, sin resumir:
+     1) evento.tarjeta: todas las tarjetas de la persona y el partido en que se mostró cada una.
+     2) evento.suspension: la suspensión que originó, con el criterio aplicado (evento.criterio_suspension) y el partido afectado y su estado.
+     3) Partidos de su selección en los que integró la formación (torneo.partido unido a plantel.formacion_jugador),
+        con su dorsal y si fue titular.
+     4) Partidos de su selección en los que NO integró la formación (no tiene fila en formacion_jugador). El partido
+        afectado por la suspensión debe figurar en esta grilla y ser posterior a la tarjeta. */
+PRINT '--- R2.4.a Seguimiento de Moritz Krüger (Alemania)';
+DECLARE @persona INT, @seleccion INT, @suspensiones INT, @tarjeta_origen INT, @partido_afectado INT,
+        @estado_afectado VARCHAR(10), @fecha_afectado DATETIMEOFFSET, @fecha_tarjeta DATETIMEOFFSET,
+        @tipo_tarjeta VARCHAR(8), @expulsion_tarjeta VARCHAR(14), @en_formacion INT;
+
+SELECT @persona = j.persona_id
+FROM plantel.jugador j
+WHERE j.nombre = 'Moritz' AND j.apellido = 'Krüger'
+  AND EXISTS (SELECT 1 FROM evento.tarjeta t
+              JOIN evento.suspension sp          ON sp.tarjeta_id = t.tarjeta_id
+              JOIN plantel.vw_persona_partido v  ON v.persona_id = t.persona_id AND v.partido_id = t.partido_id
+              JOIN torneo.seleccion s            ON s.seleccion_id = v.seleccion_id
+              JOIN torneo.pais pa                ON pa.pais_id = s.pais_id
+              WHERE t.persona_id = j.persona_id AND pa.codigo_iso = 'DEU');
+SELECT TOP (1) @seleccion = v.seleccion_id
+FROM evento.tarjeta t JOIN plantel.vw_persona_partido v ON v.persona_id = t.persona_id AND v.partido_id = t.partido_id
+WHERE t.persona_id = @persona;
+
+-- 1) Tarjetas de la persona.
+SELECT t.tarjeta_id, t.partido_id, p.fase, p.fecha_hora_utc, t.minuto, t.periodo, t.tipo, t.tipo_expulsion, t.motivo
+FROM evento.tarjeta t
+JOIN torneo.partido p ON p.partido_id = t.partido_id
+WHERE t.persona_id = @persona
+ORDER BY p.fecha_hora_utc, t.minuto;
+
+-- 2) Suspensión(es) originada(s) por esas tarjetas.
+SELECT sp.suspension_id, sp.criterio_id, cs.cantidad_amarillas, cs.partidos_suspension, sp.tarjeta_id, sp.partido_afectado_id, sp.motivo,
+       pa.fase AS fase_afectado, pa.fecha_hora_utc AS fecha_afectado, pa.estado AS estado_afectado
+FROM evento.suspension sp
+JOIN evento.tarjeta t               ON t.tarjeta_id = sp.tarjeta_id
+JOIN evento.criterio_suspension cs  ON cs.criterio_id = sp.criterio_id
+JOIN torneo.partido pa              ON pa.partido_id = sp.partido_afectado_id
+WHERE t.persona_id = @persona
+ORDER BY sp.suspension_id;
+
+-- 3) Partidos de su selección en los que integró la formación, con su dorsal y si fue titular.
+SELECT p.partido_id, p.fase, p.fecha_hora_utc, p.estado, f.condicion, fj.dorsal, fj.titular
+FROM torneo.partido p
+JOIN plantel.formacion f          ON f.partido_id = p.partido_id
+JOIN plantel.formacion_jugador fj ON fj.formacion_id = f.formacion_id
+JOIN plantel.jugador j            ON j.jugador_id = fj.jugador_id AND j.persona_id = @persona
+WHERE @seleccion IN (p.seleccion_local_id, p.seleccion_visitante_id)
+ORDER BY p.fecha_hora_utc;
+
+-- 4) Partidos de su selección en los que NO integró la formación (sin fila en formacion_jugador).
+SELECT p.partido_id, p.fase, p.fecha_hora_utc, p.estado
+FROM torneo.partido p
+WHERE @seleccion IN (p.seleccion_local_id, p.seleccion_visitante_id)
+  AND NOT EXISTS (SELECT 1 FROM plantel.formacion f
+                  JOIN plantel.formacion_jugador fj ON fj.formacion_id = f.formacion_id
+                  JOIN plantel.jugador j            ON j.jugador_id = fj.jugador_id
+                  WHERE f.partido_id = p.partido_id AND j.persona_id = @persona)
+ORDER BY p.fecha_hora_utc;
+
+-- Veredicto, calculado sobre las mismas tablas.
+SELECT @suspensiones = COUNT(*) FROM evento.suspension sp JOIN evento.tarjeta t ON t.tarjeta_id = sp.tarjeta_id
+WHERE t.persona_id = @persona AND sp.motivo LIKE 'Expulsión por doble amarilla%';
+SELECT @tarjeta_origen = sp.tarjeta_id, @partido_afectado = sp.partido_afectado_id
+FROM evento.suspension sp JOIN evento.tarjeta t ON t.tarjeta_id = sp.tarjeta_id
+WHERE t.persona_id = @persona AND sp.motivo LIKE 'Expulsión por doble amarilla%';
+SELECT @estado_afectado = estado, @fecha_afectado = fecha_hora_utc FROM torneo.partido WHERE partido_id = @partido_afectado;
+SELECT @tipo_tarjeta = t.tipo, @expulsion_tarjeta = t.tipo_expulsion, @fecha_tarjeta = p.fecha_hora_utc
+FROM evento.tarjeta t JOIN torneo.partido p ON p.partido_id = t.partido_id WHERE t.tarjeta_id = @tarjeta_origen;
+SELECT @en_formacion = COUNT(*)
+FROM plantel.formacion f JOIN plantel.formacion_jugador fj ON fj.formacion_id = f.formacion_id
+JOIN plantel.jugador j ON j.jugador_id = fj.jugador_id
+WHERE f.partido_id = @partido_afectado AND j.persona_id = @persona;
+
+IF @persona IS NOT NULL
+   AND @suspensiones = 1
+   AND @tipo_tarjeta = 'roja' AND @expulsion_tarjeta = 'doble_amarilla'
+   AND @fecha_tarjeta < @fecha_afectado
+   AND @estado_afectado = 'finalizado'
+   AND @en_formacion = 0
+    INSERT INTO #resultado VALUES ('R2.4.a', 'Seguimiento de Moritz Krüger: tarjeta, suspensión y partido perdido', 'OK', '');
+ELSE
+    INSERT INTO #resultado VALUES ('R2.4.a', 'Seguimiento de Moritz Krüger: tarjeta, suspensión y partido perdido', 'FALLO',
+           CONCAT('persona=', @persona, ', suspensiones=', @suspensiones, ', tarjeta origen=', @tarjeta_origen, ' (', @tipo_tarjeta, ' ', @expulsion_tarjeta,
+                  '), partido afectado=', @partido_afectado, ' (', @estado_afectado, '), figura en la formación de ese partido=', @en_formacion, '.'));
+GO
+
+/* PRUEBA R2.4.b - Seguimiento de Santiago Álvarez (Colombia) sobre las tablas originales
+   Resultado esperado: la roja directa del partido 15 (España-Colombia) le hizo perder el siguiente partido de Colombia, ya jugado.
+   Las cuatro grillas son las tablas de la base, sin resumir:
+     1) evento.tarjeta: todas las tarjetas de la persona y el partido en que se mostró cada una.
+     2) evento.suspension: la suspensión que originó, con el criterio aplicado (evento.criterio_suspension) y el partido afectado y su estado.
+     3) Partidos de su selección en los que integró la formación (torneo.partido unido a plantel.formacion_jugador),
+        con su dorsal y si fue titular.
+     4) Partidos de su selección en los que NO integró la formación (no tiene fila en formacion_jugador). El partido
+        afectado por la suspensión debe figurar en esta grilla y ser posterior a la tarjeta. */
+PRINT '--- R2.4.b Seguimiento de Santiago Álvarez (Colombia)';
+DECLARE @persona INT, @seleccion INT, @suspensiones INT, @tarjeta_origen INT, @partido_afectado INT,
+        @estado_afectado VARCHAR(10), @fecha_afectado DATETIMEOFFSET, @fecha_tarjeta DATETIMEOFFSET,
+        @tipo_tarjeta VARCHAR(8), @expulsion_tarjeta VARCHAR(14), @en_formacion INT;
+
+SELECT @persona = j.persona_id
+FROM plantel.jugador j
+WHERE j.nombre = 'Santiago' AND j.apellido = 'Álvarez'
+  AND EXISTS (SELECT 1 FROM evento.tarjeta t
+              JOIN evento.suspension sp          ON sp.tarjeta_id = t.tarjeta_id
+              JOIN plantel.vw_persona_partido v  ON v.persona_id = t.persona_id AND v.partido_id = t.partido_id
+              JOIN torneo.seleccion s            ON s.seleccion_id = v.seleccion_id
+              JOIN torneo.pais pa                ON pa.pais_id = s.pais_id
+              WHERE t.persona_id = j.persona_id AND pa.codigo_iso = 'COL');
+SELECT TOP (1) @seleccion = v.seleccion_id
+FROM evento.tarjeta t JOIN plantel.vw_persona_partido v ON v.persona_id = t.persona_id AND v.partido_id = t.partido_id
+WHERE t.persona_id = @persona;
+
+-- 1) Tarjetas de la persona.
+SELECT t.tarjeta_id, t.partido_id, p.fase, p.fecha_hora_utc, t.minuto, t.periodo, t.tipo, t.tipo_expulsion, t.motivo
+FROM evento.tarjeta t
+JOIN torneo.partido p ON p.partido_id = t.partido_id
+WHERE t.persona_id = @persona
+ORDER BY p.fecha_hora_utc, t.minuto;
+
+-- 2) Suspensión(es) originada(s) por esas tarjetas.
+SELECT sp.suspension_id, sp.criterio_id, cs.cantidad_amarillas, cs.partidos_suspension, sp.tarjeta_id, sp.partido_afectado_id, sp.motivo,
+       pa.fase AS fase_afectado, pa.fecha_hora_utc AS fecha_afectado, pa.estado AS estado_afectado
+FROM evento.suspension sp
+JOIN evento.tarjeta t               ON t.tarjeta_id = sp.tarjeta_id
+JOIN evento.criterio_suspension cs  ON cs.criterio_id = sp.criterio_id
+JOIN torneo.partido pa              ON pa.partido_id = sp.partido_afectado_id
+WHERE t.persona_id = @persona
+ORDER BY sp.suspension_id;
+
+-- 3) Partidos de su selección en los que integró la formación, con su dorsal y si fue titular.
+SELECT p.partido_id, p.fase, p.fecha_hora_utc, p.estado, f.condicion, fj.dorsal, fj.titular
+FROM torneo.partido p
+JOIN plantel.formacion f          ON f.partido_id = p.partido_id
+JOIN plantel.formacion_jugador fj ON fj.formacion_id = f.formacion_id
+JOIN plantel.jugador j            ON j.jugador_id = fj.jugador_id AND j.persona_id = @persona
+WHERE @seleccion IN (p.seleccion_local_id, p.seleccion_visitante_id)
+ORDER BY p.fecha_hora_utc;
+
+-- 4) Partidos de su selección en los que NO integró la formación (sin fila en formacion_jugador).
+SELECT p.partido_id, p.fase, p.fecha_hora_utc, p.estado
+FROM torneo.partido p
+WHERE @seleccion IN (p.seleccion_local_id, p.seleccion_visitante_id)
+  AND NOT EXISTS (SELECT 1 FROM plantel.formacion f
+                  JOIN plantel.formacion_jugador fj ON fj.formacion_id = f.formacion_id
+                  JOIN plantel.jugador j            ON j.jugador_id = fj.jugador_id
+                  WHERE f.partido_id = p.partido_id AND j.persona_id = @persona)
+ORDER BY p.fecha_hora_utc;
+
+-- Veredicto, calculado sobre las mismas tablas.
+SELECT @suspensiones = COUNT(*) FROM evento.suspension sp JOIN evento.tarjeta t ON t.tarjeta_id = sp.tarjeta_id
+WHERE t.persona_id = @persona AND sp.motivo LIKE 'Expulsión por roja directa%';
+SELECT @tarjeta_origen = sp.tarjeta_id, @partido_afectado = sp.partido_afectado_id
+FROM evento.suspension sp JOIN evento.tarjeta t ON t.tarjeta_id = sp.tarjeta_id
+WHERE t.persona_id = @persona AND sp.motivo LIKE 'Expulsión por roja directa%';
+SELECT @estado_afectado = estado, @fecha_afectado = fecha_hora_utc FROM torneo.partido WHERE partido_id = @partido_afectado;
+SELECT @tipo_tarjeta = t.tipo, @expulsion_tarjeta = t.tipo_expulsion, @fecha_tarjeta = p.fecha_hora_utc
+FROM evento.tarjeta t JOIN torneo.partido p ON p.partido_id = t.partido_id WHERE t.tarjeta_id = @tarjeta_origen;
+SELECT @en_formacion = COUNT(*)
+FROM plantel.formacion f JOIN plantel.formacion_jugador fj ON fj.formacion_id = f.formacion_id
+JOIN plantel.jugador j ON j.jugador_id = fj.jugador_id
+WHERE f.partido_id = @partido_afectado AND j.persona_id = @persona;
+
+IF @persona IS NOT NULL
+   AND @suspensiones = 1
+   AND @tipo_tarjeta = 'roja' AND @expulsion_tarjeta = 'roja_directa'
+   AND @fecha_tarjeta < @fecha_afectado
+   AND @estado_afectado = 'finalizado'
+   AND @en_formacion = 0
+    INSERT INTO #resultado VALUES ('R2.4.b', 'Seguimiento de Santiago Álvarez: tarjeta, suspensión y partido perdido', 'OK', '');
+ELSE
+    INSERT INTO #resultado VALUES ('R2.4.b', 'Seguimiento de Santiago Álvarez: tarjeta, suspensión y partido perdido', 'FALLO',
+           CONCAT('persona=', @persona, ', suspensiones=', @suspensiones, ', tarjeta origen=', @tarjeta_origen, ' (', @tipo_tarjeta, ' ', @expulsion_tarjeta,
+                  '), partido afectado=', @partido_afectado, ' (', @estado_afectado, '), figura en la formación de ese partido=', @en_formacion, '.'));
+GO
+
+/* PRUEBA R2.4.c - Seguimiento de Facundo Herrera (Argentina) sobre las tablas originales
+   Resultado esperado: su 2.ª amarilla (partido 9) completó la acumulación y le hizo perder Marruecos-Argentina, ya jugado (ver también R2.3).
+   Las cuatro grillas son las tablas de la base, sin resumir:
+     1) evento.tarjeta: todas las tarjetas de la persona y el partido en que se mostró cada una.
+     2) evento.suspension: la suspensión que originó, con el criterio aplicado (evento.criterio_suspension) y el partido afectado y su estado.
+     3) Partidos de su selección en los que integró la formación (torneo.partido unido a plantel.formacion_jugador),
+        con su dorsal y si fue titular.
+     4) Partidos de su selección en los que NO integró la formación (no tiene fila en formacion_jugador). El partido
+        afectado por la suspensión debe figurar en esta grilla y ser posterior a la tarjeta. */
+PRINT '--- R2.4.c Seguimiento de Facundo Herrera (Argentina)';
+DECLARE @persona INT, @seleccion INT, @suspensiones INT, @tarjeta_origen INT, @partido_afectado INT,
+        @estado_afectado VARCHAR(10), @fecha_afectado DATETIMEOFFSET, @fecha_tarjeta DATETIMEOFFSET,
+        @tipo_tarjeta VARCHAR(8), @expulsion_tarjeta VARCHAR(14), @en_formacion INT;
+
+SELECT @persona = j.persona_id
+FROM plantel.jugador j
+WHERE j.nombre = 'Facundo' AND j.apellido = 'Herrera'
+  AND EXISTS (SELECT 1 FROM evento.tarjeta t
+              JOIN evento.suspension sp          ON sp.tarjeta_id = t.tarjeta_id
+              JOIN plantel.vw_persona_partido v  ON v.persona_id = t.persona_id AND v.partido_id = t.partido_id
+              JOIN torneo.seleccion s            ON s.seleccion_id = v.seleccion_id
+              JOIN torneo.pais pa                ON pa.pais_id = s.pais_id
+              WHERE t.persona_id = j.persona_id AND pa.codigo_iso = 'ARG');
+SELECT TOP (1) @seleccion = v.seleccion_id
+FROM evento.tarjeta t JOIN plantel.vw_persona_partido v ON v.persona_id = t.persona_id AND v.partido_id = t.partido_id
+WHERE t.persona_id = @persona;
+
+-- 1) Tarjetas de la persona.
+SELECT t.tarjeta_id, t.partido_id, p.fase, p.fecha_hora_utc, t.minuto, t.periodo, t.tipo, t.tipo_expulsion, t.motivo
+FROM evento.tarjeta t
+JOIN torneo.partido p ON p.partido_id = t.partido_id
+WHERE t.persona_id = @persona
+ORDER BY p.fecha_hora_utc, t.minuto;
+
+-- 2) Suspensión(es) originada(s) por esas tarjetas.
+SELECT sp.suspension_id, sp.criterio_id, cs.cantidad_amarillas, cs.partidos_suspension, sp.tarjeta_id, sp.partido_afectado_id, sp.motivo,
+       pa.fase AS fase_afectado, pa.fecha_hora_utc AS fecha_afectado, pa.estado AS estado_afectado
+FROM evento.suspension sp
+JOIN evento.tarjeta t               ON t.tarjeta_id = sp.tarjeta_id
+JOIN evento.criterio_suspension cs  ON cs.criterio_id = sp.criterio_id
+JOIN torneo.partido pa              ON pa.partido_id = sp.partido_afectado_id
+WHERE t.persona_id = @persona
+ORDER BY sp.suspension_id;
+
+-- 3) Partidos de su selección en los que integró la formación, con su dorsal y si fue titular.
+SELECT p.partido_id, p.fase, p.fecha_hora_utc, p.estado, f.condicion, fj.dorsal, fj.titular
+FROM torneo.partido p
+JOIN plantel.formacion f          ON f.partido_id = p.partido_id
+JOIN plantel.formacion_jugador fj ON fj.formacion_id = f.formacion_id
+JOIN plantel.jugador j            ON j.jugador_id = fj.jugador_id AND j.persona_id = @persona
+WHERE @seleccion IN (p.seleccion_local_id, p.seleccion_visitante_id)
+ORDER BY p.fecha_hora_utc;
+
+-- 4) Partidos de su selección en los que NO integró la formación (sin fila en formacion_jugador).
+SELECT p.partido_id, p.fase, p.fecha_hora_utc, p.estado
+FROM torneo.partido p
+WHERE @seleccion IN (p.seleccion_local_id, p.seleccion_visitante_id)
+  AND NOT EXISTS (SELECT 1 FROM plantel.formacion f
+                  JOIN plantel.formacion_jugador fj ON fj.formacion_id = f.formacion_id
+                  JOIN plantel.jugador j            ON j.jugador_id = fj.jugador_id
+                  WHERE f.partido_id = p.partido_id AND j.persona_id = @persona)
+ORDER BY p.fecha_hora_utc;
+
+-- Veredicto, calculado sobre las mismas tablas.
+SELECT @suspensiones = COUNT(*) FROM evento.suspension sp JOIN evento.tarjeta t ON t.tarjeta_id = sp.tarjeta_id
+WHERE t.persona_id = @persona AND sp.motivo LIKE 'Acumulación de 2 amarillas%';
+SELECT @tarjeta_origen = sp.tarjeta_id, @partido_afectado = sp.partido_afectado_id
+FROM evento.suspension sp JOIN evento.tarjeta t ON t.tarjeta_id = sp.tarjeta_id
+WHERE t.persona_id = @persona AND sp.motivo LIKE 'Acumulación de 2 amarillas%';
+SELECT @estado_afectado = estado, @fecha_afectado = fecha_hora_utc FROM torneo.partido WHERE partido_id = @partido_afectado;
+SELECT @tipo_tarjeta = t.tipo, @expulsion_tarjeta = t.tipo_expulsion, @fecha_tarjeta = p.fecha_hora_utc
+FROM evento.tarjeta t JOIN torneo.partido p ON p.partido_id = t.partido_id WHERE t.tarjeta_id = @tarjeta_origen;
+SELECT @en_formacion = COUNT(*)
+FROM plantel.formacion f JOIN plantel.formacion_jugador fj ON fj.formacion_id = f.formacion_id
+JOIN plantel.jugador j ON j.jugador_id = fj.jugador_id
+WHERE f.partido_id = @partido_afectado AND j.persona_id = @persona;
+
+IF @persona IS NOT NULL
+   AND @suspensiones = 1
+   AND @tipo_tarjeta = 'amarilla' AND @expulsion_tarjeta = 'sin_expulsar'
+   AND @fecha_tarjeta < @fecha_afectado
+   AND @estado_afectado = 'finalizado'
+   AND @en_formacion = 0
+    INSERT INTO #resultado VALUES ('R2.4.c', 'Seguimiento de Facundo Herrera: tarjeta, suspensión y partido perdido', 'OK', '');
+ELSE
+    INSERT INTO #resultado VALUES ('R2.4.c', 'Seguimiento de Facundo Herrera: tarjeta, suspensión y partido perdido', 'FALLO',
+           CONCAT('persona=', @persona, ', suspensiones=', @suspensiones, ', tarjeta origen=', @tarjeta_origen, ' (', @tipo_tarjeta, ' ', @expulsion_tarjeta,
+                  '), partido afectado=', @partido_afectado, ' (', @estado_afectado, '), figura en la formación de ese partido=', @en_formacion, '.'));
+GO
+
+/* PRUEBA R2.4.d - Seguimiento de Mamadou Camara (Francia) sobre las tablas originales
+   Resultado esperado: su 2.ª amarilla completó la acumulación y pierde la final, todavía programada: suspensión ACTIVA.
+   Las cuatro grillas son las tablas de la base, sin resumir:
+     1) evento.tarjeta: todas las tarjetas de la persona y el partido en que se mostró cada una.
+     2) evento.suspension: la suspensión que originó, con el criterio aplicado (evento.criterio_suspension) y el partido afectado y su estado.
+     3) Partidos de su selección en los que integró la formación (torneo.partido unido a plantel.formacion_jugador),
+        con su dorsal y si fue titular.
+     4) Partidos de su selección en los que NO integró la formación (no tiene fila en formacion_jugador). El partido
+        afectado por la suspensión debe figurar en esta grilla y ser posterior a la tarjeta. */
+PRINT '--- R2.4.d Seguimiento de Mamadou Camara (Francia)';
+DECLARE @persona INT, @seleccion INT, @suspensiones INT, @tarjeta_origen INT, @partido_afectado INT,
+        @estado_afectado VARCHAR(10), @fecha_afectado DATETIMEOFFSET, @fecha_tarjeta DATETIMEOFFSET,
+        @tipo_tarjeta VARCHAR(8), @expulsion_tarjeta VARCHAR(14), @en_formacion INT;
+
+SELECT @persona = j.persona_id
+FROM plantel.jugador j
+WHERE j.nombre = 'Mamadou' AND j.apellido = 'Camara'
+  AND EXISTS (SELECT 1 FROM evento.tarjeta t
+              JOIN evento.suspension sp          ON sp.tarjeta_id = t.tarjeta_id
+              JOIN plantel.vw_persona_partido v  ON v.persona_id = t.persona_id AND v.partido_id = t.partido_id
+              JOIN torneo.seleccion s            ON s.seleccion_id = v.seleccion_id
+              JOIN torneo.pais pa                ON pa.pais_id = s.pais_id
+              WHERE t.persona_id = j.persona_id AND pa.codigo_iso = 'FRA');
+SELECT TOP (1) @seleccion = v.seleccion_id
+FROM evento.tarjeta t JOIN plantel.vw_persona_partido v ON v.persona_id = t.persona_id AND v.partido_id = t.partido_id
+WHERE t.persona_id = @persona;
+
+-- 1) Tarjetas de la persona.
+SELECT t.tarjeta_id, t.partido_id, p.fase, p.fecha_hora_utc, t.minuto, t.periodo, t.tipo, t.tipo_expulsion, t.motivo
+FROM evento.tarjeta t
+JOIN torneo.partido p ON p.partido_id = t.partido_id
+WHERE t.persona_id = @persona
+ORDER BY p.fecha_hora_utc, t.minuto;
+
+-- 2) Suspensión(es) originada(s) por esas tarjetas.
+SELECT sp.suspension_id, sp.criterio_id, cs.cantidad_amarillas, cs.partidos_suspension, sp.tarjeta_id, sp.partido_afectado_id, sp.motivo,
+       pa.fase AS fase_afectado, pa.fecha_hora_utc AS fecha_afectado, pa.estado AS estado_afectado
+FROM evento.suspension sp
+JOIN evento.tarjeta t               ON t.tarjeta_id = sp.tarjeta_id
+JOIN evento.criterio_suspension cs  ON cs.criterio_id = sp.criterio_id
+JOIN torneo.partido pa              ON pa.partido_id = sp.partido_afectado_id
+WHERE t.persona_id = @persona
+ORDER BY sp.suspension_id;
+
+-- 3) Partidos de su selección en los que integró la formación, con su dorsal y si fue titular.
+SELECT p.partido_id, p.fase, p.fecha_hora_utc, p.estado, f.condicion, fj.dorsal, fj.titular
+FROM torneo.partido p
+JOIN plantel.formacion f          ON f.partido_id = p.partido_id
+JOIN plantel.formacion_jugador fj ON fj.formacion_id = f.formacion_id
+JOIN plantel.jugador j            ON j.jugador_id = fj.jugador_id AND j.persona_id = @persona
+WHERE @seleccion IN (p.seleccion_local_id, p.seleccion_visitante_id)
+ORDER BY p.fecha_hora_utc;
+
+-- 4) Partidos de su selección en los que NO integró la formación (sin fila en formacion_jugador).
+SELECT p.partido_id, p.fase, p.fecha_hora_utc, p.estado
+FROM torneo.partido p
+WHERE @seleccion IN (p.seleccion_local_id, p.seleccion_visitante_id)
+  AND NOT EXISTS (SELECT 1 FROM plantel.formacion f
+                  JOIN plantel.formacion_jugador fj ON fj.formacion_id = f.formacion_id
+                  JOIN plantel.jugador j            ON j.jugador_id = fj.jugador_id
+                  WHERE f.partido_id = p.partido_id AND j.persona_id = @persona)
+ORDER BY p.fecha_hora_utc;
+
+-- Veredicto, calculado sobre las mismas tablas.
+SELECT @suspensiones = COUNT(*) FROM evento.suspension sp JOIN evento.tarjeta t ON t.tarjeta_id = sp.tarjeta_id
+WHERE t.persona_id = @persona AND sp.motivo LIKE 'Acumulación de 2 amarillas%';
+SELECT @tarjeta_origen = sp.tarjeta_id, @partido_afectado = sp.partido_afectado_id
+FROM evento.suspension sp JOIN evento.tarjeta t ON t.tarjeta_id = sp.tarjeta_id
+WHERE t.persona_id = @persona AND sp.motivo LIKE 'Acumulación de 2 amarillas%';
+SELECT @estado_afectado = estado, @fecha_afectado = fecha_hora_utc FROM torneo.partido WHERE partido_id = @partido_afectado;
+SELECT @tipo_tarjeta = t.tipo, @expulsion_tarjeta = t.tipo_expulsion, @fecha_tarjeta = p.fecha_hora_utc
+FROM evento.tarjeta t JOIN torneo.partido p ON p.partido_id = t.partido_id WHERE t.tarjeta_id = @tarjeta_origen;
+SELECT @en_formacion = COUNT(*)
+FROM plantel.formacion f JOIN plantel.formacion_jugador fj ON fj.formacion_id = f.formacion_id
+JOIN plantel.jugador j ON j.jugador_id = fj.jugador_id
+WHERE f.partido_id = @partido_afectado AND j.persona_id = @persona;
+
+IF @persona IS NOT NULL
+   AND @suspensiones = 1
+   AND @tipo_tarjeta = 'amarilla' AND @expulsion_tarjeta = 'sin_expulsar'
+   AND @fecha_tarjeta < @fecha_afectado
+   AND @estado_afectado = 'programado'
+   AND @en_formacion = 0
+    INSERT INTO #resultado VALUES ('R2.4.d', 'Seguimiento de Mamadou Camara: tarjeta, suspensión y partido perdido', 'OK', '');
+ELSE
+    INSERT INTO #resultado VALUES ('R2.4.d', 'Seguimiento de Mamadou Camara: tarjeta, suspensión y partido perdido', 'FALLO',
+           CONCAT('persona=', @persona, ', suspensiones=', @suspensiones, ', tarjeta origen=', @tarjeta_origen, ' (', @tipo_tarjeta, ' ', @expulsion_tarjeta,
+                  '), partido afectado=', @partido_afectado, ' (', @estado_afectado, '), figura en la formación de ese partido=', @en_formacion, '.'));
+GO
+
+/* PRUEBA R2.4.e - Seguimiento de Danilo Rocha (Brasil) sobre las tablas originales
+   Resultado esperado: la roja directa le hace perder el tercer puesto, todavía programado: suspensión ACTIVA.
+   Las cuatro grillas son las tablas de la base, sin resumir:
+     1) evento.tarjeta: todas las tarjetas de la persona y el partido en que se mostró cada una.
+     2) evento.suspension: la suspensión que originó, con el criterio aplicado (evento.criterio_suspension) y el partido afectado y su estado.
+     3) Partidos de su selección en los que integró la formación (torneo.partido unido a plantel.formacion_jugador),
+        con su dorsal y si fue titular.
+     4) Partidos de su selección en los que NO integró la formación (no tiene fila en formacion_jugador). El partido
+        afectado por la suspensión debe figurar en esta grilla y ser posterior a la tarjeta. */
+PRINT '--- R2.4.e Seguimiento de Danilo Rocha (Brasil)';
+DECLARE @persona INT, @seleccion INT, @suspensiones INT, @tarjeta_origen INT, @partido_afectado INT,
+        @estado_afectado VARCHAR(10), @fecha_afectado DATETIMEOFFSET, @fecha_tarjeta DATETIMEOFFSET,
+        @tipo_tarjeta VARCHAR(8), @expulsion_tarjeta VARCHAR(14), @en_formacion INT;
+
+SELECT @persona = j.persona_id
+FROM plantel.jugador j
+WHERE j.nombre = 'Danilo' AND j.apellido = 'Rocha'
+  AND EXISTS (SELECT 1 FROM evento.tarjeta t
+              JOIN evento.suspension sp          ON sp.tarjeta_id = t.tarjeta_id
+              JOIN plantel.vw_persona_partido v  ON v.persona_id = t.persona_id AND v.partido_id = t.partido_id
+              JOIN torneo.seleccion s            ON s.seleccion_id = v.seleccion_id
+              JOIN torneo.pais pa                ON pa.pais_id = s.pais_id
+              WHERE t.persona_id = j.persona_id AND pa.codigo_iso = 'BRA');
+SELECT TOP (1) @seleccion = v.seleccion_id
+FROM evento.tarjeta t JOIN plantel.vw_persona_partido v ON v.persona_id = t.persona_id AND v.partido_id = t.partido_id
+WHERE t.persona_id = @persona;
+
+-- 1) Tarjetas de la persona.
+SELECT t.tarjeta_id, t.partido_id, p.fase, p.fecha_hora_utc, t.minuto, t.periodo, t.tipo, t.tipo_expulsion, t.motivo
+FROM evento.tarjeta t
+JOIN torneo.partido p ON p.partido_id = t.partido_id
+WHERE t.persona_id = @persona
+ORDER BY p.fecha_hora_utc, t.minuto;
+
+-- 2) Suspensión(es) originada(s) por esas tarjetas.
+SELECT sp.suspension_id, sp.criterio_id, cs.cantidad_amarillas, cs.partidos_suspension, sp.tarjeta_id, sp.partido_afectado_id, sp.motivo,
+       pa.fase AS fase_afectado, pa.fecha_hora_utc AS fecha_afectado, pa.estado AS estado_afectado
+FROM evento.suspension sp
+JOIN evento.tarjeta t               ON t.tarjeta_id = sp.tarjeta_id
+JOIN evento.criterio_suspension cs  ON cs.criterio_id = sp.criterio_id
+JOIN torneo.partido pa              ON pa.partido_id = sp.partido_afectado_id
+WHERE t.persona_id = @persona
+ORDER BY sp.suspension_id;
+
+-- 3) Partidos de su selección en los que integró la formación, con su dorsal y si fue titular.
+SELECT p.partido_id, p.fase, p.fecha_hora_utc, p.estado, f.condicion, fj.dorsal, fj.titular
+FROM torneo.partido p
+JOIN plantel.formacion f          ON f.partido_id = p.partido_id
+JOIN plantel.formacion_jugador fj ON fj.formacion_id = f.formacion_id
+JOIN plantel.jugador j            ON j.jugador_id = fj.jugador_id AND j.persona_id = @persona
+WHERE @seleccion IN (p.seleccion_local_id, p.seleccion_visitante_id)
+ORDER BY p.fecha_hora_utc;
+
+-- 4) Partidos de su selección en los que NO integró la formación (sin fila en formacion_jugador).
+SELECT p.partido_id, p.fase, p.fecha_hora_utc, p.estado
+FROM torneo.partido p
+WHERE @seleccion IN (p.seleccion_local_id, p.seleccion_visitante_id)
+  AND NOT EXISTS (SELECT 1 FROM plantel.formacion f
+                  JOIN plantel.formacion_jugador fj ON fj.formacion_id = f.formacion_id
+                  JOIN plantel.jugador j            ON j.jugador_id = fj.jugador_id
+                  WHERE f.partido_id = p.partido_id AND j.persona_id = @persona)
+ORDER BY p.fecha_hora_utc;
+
+-- Veredicto, calculado sobre las mismas tablas.
+SELECT @suspensiones = COUNT(*) FROM evento.suspension sp JOIN evento.tarjeta t ON t.tarjeta_id = sp.tarjeta_id
+WHERE t.persona_id = @persona AND sp.motivo LIKE 'Expulsión por roja directa%';
+SELECT @tarjeta_origen = sp.tarjeta_id, @partido_afectado = sp.partido_afectado_id
+FROM evento.suspension sp JOIN evento.tarjeta t ON t.tarjeta_id = sp.tarjeta_id
+WHERE t.persona_id = @persona AND sp.motivo LIKE 'Expulsión por roja directa%';
+SELECT @estado_afectado = estado, @fecha_afectado = fecha_hora_utc FROM torneo.partido WHERE partido_id = @partido_afectado;
+SELECT @tipo_tarjeta = t.tipo, @expulsion_tarjeta = t.tipo_expulsion, @fecha_tarjeta = p.fecha_hora_utc
+FROM evento.tarjeta t JOIN torneo.partido p ON p.partido_id = t.partido_id WHERE t.tarjeta_id = @tarjeta_origen;
+SELECT @en_formacion = COUNT(*)
+FROM plantel.formacion f JOIN plantel.formacion_jugador fj ON fj.formacion_id = f.formacion_id
+JOIN plantel.jugador j ON j.jugador_id = fj.jugador_id
+WHERE f.partido_id = @partido_afectado AND j.persona_id = @persona;
+
+IF @persona IS NOT NULL
+   AND @suspensiones = 1
+   AND @tipo_tarjeta = 'roja' AND @expulsion_tarjeta = 'roja_directa'
+   AND @fecha_tarjeta < @fecha_afectado
+   AND @estado_afectado = 'programado'
+   AND @en_formacion = 0
+    INSERT INTO #resultado VALUES ('R2.4.e', 'Seguimiento de Danilo Rocha: tarjeta, suspensión y partido perdido', 'OK', '');
+ELSE
+    INSERT INTO #resultado VALUES ('R2.4.e', 'Seguimiento de Danilo Rocha: tarjeta, suspensión y partido perdido', 'FALLO',
+           CONCAT('persona=', @persona, ', suspensiones=', @suspensiones, ', tarjeta origen=', @tarjeta_origen, ' (', @tipo_tarjeta, ' ', @expulsion_tarjeta,
+                  '), partido afectado=', @partido_afectado, ' (', @estado_afectado, '), figura en la formación de ese partido=', @en_formacion, '.'));
+GO
+
+/* PRUEBA R2.5 - Coherencia de todas las suspensiones, sobre evento.suspension
+   La grilla es evento.suspension completa, unida a su tarjeta (evento.tarjeta) y al partido en que se mostró y al
+   partido afectado (torneo.partido). La columna jugo_el_afectado cuenta las filas de plantel.formacion_jugador de esa
+   persona en el partido afectado: debe ser 0 en todas. Cada suspensión muestra el criterio que se aplicó (cantidad_amarillas: 0 = expulsión, mayor a 0 = acumulación).
+   Resultado esperado: ninguna violación en las 5 reglas:
+     (a) toda roja (directa o por doble amarilla) tiene su suspensión;
+     (b) el partido perdido es posterior a la tarjeta y es de la misma selección;
+     (c) nadie suspendido figura en la formación del partido que pierde;
+     (d) toda acumulación de amarillas (partidos distintos, sin contar los de doble amarilla) que alcanza el criterio
+         activo tiene su suspensión por acumulación;
+     (e) ninguna suspensión quedó sin partido asignado (todas las selecciones tenían partidos programados). */
+PRINT '--- R2.5 Coherencia de las suspensiones';
+DECLARE @a INT, @b INT, @c INT, @d INT, @e INT, @umbral INT = (SELECT MIN(cantidad_amarillas) FROM evento.criterio_suspension WHERE activo = 1 AND cantidad_amarillas > 0);
+
+SELECT sp.suspension_id, sp.criterio_id, cs.cantidad_amarillas, sp.motivo,
+       sp.tarjeta_id, t.persona_id, t.tipo, t.tipo_expulsion, t.partido_id AS partido_tarjeta, pt.fecha_hora_utc AS fecha_tarjeta,
+       sp.partido_afectado_id, pa.fecha_hora_utc AS fecha_afectado, pa.estado AS estado_afectado,
+       (SELECT COUNT(*) FROM plantel.formacion f
+        JOIN plantel.formacion_jugador fj ON fj.formacion_id = f.formacion_id
+        JOIN plantel.jugador j            ON j.jugador_id = fj.jugador_id
+        WHERE f.partido_id = sp.partido_afectado_id AND j.persona_id = t.persona_id) AS jugo_el_afectado
+FROM evento.suspension sp
+JOIN evento.tarjeta t               ON t.tarjeta_id = sp.tarjeta_id
+JOIN evento.criterio_suspension cs  ON cs.criterio_id = sp.criterio_id
+JOIN torneo.partido pt              ON pt.partido_id = t.partido_id
+JOIN torneo.partido pa              ON pa.partido_id = sp.partido_afectado_id
+ORDER BY sp.suspension_id;
+
+SELECT @a = COUNT(*) FROM evento.tarjeta t
+WHERE t.tipo = 'roja' AND NOT EXISTS (SELECT 1 FROM evento.suspension sp WHERE sp.tarjeta_id = t.tarjeta_id);
+
+SELECT @b = COUNT(*)
+FROM evento.suspension sp
+JOIN evento.tarjeta t             ON t.tarjeta_id = sp.tarjeta_id
+JOIN plantel.vw_persona_partido v ON v.persona_id = t.persona_id AND v.partido_id = t.partido_id
+JOIN torneo.partido pt            ON pt.partido_id = t.partido_id
+JOIN torneo.partido pa            ON pa.partido_id = sp.partido_afectado_id
+WHERE pa.fecha_hora_utc <= pt.fecha_hora_utc
+   OR v.seleccion_id NOT IN (pa.seleccion_local_id, pa.seleccion_visitante_id);
+
+SELECT @c = COUNT(*)
+FROM evento.suspension sp
+JOIN evento.tarjeta t             ON t.tarjeta_id = sp.tarjeta_id
+JOIN plantel.jugador j            ON j.persona_id = t.persona_id
+JOIN plantel.formacion f          ON f.partido_id = sp.partido_afectado_id
+JOIN plantel.formacion_jugador fj ON fj.formacion_id = f.formacion_id AND fj.jugador_id = j.jugador_id;
+
+SELECT @d = COUNT(*)
+FROM (SELECT t.persona_id, COUNT(*) AS amarillas
+      FROM evento.tarjeta t
+      JOIN plantel.jugador j ON j.persona_id = t.persona_id
+      WHERE t.tipo = 'amarilla'
+        AND NOT EXISTS (SELECT 1 FROM evento.tarjeta r WHERE r.partido_id = t.partido_id AND r.persona_id = t.persona_id
+                          AND r.tipo_expulsion = 'doble_amarilla')
+      GROUP BY t.persona_id) x
+WHERE x.amarillas / @umbral >
+      (SELECT COUNT(*) FROM evento.suspension sp JOIN evento.tarjeta tt ON tt.tarjeta_id = sp.tarjeta_id
+                                                JOIN evento.criterio_suspension cs ON cs.criterio_id = sp.criterio_id
+       WHERE tt.persona_id = x.persona_id AND cs.cantidad_amarillas > 0);
+
+SELECT @e = COUNT(*) FROM evento.suspension WHERE partido_afectado_id IS NULL;
+
+IF @a = 0 AND @b = 0 AND @c = 0 AND @d = 0 AND @e = 0
+    INSERT INTO #resultado VALUES ('R2.5', 'Coherencia de todas las suspensiones', 'OK', '');
+ELSE
+    INSERT INTO #resultado VALUES ('R2.5', 'Coherencia de todas las suspensiones', 'FALLO',
+           CONCAT('rojas sin suspensión=', @a, ', partido perdido incorrecto=', @b, ', suspendido en la formación=', @c,
+                  ', acumulación sin suspensión=', @d, ', sin partido asignado=', @e, '.'));
 GO
 
 /* PRUEBA R2.V - Validaciones
@@ -245,10 +785,11 @@ GO
 PRINT '--- R2.V evento.reporte_tarjetas con parámetros inválidos';
 BEGIN TRY
     EXEC evento.reporte_tarjetas @seleccion_id = -1;
-    PRINT 'FALLO - la consulta debía rechazarse.';
+    INSERT INTO #resultado VALUES ('R2.V', 'evento.reporte_tarjetas con parámetros inválidos', 'FALLO', 'No se rechazó');
 END TRY
 BEGIN CATCH
-    PRINT IIF(ERROR_NUMBER() = 50002, 'OK - rechazada: ', 'FALLO - error inesperado: ') + ERROR_MESSAGE();
+    PRINT ERROR_MESSAGE();
+    INSERT INTO #resultado VALUES ('R2.V', 'evento.reporte_tarjetas con parámetros inválidos', IIF(ERROR_NUMBER() = 50002, 'OK', 'FALLO'), ERROR_MESSAGE());
 END CATCH;
 GO
 
@@ -280,9 +821,9 @@ IF @x.value('count(/designaciones_arbitrales/arbitro)', 'INT') = 22
    AND @x.value('count(//informe)', 'INT') = 4
    AND @x.value('count(//informe[@sancion])', 'INT') = 1
    AND @x.value('count(/designaciones_arbitrales/arbitro[@designaciones < 7 or @designaciones > 8])', 'INT') = 0
-    PRINT 'OK - 22 árbitros, 160 designaciones, 37 amarillas (la doble amarilla suma 2) y 3 rojas, 4 informes (1 con sanción).';
+    INSERT INTO #resultado VALUES ('R3.1', 'arbitraje.reporte_designaciones (completo)', 'OK', '22 árbitros, 160 designaciones, 37 amarillas (la doble amarilla suma 2) y 3 rojas, 4 informes (1 con sanción).');
 ELSE
-    PRINT 'FALLO - el reporte de designaciones no coincide con lo esperado.';
+    INSERT INTO #resultado VALUES ('R3.1', 'arbitraje.reporte_designaciones (completo)', 'FALLO', 'el reporte de designaciones no coincide con lo esperado.');
 GO
 
 /* PRUEBA R3.2 - Filtro por árbitro (Hernán Bustos, Argentina)
@@ -301,9 +842,9 @@ IF @x.value('count(/designaciones_arbitrales/arbitro)', 'INT') = 1
    AND @x.value('(/designaciones_arbitrales/arbitro/@designaciones)[1]', 'INT') = 7
    AND @x.value('(/designaciones_arbitrales/arbitro/@partidos_dirigidos)[1]', 'INT') = 2
    AND @x.value('count(//designacion[contains(@encuentro, "Argentina")])', 'INT') = 0
-    PRINT 'OK - 7 designaciones, 2 como principal, ninguna en partidos de Argentina.';
+    INSERT INTO #resultado VALUES ('R3.2', 'arbitraje.reporte_designaciones @arbitro_id = Hernán Bustos', 'OK', '7 designaciones, 2 como principal, ninguna en partidos de Argentina.');
 ELSE
-    PRINT 'FALLO - el filtro por árbitro no coincide con lo esperado.';
+    INSERT INTO #resultado VALUES ('R3.2', 'arbitraje.reporte_designaciones @arbitro_id = Hernán Bustos', 'FALLO', 'el filtro por árbitro no coincide con lo esperado.');
 GO
 
 /* PRUEBA R3.V - Validaciones
@@ -311,10 +852,11 @@ GO
 PRINT '--- R3.V arbitraje.reporte_designaciones con parámetros inválidos';
 BEGIN TRY
     EXEC arbitraje.reporte_designaciones @arbitro_id = -1;
-    PRINT 'FALLO - la consulta debía rechazarse.';
+    INSERT INTO #resultado VALUES ('R3.V', 'arbitraje.reporte_designaciones con parámetros inválidos', 'FALLO', 'No se rechazó');
 END TRY
 BEGIN CATCH
-    PRINT IIF(ERROR_NUMBER() = 50002, 'OK - rechazada: ', 'FALLO - error inesperado: ') + ERROR_MESSAGE();
+    PRINT ERROR_MESSAGE();
+    INSERT INTO #resultado VALUES ('R3.V', 'arbitraje.reporte_designaciones con parámetros inválidos', IIF(ERROR_NUMBER() = 50002, 'OK', 'FALLO'), ERROR_MESSAGE());
 END CATCH;
 GO
 
@@ -347,9 +889,9 @@ IF (SELECT COUNT(*) FROM @r) = 41
                  AND ocupacion = 100.0 AND facturado = 9765000.00 AND estimado = 11000000.00)
    AND EXISTS (SELECT 1 FROM @r WHERE sede = 'MetLife Stadium' AND partido = 'SUBTOTAL SEDE'
                  AND facturado = 1555000.00 AND estimado = 2125000.00)
-    PRINT 'OK - 41 filas, 100 % de ocupación, 9.765.000 facturados y 11.000.000 estimados.';
+    INSERT INTO #resultado VALUES ('R4.1', 'publicidad.reporte_ocupacion (completo)', 'OK', '41 filas, 100 % de ocupación, 9.765.000 facturados y 11.000.000 estimados.');
 ELSE
-    PRINT 'FALLO - el reporte de ocupación no coincide con lo esperado.';
+    INSERT INTO #resultado VALUES ('R4.1', 'publicidad.reporte_ocupacion (completo)', 'FALLO', 'el reporte de ocupación no coincide con lo esperado.');
 GO
 
 /* PRUEBA R4.2 - Filtro por sede con detalle por espacio (MetLife Stadium)
@@ -383,9 +925,9 @@ IF (SELECT COUNT(*) FROM @r) = 8
         WHERE p.sede_id = @sede AND e.facturado = 1) = 16
    AND (SELECT COUNT(*) FROM publicidad.espacio_publicitario e JOIN torneo.partido p ON p.partido_id = e.partido_id
         WHERE p.sede_id = @sede AND e.facturado = 0 AND e.fecha_exhibicion IS NOT NULL) = 4
-    PRINT 'OK - MetLife: 6 partidos + subtotal + total, y detalle de 24 espacios (16 facturados, 4 exhibidos, 4 asignados).';
+    INSERT INTO #resultado VALUES ('R4.2', 'publicidad.reporte_ocupacion @sede_id = MetLife Stadium, @detalle = 1', 'OK', 'MetLife: 6 partidos + subtotal + total, y detalle de 24 espacios (16 facturados, 4 exhibidos, 4 asignados).');
 ELSE
-    PRINT 'FALLO - el reporte de ocupación por sede no coincide con lo esperado.';
+    INSERT INTO #resultado VALUES ('R4.2', 'publicidad.reporte_ocupacion @sede_id = MetLife Stadium, @detalle = 1', 'FALLO', 'el reporte de ocupación por sede no coincide con lo esperado.');
 GO
 
 /* PRUEBA R4.V - Validaciones
@@ -393,10 +935,11 @@ GO
 PRINT '--- R4.V publicidad.reporte_ocupacion con parámetros inválidos';
 BEGIN TRY
     EXEC publicidad.reporte_ocupacion @sede_id = -1;
-    PRINT 'FALLO - la consulta debía rechazarse.';
+    INSERT INTO #resultado VALUES ('R4.V', 'publicidad.reporte_ocupacion con parámetros inválidos', 'FALLO', 'No se rechazó');
 END TRY
 BEGIN CATCH
-    PRINT IIF(ERROR_NUMBER() = 50002, 'OK - rechazada: ', 'FALLO - error inesperado: ') + ERROR_MESSAGE();
+    PRINT ERROR_MESSAGE();
+    INSERT INTO #resultado VALUES ('R4.V', 'publicidad.reporte_ocupacion con parámetros inválidos', IIF(ERROR_NUMBER() = 50002, 'OK', 'FALLO'), ERROR_MESSAGE());
 END CATCH;
 GO
 
@@ -435,9 +978,9 @@ IF (SELECT COUNT(*) FROM @m) = 32
         + IIF(c09 = 'SI', 1, 0) + IIF(c10 = 'SI', 1, 0) + IIF(c11 = 'SI', 1, 0) + IIF(c12 = 'SI', 1, 0) + IIF(c13 = 'SI', 1, 0)
         + IIF(c14 = 'SI', 1, 0) + IIF(c15 = 'SI', 1, 0) + IIF(c16 = 'SI', 1, 0) + IIF(c17 = 'SI', 1, 0) + IIF(c18 = 'SI', 1, 0)
         + IIF(c19 = 'SI', 1, 0) + IIF(c20 = 'SI', 1, 0) + IIF(c21 = 'SI', 1, 0) + IIF(c22 = 'SI', 1, 0)))
-    PRINT 'OK - 32 partidos x 17 mercados: 0 mercados a las 16:00 UTC, 6 a las 19:00, 6 a las 23:00 y 8 a la 01:00; cada total coincide con sus SI.';
+    INSERT INTO #resultado VALUES ('R5.1', 'publicidad.reporte_matriz_prime_time (completo)', 'OK', '32 partidos x 17 mercados: 0 mercados a las 16:00 UTC, 6 a las 19:00, 6 a las 23:00 y 8 a la 01:00; cada total coincide con sus SI.');
 ELSE
-    PRINT 'FALLO - la matriz de prime time no coincide con lo esperado.';
+    INSERT INTO #resultado VALUES ('R5.1', 'publicidad.reporte_matriz_prime_time (completo)', 'FALLO', 'la matriz de prime time no coincide con lo esperado.');
 GO
 
 /* PRUEBA R5.2 - Simulación para un partido (Alemania-Corea del Sur, 01:00 UTC)
@@ -491,38 +1034,45 @@ IF (SELECT COUNT(*) FROM @m) = 1
    AND (SELECT COUNT(*) FROM @espacios) = 4
    AND (SELECT COUNT(*) FROM @espacios WHERE criterio = 1 AND mercado IN ('Alemania', 'Corea del Sur')) = 2
    AND (SELECT COUNT(*) FROM @espacios WHERE criterio = 2) = 2
-    PRINT 'OK - Alemania-Corea del Sur: 8 mercados en prime time; espacios 1 y 2 por criterio 1 (Alemania y Corea) y 3 y 4 por criterio 2.';
+    INSERT INTO #resultado VALUES ('R5.2', 'publicidad.reporte_matriz_prime_time @partido_id = Alemania-Corea del Sur', 'OK', 'Alemania-Corea del Sur: 8 mercados en prime time; espacios 1 y 2 por criterio 1 (Alemania y Corea) y 3 y 4 por criterio 2.');
 ELSE
-    PRINT 'FALLO - la simulación de prime time para Alemania-Corea del Sur no coincide con lo esperado.';
+    INSERT INTO #resultado VALUES ('R5.2', 'publicidad.reporte_matriz_prime_time @partido_id = Alemania-Corea del Sur', 'FALLO', 'la simulación de prime time para Alemania-Corea del Sur no coincide con lo esperado.');
 GO
 
 /* PRUEBA R5.3 - Todos los países como mercado
-   Resultado esperado: 32 filas y 26 columnas de mercado (los 26 países registrados, también los
-   que no tienen piezas, como ITA, NLD o NZL). */
+   Resultado esperado: 32 filas y una columna de mercado por cada país registrado (también los que no
+   tienen piezas, como ITA, NLD o NZL). La cantidad de países depende de si antes se corrió la importación
+   de la Entrega 6 (que carga los 48 países del torneo), por eso el ancho de la tabla se arma según los
+   países que haya y no se fija en el script. */
 PRINT '--- R5.3 publicidad.reporte_matriz_prime_time @solo_mercados_con_piezas = 0';
 EXEC publicidad.reporte_matriz_prime_time @solo_mercados_con_piezas = 0;
 
--- 5 columnas fijas + 26 de mercado (todos los países registrados): si el ancho no coincide, el INSERT ... EXEC falla.
-DECLARE @m TABLE (partido_id INT, fecha_utc VARCHAR(16), fase VARCHAR(13), encuentro VARCHAR(60), mercados INT,
-                  c06 VARCHAR(2), c07 VARCHAR(2), c08 VARCHAR(2), c09 VARCHAR(2), c10 VARCHAR(2), c11 VARCHAR(2),
-                  c12 VARCHAR(2), c13 VARCHAR(2), c14 VARCHAR(2), c15 VARCHAR(2), c16 VARCHAR(2), c17 VARCHAR(2),
-                  c18 VARCHAR(2), c19 VARCHAR(2), c20 VARCHAR(2), c21 VARCHAR(2), c22 VARCHAR(2), c23 VARCHAR(2),
-                  c24 VARCHAR(2), c25 VARCHAR(2), c26 VARCHAR(2), c27 VARCHAR(2), c28 VARCHAR(2), c29 VARCHAR(2),
-                  c30 VARCHAR(2), c31 VARCHAR(2));
-INSERT INTO @m EXEC publicidad.reporte_matriz_prime_time @solo_mercados_con_piezas = 0;
+-- 5 columnas fijas + una por país registrado: si el ancho no coincide, el INSERT ... EXEC falla.
+CREATE TABLE #m (partido_id INT, fecha_utc VARCHAR(16), fase VARCHAR(13), encuentro VARCHAR(60), mercados INT);
+DECLARE @paises INT = (SELECT COUNT(*) FROM torneo.pais), @sql NVARCHAR(MAX), @invalidas INT, @total_mal INT;
+SELECT @sql = N'ALTER TABLE #m ADD ' + STRING_AGG(CAST(N'c' + CAST(n AS NVARCHAR(3)) + N' VARCHAR(2)' AS NVARCHAR(MAX)), N', ')
+FROM (SELECT ROW_NUMBER() OVER (ORDER BY pais_id) AS n FROM torneo.pais) x;
+EXEC sp_executesql @sql;
+INSERT INTO #m EXEC publicidad.reporte_matriz_prime_time @solo_mercados_con_piezas = 0;
 
-IF (SELECT COUNT(*) FROM @m) = 32
-   AND (SELECT COUNT(*) FROM torneo.pais) = 26
-   AND NOT EXISTS (SELECT 1 FROM @m WHERE c06 IS NULL OR c31 IS NULL OR c06 NOT IN ('SI', 'NO') OR c31 NOT IN ('SI', 'NO'))
-   AND NOT EXISTS (SELECT 1 FROM @m WHERE mercados <> (IIF(c06 = 'SI', 1, 0) + IIF(c07 = 'SI', 1, 0) + IIF(c08 = 'SI', 1, 0)
-        + IIF(c09 = 'SI', 1, 0) + IIF(c10 = 'SI', 1, 0) + IIF(c11 = 'SI', 1, 0) + IIF(c12 = 'SI', 1, 0) + IIF(c13 = 'SI', 1, 0)
-        + IIF(c14 = 'SI', 1, 0) + IIF(c15 = 'SI', 1, 0) + IIF(c16 = 'SI', 1, 0) + IIF(c17 = 'SI', 1, 0) + IIF(c18 = 'SI', 1, 0)
-        + IIF(c19 = 'SI', 1, 0) + IIF(c20 = 'SI', 1, 0) + IIF(c21 = 'SI', 1, 0) + IIF(c22 = 'SI', 1, 0) + IIF(c23 = 'SI', 1, 0)
-        + IIF(c24 = 'SI', 1, 0) + IIF(c25 = 'SI', 1, 0) + IIF(c26 = 'SI', 1, 0) + IIF(c27 = 'SI', 1, 0) + IIF(c28 = 'SI', 1, 0)
-        + IIF(c29 = 'SI', 1, 0) + IIF(c30 = 'SI', 1, 0) + IIF(c31 = 'SI', 1, 0)))
-    PRINT 'OK - 32 partidos x 26 mercados (todos los países registrados); cada total coincide con sus SI.';
+-- celdas que no son 'SI' ni 'NO', y filas cuyo total de mercados no coincide con la cantidad de 'SI'
+SELECT @sql = N'SELECT @invalidas = COUNT(*) FROM #m CROSS APPLY (VALUES '
+    + STRING_AGG(CAST(N'(c' + CAST(n AS NVARCHAR(3)) + N')' AS NVARCHAR(MAX)), N', ')
+    + N') v (celda) WHERE v.celda IS NULL OR v.celda NOT IN (''SI'', ''NO'');'
+FROM (SELECT ROW_NUMBER() OVER (ORDER BY pais_id) AS n FROM torneo.pais) x;
+EXEC sp_executesql @sql, N'@invalidas INT OUTPUT', @invalidas OUTPUT;
+SELECT @sql = N'SELECT @total_mal = COUNT(*) FROM #m WHERE mercados <> (SELECT COUNT(*) FROM (VALUES '
+    + STRING_AGG(CAST(N'(c' + CAST(n AS NVARCHAR(3)) + N')' AS NVARCHAR(MAX)), N', ')
+    + N') v (celda) WHERE v.celda = ''SI'');'
+FROM (SELECT ROW_NUMBER() OVER (ORDER BY pais_id) AS n FROM torneo.pais) x;
+EXEC sp_executesql @sql, N'@total_mal INT OUTPUT', @total_mal OUTPUT;
+
+IF (SELECT COUNT(*) FROM #m) = 32 AND @invalidas = 0 AND @total_mal = 0
+    INSERT INTO #resultado VALUES ('R5.3', 'publicidad.reporte_matriz_prime_time @solo_mercados_con_piezas = 0', 'OK',
+        CONCAT('32 partidos x ', @paises, ' mercados (todos los países registrados); cada total coincide con sus SI.'));
 ELSE
-    PRINT 'FALLO - la matriz con todos los países no coincide con lo esperado.';
+    INSERT INTO #resultado VALUES ('R5.3', 'publicidad.reporte_matriz_prime_time @solo_mercados_con_piezas = 0', 'FALLO', 'la matriz con todos los países no coincide con lo esperado.');
+DROP TABLE #m;
 GO
 
 /* PRUEBA R5.V - Validaciones
@@ -530,10 +1080,11 @@ GO
 PRINT '--- R5.V publicidad.reporte_matriz_prime_time con parámetros inválidos';
 BEGIN TRY
     EXEC publicidad.reporte_matriz_prime_time @partido_id = -1;
-    PRINT 'FALLO - la consulta debía rechazarse.';
+    INSERT INTO #resultado VALUES ('R5.V', 'publicidad.reporte_matriz_prime_time con parámetros inválidos', 'FALLO', 'No se rechazó');
 END TRY
 BEGIN CATCH
-    PRINT IIF(ERROR_NUMBER() = 50002, 'OK - rechazada: ', 'FALLO - error inesperado: ') + ERROR_MESSAGE();
+    PRINT ERROR_MESSAGE();
+    INSERT INTO #resultado VALUES ('R5.V', 'publicidad.reporte_matriz_prime_time con parámetros inválidos', IIF(ERROR_NUMBER() = 50002, 'OK', 'FALLO'), ERROR_MESSAGE());
 END CATCH;
 GO
 
@@ -560,9 +1111,9 @@ IF @x.value('count(/selecciones/seleccion)', 'INT') = 16
    AND @x.value('(/selecciones/seleccion[@codigo = "FRA"]/convocados/convocado[@dorsal = 20]/@nombre)[1]', 'VARCHAR(100)')
        = 'Hugo Marchand'
    AND @x.value('count(//convocado[@nombre = "Youssef Sarr"])', 'INT') = 0
-    PRINT 'OK - 16 selecciones con 23 convocados; Francia muestra el reemplazo de último momento.';
+    INSERT INTO #resultado VALUES ('R6.1', 'plantel.reporte_plantillas (completo)', 'OK', '16 selecciones con 23 convocados; Francia muestra el reemplazo de último momento.');
 ELSE
-    PRINT 'FALLO - el reporte de plantillas no coincide con lo esperado.';
+    INSERT INTO #resultado VALUES ('R6.1', 'plantel.reporte_plantillas (completo)', 'FALLO', 'el reporte de plantillas no coincide con lo esperado.');
 GO
 
 /* PRUEBA R6.2 - Filtro por selección (Francia)
@@ -583,9 +1134,9 @@ IF @x.value('count(/selecciones/seleccion)', 'INT') = 1
    AND @x.value('(/selecciones/seleccion/@grupo)[1]', 'VARCHAR(5)') = 'C'
    AND @x.value('(/selecciones/seleccion/@director_tecnico)[1]', 'VARCHAR(100)') = 'Youssef Martin'
    AND @x.value('count(//convocado)', 'INT') = 23
-    PRINT 'OK - sólo Francia (UEFA, grupo C, director técnico Youssef Martin) con sus 23 convocados.';
+    INSERT INTO #resultado VALUES ('R6.2', 'plantel.reporte_plantillas @seleccion_id = Francia', 'OK', 'sólo Francia (UEFA, grupo C, director técnico Youssef Martin) con sus 23 convocados.');
 ELSE
-    PRINT 'FALLO - el filtro por selección del reporte de plantillas no coincide con lo esperado.';
+    INSERT INTO #resultado VALUES ('R6.2', 'plantel.reporte_plantillas @seleccion_id = Francia', 'FALLO', 'el filtro por selección del reporte de plantillas no coincide con lo esperado.');
 GO
 
 /* PRUEBA R6.V - Validaciones
@@ -593,10 +1144,11 @@ GO
 PRINT '--- R6.V plantel.reporte_plantillas con parámetros inválidos';
 BEGIN TRY
     EXEC plantel.reporte_plantillas @seleccion_id = -1;
-    PRINT 'FALLO - la consulta debía rechazarse.';
+    INSERT INTO #resultado VALUES ('R6.V', 'plantel.reporte_plantillas con parámetros inválidos', 'FALLO', 'No se rechazó');
 END TRY
 BEGIN CATCH
-    PRINT IIF(ERROR_NUMBER() = 50002, 'OK - rechazada: ', 'FALLO - error inesperado: ') + ERROR_MESSAGE();
+    PRINT ERROR_MESSAGE();
+    INSERT INTO #resultado VALUES ('R6.V', 'plantel.reporte_plantillas con parámetros inválidos', IIF(ERROR_NUMBER() = 50002, 'OK', 'FALLO'), ERROR_MESSAGE());
 END CATCH;
 GO
 
@@ -636,9 +1188,9 @@ IF (SELECT COUNT(*) FROM @r) = 32
    AND EXISTS (SELECT 1 FROM @r WHERE local = 'España' AND visitante = 'Uruguay'
                  AND resultado = '0 - 0' AND ganador = 'Uruguay')
    AND EXISTS (SELECT 1 FROM @r WHERE local = 'Estados Unidos' AND visitante = 'Corea del Sur' AND goles LIKE '%(e.c.)%')
-    PRINT 'OK - 32 partidos, 2 programados, definiciones por penales y gol en contra correctos.';
+    INSERT INTO #resultado VALUES ('R7.1', 'torneo.reporte_resultados (completo)', 'OK', '32 partidos, 2 programados, definiciones por penales y gol en contra correctos.');
 ELSE
-    PRINT 'FALLO - el reporte de resultados no coincide con lo esperado.';
+    INSERT INTO #resultado VALUES ('R7.1', 'torneo.reporte_resultados (completo)', 'FALLO', 'el reporte de resultados no coincide con lo esperado.');
 GO
 
 /* PRUEBA R7.2 - Filtro por selección (Argentina)
@@ -663,9 +1215,9 @@ IF (SELECT COUNT(*) FROM @r) = 6
    AND NOT EXISTS (SELECT 1 FROM @r WHERE grupo IS NULL OR penales IS NULL OR ganador IS NULL OR asistencia IS NULL
                       OR ocupacion IS NULL OR goles IS NULL)
    AND @filas_tabla = 4
-    PRINT 'OK - 6 partidos de Argentina (3 de grupos, cuartos, semifinal y la final programada) y la tabla del grupo A (4 selecciones).';
+    INSERT INTO #resultado VALUES ('R7.2', 'torneo.reporte_resultados @seleccion_id = Argentina', 'OK', '6 partidos de Argentina (3 de grupos, cuartos, semifinal y la final programada) y la tabla del grupo A (4 selecciones).');
 ELSE
-    PRINT 'FALLO - el filtro por selección del reporte de resultados no coincide con lo esperado.';
+    INSERT INTO #resultado VALUES ('R7.2', 'torneo.reporte_resultados @seleccion_id = Argentina', 'FALLO', 'el filtro por selección del reporte de resultados no coincide con lo esperado.');
 GO
 
 /* PRUEBA R7.3 - Filtro por fase (cuartos), sin tabla de posiciones
@@ -690,9 +1242,9 @@ IF (SELECT COUNT(*) FROM @r) = 4
                  AND penales = '(3-4 pen.)' AND ganador = 'Uruguay')
    AND NOT EXISTS (SELECT 1 FROM @r WHERE grupo IS NULL OR penales IS NULL OR ganador IS NULL OR asistencia IS NULL
                       OR ocupacion IS NULL OR goles IS NULL)
-    PRINT 'OK - 4 partidos de cuartos con sus resultados, dos de ellos definidos por penales.';
+    INSERT INTO #resultado VALUES ('R7.3', 'torneo.reporte_resultados @fase = cuartos, @tabla_posiciones = 0', 'OK', '4 partidos de cuartos con sus resultados, dos de ellos definidos por penales.');
 ELSE
-    PRINT 'FALLO - el filtro por fase del reporte de resultados no coincide con lo esperado.';
+    INSERT INTO #resultado VALUES ('R7.3', 'torneo.reporte_resultados @fase = cuartos, @tabla_posiciones = 0', 'FALLO', 'el filtro por fase del reporte de resultados no coincide con lo esperado.');
 GO
 
 /* PRUEBA R7.V - Validaciones
@@ -701,9 +1253,27 @@ GO
 PRINT '--- R7.V torneo.reporte_resultados con parámetros inválidos';
 BEGIN TRY
     EXEC torneo.reporte_resultados @fase = 'octavo', @seleccion_id = -1, @sede_id = -1;
-    PRINT 'FALLO - la consulta debía rechazarse.';
+    INSERT INTO #resultado VALUES ('R7.V', 'torneo.reporte_resultados con parámetros inválidos', 'FALLO', 'No se rechazó');
 END TRY
 BEGIN CATCH
-    PRINT IIF(ERROR_NUMBER() = 50002, 'OK - rechazada: ', 'FALLO - error inesperado: ') + ERROR_MESSAGE();
+    PRINT ERROR_MESSAGE();
+    INSERT INTO #resultado VALUES ('R7.V', 'torneo.reporte_resultados con parámetros inválidos', IIF(ERROR_NUMBER() = 50002, 'OK', 'FALLO'), ERROR_MESSAGE());
 END CATCH;
+GO
+
+-- ============================================================
+-- RESUMEN
+-- ============================================================
+
+PRINT '################ RESUMEN ################';
+-- Resultado esperado: todas las pruebas en OK y ninguna en FALLO.
+SELECT resultado, COUNT(*) AS pruebas FROM #resultado GROUP BY resultado;
+SELECT orden, prueba, descripcion, resultado FROM #resultado ORDER BY orden;
+IF EXISTS (SELECT 1 FROM #resultado WHERE resultado <> 'OK')
+    SELECT 'PRUEBAS FALLIDAS' AS atencion, prueba, descripcion, detalle FROM #resultado WHERE resultado <> 'OK' ORDER BY orden;
+ELSE
+    PRINT 'Todas las pruebas finalizaron con el resultado esperado.';
+GO
+
+SET NOEXEC OFF;
 GO
