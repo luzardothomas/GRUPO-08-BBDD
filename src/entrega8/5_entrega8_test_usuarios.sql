@@ -35,6 +35,9 @@
 -- CÓMO EJECUTARLO:
 --   Como DBA (sysadmin), después de 1_entrega8_cifrado.sql, 2_entrega8_roles.sql y
 --   3_entrega8_usuarios.sql (sobre la base con las Entregas 5, 6 y 7 cargadas).
+--   No usa rutas absolutas: la importación del administrador se llama con la ruta relativa del
+--   repositorio (imports/scraping/sedes.json), que el servidor no resuelve; prueba el permiso, no la
+--   lectura del archivo (esa la prueba 3_entrega6_test.sql).
 --   Se puede ejecutar completo, o ejecutar primero el Lote 0 y después cada lote por separado
 --   (seleccionándolo), en la misma ventana: los resultados se juntan en la tabla temporal
 --   #resultado y el lote RESUMEN los muestra. Ningún lote deja cambios en la base.
@@ -51,14 +54,19 @@ GO
 -- ============================================================
 
 PRINT '--- Lote 0: preparación';
-IF OBJECT_ID('seguridad.fn_descifrar', 'FN') IS NULL OR OBJECT_ID('seguridad.comprobar_permisos', 'P') IS NULL
-   OR EXISTS (SELECT 1 FROM (VALUES ('usr_administrador'), ('usr_gestor_publicidad'), ('usr_comite_arbitral'),
-                                    ('usr_var'), ('usr_planillero'), ('usr_consulta')) u (usuario)
-              WHERE DATABASE_PRINCIPAL_ID(u.usuario) IS NULL)
-BEGIN
-    RAISERROR('Ejecutar antes 1_entrega8_cifrado.sql, 2_entrega8_roles.sql y 3_entrega8_usuarios.sql. No se ejecuta ninguna prueba.', 16, 1);
+DECLARE @faltan_scripts BIT =
+    IIF(OBJECT_ID('seguridad.fn_descifrar', 'FN') IS NULL OR OBJECT_ID('seguridad.comprobar_permisos', 'P') IS NULL
+        OR EXISTS (SELECT 1 FROM (VALUES ('usr_administrador'), ('usr_gestor_publicidad'), ('usr_comite_arbitral'),
+                                         ('usr_var'), ('usr_planillero'), ('usr_consulta')) u (usuario)
+                   WHERE DATABASE_PRINCIPAL_ID(u.usuario) IS NULL), 1, 0);
+EXEC sp_set_session_context N'e8_faltan_scripts', @faltan_scripts;
+IF @faltan_scripts = 1
+    THROW 50000, 'Ejecutar antes 1_entrega8_cifrado.sql, 2_entrega8_roles.sql y 3_entrega8_usuarios.sql. No se ejecuta ninguna prueba.', 1;
+GO
+
+-- THROW termina sólo su lote: si faltan los scripts, éste evita que se ejecuten los lotes siguientes.
+IF CAST(SESSION_CONTEXT(N'e8_faltan_scripts') AS BIT) = 1
     SET NOEXEC ON;
-END;
 GO
 
 IF OBJECT_ID('tempdb..#resultado') IS NOT NULL DROP TABLE #resultado;
@@ -94,17 +102,16 @@ GO
 
 PRINT '--- 1.2 usr_administrador: lo que puede hacer';
 -- Da de alta una sede y la borra, ve la convocatoria con los motivos descifrados, ejecuta dos reportes
--- (uno con SQL dinámico), consulta la API de cambio e importa un archivo (en Windows; SQL Server para
--- Linux no deja leer archivos a un login que no es sysadmin).
--- Resultado esperado: todo se ejecuta; las importaciones terminan con su lote completo.
+-- (uno con SQL dinámico), consulta la API de cambio y llama a la importación de sedes.json.
+-- Resultado esperado: todo se ejecuta. La importación recibe la ruta relativa del repositorio, que el servidor
+-- no resuelve: se ejecuta (tiene permiso) y la rechaza su validación (error 50003), sin cambios.
 DECLARE @r TABLE (sp VARCHAR(100), esperado VARCHAR(12), error INT);
 DECLARE @pais INT = (SELECT pais_id FROM torneo.pais WHERE codigo_iso = 'ARG'),
         @seleccion INT = (SELECT seleccion_id FROM torneo.seleccion s JOIN torneo.pais p ON p.pais_id = s.pais_id WHERE p.codigo_iso = 'ARG'),
         @partido INT = (SELECT MIN(partido_id) FROM torneo.partido WHERE fase = 'final'),
         @sede INT = (SELECT MIN(sede_id) FROM torneo.sede),
         @id INT, @x VARCHAR(200);
-DECLARE @linux BIT = IIF(@@VERSION LIKE '%Linux%', 1, 0);
-DECLARE @sedes_json VARCHAR(500) = IIF(@linux = 1, '/bbdd/imports/scraping/sedes.json', 'C:\mundial2026\imports\scraping\sedes.json');
+DECLARE @sedes_json VARCHAR(500) = 'imports/scraping/sedes.json';   -- ruta relativa del repositorio
 EXECUTE AS LOGIN = 'usr_administrador';
 PRINT CONCAT('Sesión: ', SUSER_SNAME());
 BEGIN TRY
@@ -180,12 +187,12 @@ BEGIN CATCH
                      + LEFT(REPLACE(REPLACE(ERROR_MESSAGE(), CHAR(13), ''), CHAR(10), ' '), 140)));
 END CATCH;
 BEGIN TRY
-    IF @linux = 0 EXEC torneo.importar_sedes @sedes_json; ELSE PRINT '  (en SQL Server para Linux no se prueba la lectura de archivos)';
-    INSERT INTO @r VALUES ('torneo.importar_sedes', 'ok', 0);
-    PRINT CONCAT('  PUEDE      torneo.importar_sedes', IIF(@linux = 0, ' -> sedes.json importado (lote completo)', ''));
+    EXEC torneo.importar_sedes @sedes_json;
+    INSERT INTO @r VALUES ('torneo.importar_sedes', 'validacion', 0);
+    PRINT CONCAT('  PUEDE      torneo.importar_sedes', '');
 END TRY
 BEGIN CATCH
-    INSERT INTO @r VALUES ('torneo.importar_sedes', 'ok', ERROR_NUMBER());
+    INSERT INTO @r VALUES ('torneo.importar_sedes', 'validacion', ERROR_NUMBER());
     PRINT CONCAT(IIF(ERROR_NUMBER() = 229, '  NO PUEDE   ', '  PUEDE      '), 'torneo.importar_sedes',
                  IIF(ERROR_NUMBER() = 229, ' -> permiso denegado (error 229)',
                      ' -> se ejecutó y lo rechazó su validación, sin cambios: '

@@ -223,7 +223,7 @@ más permisos: así se ve la diferencia entre roles. Cada intento se informa en 
 
 | Parte | Usuario | n.2 Lo que puede hacer | n.3 Lo que no puede hacer |
 |---|---|---|---|
-| 1 | `usr_administrador` (109 SP) | Alta y baja de una sede, convocatoria con los motivos descifrados, reportes (uno con SQL dinámico), API de cambio e importación de `sedes.json` | Crear usuarios (DBA), SP auxiliares, tablas |
+| 1 | `usr_administrador` (109 SP) | Alta y baja de una sede, convocatoria con los motivos descifrados, reportes (uno con SQL dinámico), API de cambio e importación de `sedes.json` (con la ruta relativa del repositorio: se ejecuta y la rechaza su validación) | Crear usuarios (DBA), SP auxiliares, tablas |
 | 2 | `usr_gestor_publicidad` (20 SP) | Alta de un anunciante, su contacto descifrado y su baja; reportes de publicidad; asignación de espacios | Lo que hizo el administrador: alta de sede, convocatoria, reporte de resultados, API; tablas |
 | 3 | `usr_comite_arbitral` (16 SP) | Alta de un árbitro con idioma, su fecha de nacimiento descifrada y su baja; reporte de designaciones; designación | Lo que hizo el gestor de publicidad: anunciantes, contacto, reportes y asignación; tablas |
 | 4 | `usr_var` (11 SP) | Reportes; anular o corregir goles, corregir o anular tarjetas, registrar una tarjeta, cargar un informe | Lo que hizo el comité arbitral: árbitros, su ficha, designar, borrar informes; tablas |
@@ -243,9 +243,10 @@ La parte 7 compara a los seis usuarios:
 | 7.3 | Sólo `usr_administrador` tiene `ADMINISTER BULK OPERATIONS` |
 
 Verificado el 10/11/2026 en SQL Server 2025 para Linux (contenedor), con las Entregas 5, 6 y 7 cargadas:
-`4_entrega8_test_cifrado.sql` **5 OK, 0 FALLO** y `5_entrega8_test_usuarios.sql` **21 OK, 0 FALLO**. En Linux la
-importación de archivos de la prueba 1.2 no se ejecuta (no admite `ADMINISTER BULK OPERATIONS` para logins no
-`sysadmin`). Falta correr estos dos scripts en SQL Server 2025 Express sobre Windows.
+`4_entrega8_test_cifrado.sql` **5 OK, 0 FALLO** y `5_entrega8_test_usuarios.sql` **21 OK, 0 FALLO**. El test no usa
+rutas absolutas ni distingue entre sistemas operativos: la importación del administrador recibe la ruta relativa del
+repositorio (`imports/scraping/sedes.json`), que el servidor no resuelve, así que prueba el permiso (se ejecuta y la
+rechaza su validación, error 50003) y no la lectura del archivo, que ya prueba `3_entrega6_test.sql`.
 
 ## Política de backup (RPO) — pendiente
 

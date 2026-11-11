@@ -40,14 +40,19 @@ GO
 -- ============================================================
 
 PRINT '--- Lote 0: preparación';
-IF OBJECT_ID('seguridad.fn_descifrar', 'FN') IS NULL OR OBJECT_ID('seguridad.comprobar_permisos', 'P') IS NULL
-   OR EXISTS (SELECT 1 FROM (VALUES ('usr_administrador'), ('usr_gestor_publicidad'), ('usr_comite_arbitral'),
-                                    ('usr_var'), ('usr_planillero'), ('usr_consulta')) u (usuario)
-              WHERE DATABASE_PRINCIPAL_ID(u.usuario) IS NULL)
-BEGIN
-    RAISERROR('Ejecutar antes 1_entrega8_cifrado.sql, 2_entrega8_roles.sql y 3_entrega8_usuarios.sql. No se ejecuta ninguna prueba.', 16, 1);
+DECLARE @faltan_scripts BIT =
+    IIF(OBJECT_ID('seguridad.fn_descifrar', 'FN') IS NULL OR OBJECT_ID('seguridad.comprobar_permisos', 'P') IS NULL
+        OR EXISTS (SELECT 1 FROM (VALUES ('usr_administrador'), ('usr_gestor_publicidad'), ('usr_comite_arbitral'),
+                                         ('usr_var'), ('usr_planillero'), ('usr_consulta')) u (usuario)
+                   WHERE DATABASE_PRINCIPAL_ID(u.usuario) IS NULL), 1, 0);
+EXEC sp_set_session_context N'e8_faltan_scripts', @faltan_scripts;
+IF @faltan_scripts = 1
+    THROW 50000, 'Ejecutar antes 1_entrega8_cifrado.sql, 2_entrega8_roles.sql y 3_entrega8_usuarios.sql. No se ejecuta ninguna prueba.', 1;
+GO
+
+-- THROW termina sólo su lote: si faltan los scripts, éste evita que se ejecuten los lotes siguientes.
+IF CAST(SESSION_CONTEXT(N'e8_faltan_scripts') AS BIT) = 1
     SET NOEXEC ON;
-END;
 GO
 
 IF OBJECT_ID('tempdb..#resultado') IS NOT NULL DROP TABLE #resultado;
