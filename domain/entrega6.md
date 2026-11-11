@@ -82,7 +82,7 @@ SELECT * FROM importacion.error ORDER BY error_id DESC;
 | Wikipedia, `https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_squads` | JSON (wikitext) → `scraping/planteles.json` | `plantel.importar_planteles` | `plantel.jugador`, `plantel.convocatoria`, `plantel.cuerpo_tecnico` |
 | Kaggle (`https://www.kaggle.com/datasets/swaptr/fifa-wc-2026-matches`, `teams.csv`) | CSV | `torneo.importar_estadisticas_equipos_kaggle_2026` | `torneo.seleccion_estadistica_kaggle`, vinculada a `torneo.seleccion` |
 | Kaggle (`https://www.kaggle.com/datasets/swaptr/fifa-wc-2026-players`, `players.csv`) | CSV | `plantel.importar_estadisticas_jugadores_kaggle_2026` | `plantel.jugador_estadistica_kaggle`, vinculada a selección y jugador |
-| openfootball (`https://github.com/openfootball/worldcup.json`, `worldcup.json`) | JSON | `torneo.importar_fixture` | `torneo.partido` (104 partidos y resultados con alargue y penales) |
+| openfootball (`https://github.com/openfootball/worldcup.json`, `worldcup.json`) | JSON | `torneo.importar_fixture` | `torneo.partido` (104 partidos y resultados con alargue y penales), `plantel.formacion` y `evento.gol` (goles del archivo, con alineaciones aleatorias; ver abajo) |
 | Tarifario comercial (`https://dossiermundial.netlify.app/`, `tarifas_publicidad.xml`) | XML | `publicidad.importar_tarifas` | `publicidad.anunciante`, `publicidad.campania`, `publicidad.campania_pais_interes`, `publicidad.pieza_publicitaria` (en USD) |
 | API Banco Mundial (`https://api.worldbank.org/v2/country/all/indicator/NY.GDP.PCAP.CD`) | JSON | `torneo.consultar_api_banco_mundial` | `torneo.indicador_economico`, `torneo.pais.pbi_per_capita` |
 | API Frankfurter (`https://api.frankfurter.dev/v1`) | JSON | `publicidad.consultar_api_frankfurter` | `publicidad.tipo_cambio` |
@@ -253,3 +253,20 @@ completa en SQL Server 2025 Express sobre Windows 11 el 23/10/2026.
 
 - **Numerar los archivos** con dos dígitos y armar la **solución de SSMS**, igual que en la Entrega 5.
 - **Sumar las tablas nuevas al DER.**
+
+## Goles y formaciones del fixture (datos aleatorios)
+
+`worldcup.json` trae, además del marcador, el autor y el minuto de cada gol, pero no las alineaciones. Como los reportes de la
+Entrega 7 (goleadores, tarjetas, designaciones) parten de `evento.gol` y un gol sólo puede registrarse para un jugador que integra
+la formación del partido, `torneo.importar_fixture` llama a `importacion.cargar_detalle_partido` al dar de alta cada partido
+jugado, antes de finalizarlo con `torneo.registrar_resultado`. El enunciado admite estos datos: la Entrega 7 pide "suficientes datos
+(por importación, APIs, o mediante testing manual o carga de datos aleatorios)".
+
+- **Del archivo:** el marcador, el minuto de cada gol, si fue de penal o en contra y el nombre del autor.
+- **Autor:** el convocado de la selección cuyo nombre coincide con el del archivo; si ninguno coincide, un titular al azar (el gol y
+  el minuto siguen siendo los reales).
+- **Al azar:** las alineaciones (11 titulares con un arquero, más 7 suplentes), el tipo de los goles que no son de penal ni en contra
+  (jugada, cabezazo o tiro libre) y quién patea cada penal convertido de una tanda.
+- **Orden de carga:** necesita los planteles ya importados. Si una selección no tiene convocados a la fecha del partido, el partido se
+  importa sólo con su marcador (sin formaciones ni goles).
+- **Resultado con el fixture completo:** 208 formaciones y 333 goles (los 308 del marcador y 25 de tandas de penales), sin filas rechazadas.

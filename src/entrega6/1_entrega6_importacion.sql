@@ -1150,13 +1150,201 @@ BEGIN
 END;
 GO
 
+/* Detalle de un partido importado: formaciones y goles.
+ El fixture (worldcup.json) trae el marcador y, de cada gol, el autor y el minuto, pero no las
+ alineaciones. Como el reporte de goleadores (y el resto de los reportes del partido) parten de
+ evento.gol, que exige que el autor integre la formación del partido, este procedimiento arma
+ las alineaciones y registra los goles con los SP de la Entrega 5 (plantel.cargar_formacion y
+ evento.gol_insertar), antes de que el partido se finalice:
+   * Autor del gol: el jugador de la convocatoria vigente de la selección cuyo nombre coincide
+     con el del archivo (sin distinguir mayúsculas ni acentos). Si el nombre no coincide con
+     ningún convocado (las fuentes usan nombres distintos), el autor se elige AL AZAR entre los
+     titulares de esa selección: el gol y el minuto son los del archivo, el autor es aleatorio.
+   * Alineaciones (el archivo no las trae, se generan al azar): los goleadores identificados más
+     titulares elegidos al azar hasta completar los de torneo.parametro 'formacion_titulares',
+     con un arquero, y un banco de suplentes al azar. Esquema táctico fijo 4-4-2.
+   * Tipo de gol: penal y en contra salen del archivo; los demás se reparten al azar entre
+     jugada, cabezazo y tiro libre.
+   * Tanda de penales: el archivo sólo trae el resultado (ej. 3-4), así que cada penal convertido
+     lo patea un titular al azar.
+ Si alguna de las dos selecciones no tiene convocados suficientes a la fecha del partido (por
+ ejemplo, todavía no se importaron los planteles), no se carga nada y @cargado queda en 0: el
+ partido se importa sólo con su marcador. Cualquier otro error se propaga a quien llama. */
+
+CREATE OR ALTER PROCEDURE importacion.cargar_detalle_partido
+    @partido_id        INT,
+    @goles_local       NVARCHAR(MAX),
+    @goles_visitante   NVARCHAR(MAX),
+    @penales_local     INT,
+    @penales_visitante INT,
+    @cargado           BIT OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @fecha DATE, @titulares INT, @suplentes INT = 7, @condicion VARCHAR(9), @n INT, @faltan INT,
+            @formacion_local INT, @formacion_visitante INT, @formacion_id INT, @orden INT, @max_orden INT,
+            @jugador_id INT, @minuto INT, @tipo VARCHAR(10), @periodo VARCHAR(20), @autor VARCHAR(9), @k INT;
+    SET @cargado = 0;
+
+    SELECT @fecha = CAST(fecha_hora_utc AS DATE) FROM torneo.partido WHERE partido_id = @partido_id;
+    SELECT @titulares = valor FROM torneo.parametro WHERE clave = 'formacion_titulares';
+    IF @fecha IS NULL OR @titulares IS NULL RETURN;
+
+    -- Convocatoria vigente de cada selección a la fecha del partido.
+    CREATE TABLE #plantel (condicion VARCHAR(9), jugador_id INT, nombre_completo VARCHAR(250) COLLATE DATABASE_DEFAULT,
+                           posicion VARCHAR(13));
+    INSERT INTO #plantel (condicion, jugador_id, nombre_completo, posicion)
+    SELECT x.condicion, j.jugador_id, LTRIM(RTRIM(j.nombre)) + ' ' + LTRIM(RTRIM(j.apellido)), j.posicion_habitual
+    FROM torneo.partido p
+    CROSS APPLY (VALUES ('local', p.seleccion_local_id), ('visitante', p.seleccion_visitante_id)) x (condicion, seleccion_id)
+    JOIN plantel.convocatoria c ON c.seleccion_id = x.seleccion_id
+                               AND c.fecha_alta <= @fecha AND (c.fecha_baja IS NULL OR c.fecha_baja > @fecha)
+    JOIN plantel.jugador j ON j.jugador_id = c.jugador_id
+    WHERE p.partido_id = @partido_id;
+
+    IF (SELECT COUNT(*) FROM #plantel WHERE condicion = 'local') < @titulares
+       OR (SELECT COUNT(*) FROM #plantel WHERE condicion = 'visitante') < @titulares
+    BEGIN
+        DROP TABLE #plantel;
+        RETURN;
+    END;
+
+    -- Goles del archivo. Un gol en contra figura en la lista del equipo beneficiado, pero su autor es del rival.
+    CREATE TABLE #goles (orden INT IDENTITY(1, 1), autor VARCHAR(9), nombre VARCHAR(250) COLLATE DATABASE_DEFAULT,
+                         minuto INT, periodo VARCHAR(20), tipo VARCHAR(10), jugador_id INT);
+    INSERT INTO #goles (autor, nombre, minuto, periodo, tipo)
+    SELECT IIF(d.en_contra = 'true', IIF(l.lado = 'local', 'visitante', 'local'), l.lado),
+           LTRIM(RTRIM(d.nombre)),
+           m.minuto,
+           CASE WHEN CHARINDEX('+', d.minuto_txt) > 0 AND m.base = 45  THEN 'adicional_PT'
+                WHEN CHARINDEX('+', d.minuto_txt) > 0 AND m.base = 90  THEN 'adicional_ST'
+                WHEN CHARINDEX('+', d.minuto_txt) > 0 AND m.base IN (105, 120) THEN 'adicional_alargue'
+                WHEN m.minuto <= 45  THEN 'PT'
+                WHEN m.minuto <= 90  THEN 'ST'
+                WHEN m.minuto <= 105 THEN 'alargue_1'
+                WHEN m.minuto <= 120 THEN 'alargue_2' END,
+           CASE WHEN d.penal = 'true' THEN 'penal'
+                WHEN d.en_contra = 'true' THEN 'en_contra'
+                WHEN az.r < 7 THEN 'jugada'
+                WHEN az.r < 9 THEN 'cabezazo'
+                ELSE 'tiro_libre' END
+    FROM (VALUES ('local', @goles_local), ('visitante', @goles_visitante)) l (lado, json_goles)
+    CROSS APPLY OPENJSON(ISNULL(l.json_goles, N'[]')) WITH (
+        nombre     VARCHAR(250) '$.name',
+        minuto_txt VARCHAR(10)  '$.minute',
+        penal      VARCHAR(5)   '$.penalty',
+        en_contra  VARCHAR(5)   '$.owngoal'
+    ) d
+    CROSS APPLY (SELECT ABS(CHECKSUM(NEWID(), d.nombre, d.minuto_txt)) % 10 AS r) az
+    CROSS APPLY (SELECT TRY_CONVERT(INT, IIF(CHARINDEX('+', d.minuto_txt) > 0, LEFT(d.minuto_txt, CHARINDEX('+', d.minuto_txt) - 1), d.minuto_txt)) AS base,
+                        ISNULL(TRY_CONVERT(INT, IIF(CHARINDEX('+', d.minuto_txt) > 0, LEFT(d.minuto_txt, CHARINDEX('+', d.minuto_txt) - 1), d.minuto_txt)), 1)
+                      + ISNULL(TRY_CONVERT(INT, IIF(CHARINDEX('+', d.minuto_txt) > 0, SUBSTRING(d.minuto_txt, CHARINDEX('+', d.minuto_txt) + 1, 3), '0')), 0) AS minuto) m;
+    UPDATE #goles SET minuto = 1 WHERE minuto < 1;
+
+    -- Autor identificado por nombre (si hay homónimos, el de menor id).
+    UPDATE g SET jugador_id = (SELECT MIN(p.jugador_id) FROM #plantel p WHERE p.condicion = g.autor AND p.nombre_completo = g.nombre)
+    FROM #goles g;
+
+    -- Alineaciones al azar: goleadores identificados + titulares al azar (con un arquero) + banco.
+    CREATE TABLE #alineacion (condicion VARCHAR(9), jugador_id INT, posicion VARCHAR(13), titular BIT);
+    DECLARE lados CURSOR LOCAL FAST_FORWARD FOR SELECT 'local' UNION ALL SELECT 'visitante';
+    OPEN lados;
+    FETCH NEXT FROM lados INTO @condicion;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        INSERT INTO #alineacion (condicion, jugador_id, posicion, titular)
+        SELECT DISTINCT TOP (@titulares) @condicion, p.jugador_id, p.posicion, 1
+        FROM #plantel p JOIN #goles g ON g.jugador_id = p.jugador_id AND g.autor = @condicion
+        WHERE p.condicion = @condicion;
+
+        IF NOT EXISTS (SELECT 1 FROM #alineacion WHERE condicion = @condicion AND posicion = 'arquero')
+           AND (SELECT COUNT(*) FROM #alineacion WHERE condicion = @condicion) < @titulares
+            INSERT INTO #alineacion (condicion, jugador_id, posicion, titular)
+            SELECT TOP (1) @condicion, p.jugador_id, p.posicion, 1
+            FROM #plantel p
+            WHERE p.condicion = @condicion AND p.posicion = 'arquero'
+              AND NOT EXISTS (SELECT 1 FROM #alineacion a WHERE a.condicion = @condicion AND a.jugador_id = p.jugador_id)
+            ORDER BY NEWID();
+
+        SELECT @faltan = @titulares - COUNT(*) FROM #alineacion WHERE condicion = @condicion;
+        IF @faltan > 0
+            INSERT INTO #alineacion (condicion, jugador_id, posicion, titular)
+            SELECT TOP (@faltan) @condicion, p.jugador_id, p.posicion, 1
+            FROM #plantel p
+            WHERE p.condicion = @condicion
+              AND NOT EXISTS (SELECT 1 FROM #alineacion a WHERE a.condicion = @condicion AND a.jugador_id = p.jugador_id)
+            ORDER BY NEWID();
+
+        INSERT INTO #alineacion (condicion, jugador_id, posicion, titular)
+        SELECT TOP (@suplentes) @condicion, p.jugador_id, p.posicion, 0
+        FROM #plantel p
+        WHERE p.condicion = @condicion
+          AND NOT EXISTS (SELECT 1 FROM #alineacion a WHERE a.condicion = @condicion AND a.jugador_id = p.jugador_id)
+        ORDER BY NEWID();
+
+        DECLARE @lista plantel.tt_formacion_jugador;
+        DELETE FROM @lista;
+        INSERT INTO @lista (jugador_id, posicion, titular)
+        SELECT jugador_id, posicion, titular FROM #alineacion WHERE condicion = @condicion;
+        EXEC plantel.cargar_formacion @partido_id, @condicion, '4-4-2', @lista, @formacion_id OUTPUT;
+        IF @condicion = 'local' SET @formacion_local = @formacion_id; ELSE SET @formacion_visitante = @formacion_id;
+
+        FETCH NEXT FROM lados INTO @condicion;
+    END;
+    CLOSE lados;
+    DEALLOCATE lados;
+
+    -- Goles sin autor identificado: un titular al azar (no arquero) de la selección que corresponde.
+    SELECT @orden = MIN(orden), @max_orden = MAX(orden) FROM #goles;
+    WHILE @orden <= @max_orden
+    BEGIN
+        SELECT @autor = autor, @minuto = minuto, @tipo = tipo, @periodo = periodo, @jugador_id = jugador_id
+        FROM #goles WHERE orden = @orden;
+        IF @jugador_id IS NULL
+        BEGIN
+            SELECT TOP (1) @jugador_id = jugador_id FROM #alineacion
+            WHERE condicion = @autor AND titular = 1 AND posicion <> 'arquero' ORDER BY NEWID();
+        END;
+        SET @formacion_id = IIF(@autor = 'local', @formacion_local, @formacion_visitante);
+        EXEC evento.gol_insertar @formacion_id, @jugador_id, @minuto, @tipo, @periodo;
+        SET @orden += 1;
+    END;
+
+    -- Tanda de penales: sólo se conoce el resultado; cada penal convertido lo patea un titular al azar.
+    DECLARE tandas CURSOR LOCAL FAST_FORWARD FOR
+        SELECT 'local', ISNULL(@penales_local, 0) UNION ALL SELECT 'visitante', ISNULL(@penales_visitante, 0);
+    OPEN tandas;
+    FETCH NEXT FROM tandas INTO @condicion, @n;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        SET @k = 1;
+        WHILE @k <= @n
+        BEGIN
+            SELECT TOP (1) @jugador_id = jugador_id FROM #alineacion
+            WHERE condicion = @condicion AND titular = 1 AND posicion <> 'arquero' ORDER BY NEWID();
+            SET @minuto = 120 + IIF(@k > 15, 15, @k);
+            SET @formacion_id = IIF(@condicion = 'local', @formacion_local, @formacion_visitante);
+            EXEC evento.gol_insertar @formacion_id, @jugador_id, @minuto, 'penal', 'penales';
+            SET @k += 1;
+        END;
+        FETCH NEXT FROM tandas INTO @condicion, @n;
+    END;
+    CLOSE tandas;
+    DEALLOCATE tandas;
+
+    DROP TABLE #plantel, #goles, #alineacion;
+    SET @cargado = 1;
+END;
+GO
+
 /* worldcup.json del repositorio público openfootball (JSON):
  Fuente: https://github.com/openfootball/worldcup.json
  Cada partido trae ronda, fecha, hora local con su huso ('13:00 UTC-6'), selecciones,
  sede (la ciudad, con la localidad entre paréntesis: 'Dallas (Arlington)') y el marcador
  (ft = 90 minutos, et = alargue, p = penales).
  Clave natural: fase + local + visitante.
-   * Nuevo: torneo.partido_insertar y, si ya se jugó, torneo.registrar_resultado.
+   * Nuevo: torneo.partido_insertar y, si ya se jugó, sus formaciones y goles
+     (importacion.cargar_detalle_partido) y torneo.registrar_resultado.
    * Existente programado: se reprograma (partido_modificar) si cambió sede u horario, y
      se carga el resultado si ya lo tiene.
    * Existente finalizado: el resultado registrado no se reescribe (registro histórico);
@@ -1177,7 +1365,8 @@ BEGIN
             @fecha DATE, @hora TIME(0), @offset INT, @fase VARCHAR(13), @local_id INT, @visitante_id INT,
             @sede_id INT, @fecha_hora_local DATETIMEOFFSET, @gl INT, @gv INT, @pl INT, @pv INT,
             @partido_id INT, @estado VARCHAR(10), @sede_actual INT, @fecha_actual DATETIMEOFFSET,
-            @gl_actual INT, @gv_actual INT, @pl_actual INT, @pv_actual INT;
+            @gl_actual INT, @gv_actual INT, @pl_actual INT, @pv_actual INT,
+            @goles_local NVARCHAR(MAX), @goles_visitante NVARCHAR(MAX), @detalle BIT;
 
     EXEC importacion.lote_abrir 'torneo.importar_fixture', @ruta_archivo, @lote_id OUTPUT;
 
@@ -1206,13 +1395,15 @@ BEGIN
         gl_120           VARCHAR(10)  COLLATE DATABASE_DEFAULT,
         gv_120           VARCHAR(10)  COLLATE DATABASE_DEFAULT,
         pl               VARCHAR(10)  COLLATE DATABASE_DEFAULT,
-        pv               VARCHAR(10)  COLLATE DATABASE_DEFAULT
+        pv               VARCHAR(10)  COLLATE DATABASE_DEFAULT,
+        goles_local      NVARCHAR(MAX),
+        goles_visitante  NVARCHAR(MAX)
     );
 
     INSERT INTO #partidos (fila, ronda, fecha, hora, equipo_local, equipo_visitante, sede,
-                           gl_90, gv_90, gl_120, gv_120, pl, pv)
+                           gl_90, gv_90, gl_120, gv_120, pl, pv, goles_local, goles_visitante)
     SELECT CAST(m.[key] AS INT) + 1 AS fila, d.ronda, d.fecha, d.hora, d.equipo_local, d.equipo_visitante, d.sede,
-           d.gl_90, d.gv_90, d.gl_120, d.gv_120, d.pl, d.pv
+           d.gl_90, d.gv_90, d.gl_120, d.gv_120, d.pl, d.pv, d.goles_local, d.goles_visitante
     FROM OPENJSON(@json, '$.matches') m
     CROSS APPLY OPENJSON(m.value) WITH (
         ronda            VARCHAR(40)  '$.round',
@@ -1226,7 +1417,9 @@ BEGIN
         gl_120           VARCHAR(10)  '$.score.et[0]',
         gv_120           VARCHAR(10)  '$.score.et[1]',
         pl               VARCHAR(10)  '$.score.p[0]',
-        pv               VARCHAR(10)  '$.score.p[1]'
+        pv               VARCHAR(10)  '$.score.p[1]',
+        goles_local      NVARCHAR(MAX) '$.goals1' AS JSON,
+        goles_visitante  NVARCHAR(MAX) '$.goals2' AS JSON
     ) d;
 
     SELECT @leidos = COUNT(*) FROM #partidos;
@@ -1235,7 +1428,8 @@ BEGIN
     BEGIN
         SELECT @ronda = ronda, @fecha_txt = fecha, @hora_txt = hora, @local_txt = equipo_local,
                @visitante_txt = equipo_visitante, @sede_txt = sede, @gl_90 = gl_90, @gv_90 = gv_90,
-               @gl_120 = gl_120, @gv_120 = gv_120, @pl_txt = pl, @pv_txt = pv
+               @gl_120 = gl_120, @gv_120 = gv_120, @pl_txt = pl, @pv_txt = pv,
+               @goles_local = goles_local, @goles_visitante = goles_visitante
         FROM #partidos WHERE fila = @i;
 
         SET @registro = CONCAT(@fecha_txt, ' ', @hora_txt, ' | ', @local_txt, ' vs ', @visitante_txt,
@@ -1302,7 +1496,10 @@ BEGIN
                 EXEC torneo.partido_insertar @sede_id, @fecha_hora_local, @fase, @local_id, @visitante_id,
                      NULL, @partido_id OUTPUT;
                 IF @gl IS NOT NULL
+                BEGIN
+                    EXEC importacion.cargar_detalle_partido @partido_id, @goles_local, @goles_visitante, @pl, @pv, @detalle OUTPUT;
                     EXEC torneo.registrar_resultado @partido_id, @gl, @gv, @pl, @pv;
+                END;
                 SET @insertados += 1;
             END
             ELSE IF @estado = 'finalizado'
@@ -1328,6 +1525,8 @@ BEGIN
                 END;
                 IF @gl IS NOT NULL
                 BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM plantel.formacion WHERE partido_id = @partido_id)
+                        EXEC importacion.cargar_detalle_partido @partido_id, @goles_local, @goles_visitante, @pl, @pv, @detalle OUTPUT;
                     EXEC torneo.registrar_resultado @partido_id, @gl, @gv, @pl, @pv;
                     SET @cambio = 1;
                 END;

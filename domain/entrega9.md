@@ -1,14 +1,15 @@
 # Análisis — Entrega 9 (Cierre: BI, visualización y aplicación)
 
-Estado: **BI en curso** (plataforma elegida: **Power BI Desktop**). Los scripts y la guía están en `src/entrega9/`; falta
-armar y guardar el archivo `.pbix`. La aplicación ABM y la pantalla de importación quedan para una tanda siguiente.
+Estado: **BI** con **Power BI Desktop** (scripts en `src/entrega9/`; guía y `.pbix` en `src/entrega9/power_bi/`) y **aplicación** en JavaScript
+(Node.js + Express, en `src/entrega9/app/`) con ABM de anunciantes, pantalla de importación (Entrega 6) y reportes XML
+(Entrega 7); cada una tiene su guía (`power_bi/GUIA.md` y `app/GUIA.md`).
 
 | Archivo (`src/entrega9/`) | Qué hace |
 |---|---|
 | `1_entrega9_sede_coordenadas.sql` | Modifica `torneo.sede`: agrega `latitud` y `longitud` y carga las 16 sedes (mapa opcional) |
 | `2_entrega9_vistas_bi.sql` | Esquema `bi` con 4 vistas (`vw_goles`, `vw_ocupacion_publicitaria`, `vw_partidos`, `vw_sedes`), rol `bi_lector` y usuario `usr_bi` |
 | `3_entrega9_test_bi.sql` | 5 pruebas: `usr_bi` lee las vistas, las vistas coinciden con los reportes de la Entrega 7, sedes con coordenadas, `usr_bi` no lee tablas ni ejecuta SP |
-| `guia_power_bi.md` | Conexión, modelo, medidas DAX y diseño de la página del dashboard |
+| `power_bi/GUIA.md` | Cómo abrir el dashboard; conexión, modelo, medidas DAX y diseño de la página del dashboard |
 
 Decisiones tomadas:
 
