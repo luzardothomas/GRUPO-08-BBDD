@@ -728,19 +728,23 @@ END CATCH;
 GO
 
 PRINT '--- 1.11.c ABM de criterios de suspensión';
--- Resultado esperado: quedan 2 criterios activos: general (2 amarillas => 1 partido) y cuerpo técnico (3 amarillas => 1 partido).
--- El criterio temporal de semifinal se modifica y se elimina.
+-- Resultado esperado: quedan 14 criterios de acumulación, una fila por fase (7) y tipo de persona: jugadores (2 amarillas => 1 partido)
+-- y cuerpo técnico (3 amarillas => 1 partido); más los 14 de expulsión (0 amarillas: roja directa o doble amarilla, 7 fases x 2 tipos
+-- de persona) cargados con los parámetros iniciales: 28 en total. El criterio temporal de semifinal se modifica y se elimina.
 DECLARE @id INT;
-EXEC evento.criterio_suspension_insertar 2, 1, NULL, NULL, 1, @id OUTPUT;             INSERT INTO #id VALUES ('criterio_general', @id);
-EXEC evento.criterio_suspension_insertar 3, 1, NULL, 'cuerpo_tecnico', 1, @id OUTPUT;
-EXEC evento.criterio_suspension_insertar 1, 1, 'semifinal', NULL, 1, @id OUTPUT;
-EXEC evento.criterio_suspension_modificar @id, 1, 2, 'semifinal', NULL, 0;
+EXEC evento.criterio_suspension_insertar_todas_las_fases 2, 1, 'jugador';
+INSERT INTO #id SELECT 'criterio_general', criterio_id FROM evento.criterio_suspension
+WHERE cantidad_amarillas > 0 AND fase_aplicable = 'grupos' AND tipo_persona_aplicable = 'jugador' AND cantidad_amarillas = 2;
+EXEC evento.criterio_suspension_insertar_todas_las_fases 3, 1, 'cuerpo_tecnico';
+EXEC evento.criterio_suspension_insertar 1, 1, 'semifinal', 'jugador', 1, @id OUTPUT;
+EXEC evento.criterio_suspension_modificar @id, 1, 2, 'semifinal', 'jugador', 0;
 EXEC evento.criterio_suspension_eliminar @id;
 SELECT criterio_id, fase_aplicable, tipo_persona_aplicable, cantidad_amarillas, partidos_suspension, activo FROM evento.criterio_suspension;
-INSERT INTO #resultado SELECT '1.11.c', 'criterio_suspension: alta, modificación y baja', IIF(COUNT(*) = 2, 'OK', 'FALLO'), '' FROM evento.criterio_suspension;
--- Resultado esperado: rechazo con 4 condiciones (fase, tipo de persona, cantidad de amarillas, partidos); y rechazo por duplicado.
+INSERT INTO #resultado SELECT '1.11.c', 'criterio_suspension: alta, modificación y baja', IIF(COUNT(*) = 14 AND (SELECT COUNT(*) FROM evento.criterio_suspension) = 28 AND NOT EXISTS (SELECT 1 FROM evento.criterio_suspension WHERE fase_aplicable IS NULL OR tipo_persona_aplicable IS NULL), 'OK', 'FALLO'), '' FROM evento.criterio_suspension WHERE cantidad_amarillas > 0;
+-- Resultado esperado: rechazo con 4 condiciones (fase, tipo de persona, cantidad de amarillas, partidos); rechazo con 2 condiciones
+-- si no se informa la fase ni el tipo de persona (ya no existe 'todas'); y rechazo por duplicado.
 BEGIN TRY
-    EXEC evento.criterio_suspension_insertar 0, -1, 'amistoso', 'hincha';
+    EXEC evento.criterio_suspension_insertar -1, -1, 'amistoso', 'hincha';
     INSERT INTO #resultado VALUES ('1.11.c', 'criterio_suspension: alta inválida', 'FALLO', 'No se rechazó');
 END TRY
 BEGIN CATCH
@@ -750,6 +754,15 @@ BEGIN CATCH
 END CATCH;
 BEGIN TRY
     EXEC evento.criterio_suspension_insertar 2, 3;
+    INSERT INTO #resultado VALUES ('1.11.c', 'criterio_suspension: sin fase ni tipo de persona', 'FALLO', 'No se rechazó');
+END TRY
+BEGIN CATCH
+    PRINT ERROR_MESSAGE();
+    INSERT INTO #resultado VALUES ('1.11.c', 'criterio_suspension: sin fase ni tipo de persona (2 condiciones)',
+           IIF(ERROR_NUMBER() = 50001 AND LEN(ERROR_MESSAGE()) - LEN(REPLACE(ERROR_MESSAGE(), CHAR(10) + '-', CHAR(10))) = 2, 'OK', 'FALLO'), ERROR_MESSAGE());
+END CATCH;
+BEGIN TRY
+    EXEC evento.criterio_suspension_insertar 2, 3, 'grupos', 'jugador';
     INSERT INTO #resultado VALUES ('1.11.c', 'criterio_suspension: duplicado', 'FALLO', 'No se rechazó');
 END TRY
 BEGIN CATCH
@@ -1281,7 +1294,7 @@ INSERT INTO #resultado VALUES ('2.5.a', 'registrar_tarjeta: primera amarilla sin
 GO
 
 PRINT '--- 2.5.b CASO OBLIGATORIO: roja directa';
--- Resultado esperado: roja directa al 4 de Francia en P1 => 1 suspensión sin criterio (no es por acumulación)
+-- Resultado esperado: roja directa al 4 de Francia en P1 => 1 suspensión con el criterio de roja directa
 -- para el próximo partido programado de Francia: P4.
 DECLARE @p1 INT = (SELECT valor FROM #id WHERE clave = 'P1'), @p4 INT = (SELECT valor FROM #id WHERE clave = 'P4'), @tarjeta INT, @susp INT;
 EXEC evento.registrar_tarjeta @partido_id = @p1, @minuto = 75, @periodo = 'ST', @tipo = 'roja', @motivo = 'Agresión a un rival',
@@ -1289,9 +1302,10 @@ EXEC evento.registrar_tarjeta @partido_id = @p1, @minuto = 75, @periodo = 'ST', 
 SELECT t.tarjeta_id, t.tipo, t.tipo_expulsion, t.minuto, s.suspension_id, s.criterio_id, s.partido_afectado_id, s.motivo
 FROM evento.tarjeta t LEFT JOIN evento.suspension s ON s.tarjeta_id = t.tarjeta_id WHERE t.tarjeta_id = @tarjeta;
 INSERT INTO #resultado SELECT '2.5.b', 'OBLIGATORIO: roja directa con suspensión para el próximo partido',
-       IIF(@susp = 1 AND COUNT(*) = 1 AND SUM(CASE WHEN partido_afectado_id = @p4 AND criterio_id IS NULL THEN 1 ELSE 0 END) = 1
+       IIF(@susp = 1 AND COUNT(*) = 1 AND SUM(CASE WHEN s.partido_afectado_id = @p4 THEN 1 ELSE 0 END) = 1
            AND (SELECT tipo_expulsion FROM evento.tarjeta WHERE tarjeta_id = @tarjeta) = 'roja_directa', 'OK', 'FALLO'), ''
-FROM evento.suspension WHERE tarjeta_id = @tarjeta;
+FROM evento.suspension s JOIN evento.criterio_suspension c ON c.criterio_id = s.criterio_id AND c.cantidad_amarillas = 0
+WHERE s.tarjeta_id = @tarjeta;
 GO
 
 PRINT '--- 2.5.c Tarjeta a un integrante del cuerpo técnico';
@@ -1502,7 +1516,7 @@ FROM evento.tarjeta t JOIN plantel.jugador j ON j.persona_id = t.persona_id LEFT
 WHERE j.nombre = 'MEX' AND j.apellido = 'Jugador 08' ORDER BY t.tarjeta_id;
 INSERT INTO #resultado SELECT '2.8.b', 'OBLIGATORIO: expulsión por doble amarilla',
        IIF(@susp = 1 AND t.tipo = 'roja' AND t.tipo_expulsion = 'doble_amarilla'
-           AND (SELECT COUNT(*) FROM evento.suspension s WHERE s.tarjeta_id = t.tarjeta_id AND s.partido_afectado_id IS NULL AND s.criterio_id IS NULL) = 1, 'OK', 'FALLO'), ''
+           AND (SELECT COUNT(*) FROM evento.suspension s WHERE s.tarjeta_id = t.tarjeta_id AND s.partido_afectado_id IS NULL AND s.criterio_id IN (SELECT criterio_id FROM evento.criterio_suspension WHERE cantidad_amarillas = 0)) = 1, 'OK', 'FALLO'), ''
 FROM evento.tarjeta t WHERE t.tarjeta_id = @tarjeta;
 GO
 

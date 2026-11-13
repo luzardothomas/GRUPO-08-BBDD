@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mundial 2026 - Aplicación</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Mundial 2026</h1>
+    <p>Aplicación de la Entrega 9: todo se hace a través de los procedimientos almacenados de la base</p>
+    <nav role="tablist">
+      <button role="tab" id="tab-anunciantes" aria-selected="true">Anunciantes (ABM)</button>
+      <button role="tab" id="tab-importacion" aria-selected="false">Importación y reportes</button>
+    </nav>
+  </header>
+
+  <main id="vista-anunciantes">
+    <section class="panel">
+      <h2 id="titulo-form">Nuevo anunciante</h2>
+      <form id="form">
+        <input type="hidden" id="anunciante_id">
+        <label>Nombre
+          <input id="nombre" maxlength="100" autocomplete="off">
+        </label>
+        <label>Razón social
+          <input id="razon_social" maxlength="150" autocomplete="off">
+        </label>
+        <label>Contacto
+          <input id="contacto" maxlength="100" autocomplete="off">
+        </label>
+        <div class="acciones">
+          <button type="submit" id="guardar">Guardar</button>
+          <button type="button" id="cancelar" class="secundario" hidden>Cancelar edición</button>
+        </div>
+      </form>
+      <pre id="mensaje" role="status" hidden></pre>
+    </section>
+
+    <section class="panel">
+      <h2>Listado <span id="cantidad"></span></h2>
+      <table>
+        <thead>
+          <tr><th>Id</th><th>Nombre</th><th>Razón social</th><th>Contacto</th><th></th></tr>
+        </thead>
+        <tbody id="filas"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <main id="vista-importacion" hidden>
+    <section class="panel">
+      <h2>Importar un archivo</h2>
+      <p class="ayuda">Usa los procedimientos de importación de la Entrega 6. Las filas con errores se rechazan y el resto se importa (importación parcial).</p>
+      <form id="form-importacion">
+        <label>Formato del archivo
+          <select id="imp-formato"></select>
+        </label>
+        <label>Datos a importar
+          <select id="imp-tipo"></select>
+        </label>
+        <label>Archivo <span id="imp-extension" class="ayuda"></span>
+          <input type="file" id="imp-archivo">
+        </label>
+        <div class="acciones">
+          <button type="submit">Importar</button>
+        </div>
+      </form>
+      <pre id="imp-mensaje" role="status" hidden></pre>
+      <div id="imp-resultado" hidden>
+        <h3>Resumen del lote</h3>
+        <table>
+          <thead><tr><th>Lote</th><th>Proceso</th><th>Leídos</th><th>Insertados</th><th>Actualizados</th><th>Sin cambios</th><th>Rechazados</th><th>Estado</th></tr></thead>
+          <tbody id="imp-fila"></tbody>
+        </table>
+        <p class="ayuda">El detalle de cada fila rechazada queda registrado en la tabla importacion.error de la base.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Reportes XML</h2>
+      <p class="ayuda">Ejecuta el reporte de la Entrega 7, lo muestra y guarda el XML en un archivo.</p>
+      <div class="acciones" id="rep-botones"></div>
+      <pre id="rep-mensaje" role="status" hidden></pre>
+      <div id="rep-resultado" hidden>
+        <p>Guardado como <a id="rep-enlace" href="#" target="_blank" rel="noopener"></a></p>
+        <pre id="rep-xml" class="xml"></pre>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -78,8 +78,14 @@ PRINT '--- Lote 1: parámetros del reglamento y criterio de suspensión';
 
 EXEC torneo.parametro_cargar_defaults;      -- sólo carga los que falten
 
-IF NOT EXISTS (SELECT 1 FROM evento.criterio_suspension WHERE activo = 1)
-    EXEC evento.criterio_suspension_insertar @cantidad_amarillas = 2, @partidos_suspension = 1;
+IF NOT EXISTS (SELECT 1 FROM evento.criterio_suspension WHERE activo = 1 AND cantidad_amarillas > 0)
+BEGIN
+    -- 2 amarillas = 1 partido, en todas las fases, para jugadores y cuerpo técnico.
+    EXEC evento.criterio_suspension_insertar_todas_las_fases @cantidad_amarillas = 2, @partidos_suspension = 1,
+         @tipo_persona_aplicable = 'jugador';
+    EXEC evento.criterio_suspension_insertar_todas_las_fases @cantidad_amarillas = 2, @partidos_suspension = 1,
+         @tipo_persona_aplicable = 'cuerpo_tecnico';
+END;
 GO
 
 -- ============================================================
@@ -107,7 +113,7 @@ INSERT INTO @pais (codigo, nombre, huso, pbi) VALUES
     ('QAT', 'Catar',          'UTC+03', 81400.00), ('EGY', 'Egipto',         'UTC+03',  3512.00),
     ('NZL', 'Nueva Zelanda',  'UTC+12', 48249.00), ('PRT', 'Portugal',       'UTC+01', 27275.00);
 
-DECLARE @i INT = 1, @nombre VARCHAR(80), @codigo CHAR(3), @huso CHAR(6), @pbi NUMERIC(12,2);
+DECLARE @i INT = 1, @nombre VARCHAR(80), @codigo CHAR(3), @huso CHAR(6), @pbi NUMERIC(12,2), @pais_existente INT;
 
 WHILE @i <= (SELECT MAX(n) FROM @conf)
 BEGIN
@@ -121,9 +127,14 @@ SET @i = 1;
 WHILE @i <= (SELECT MAX(n) FROM @pais)
 BEGIN
     SELECT @codigo = codigo, @nombre = nombre, @huso = huso, @pbi = pbi FROM @pais WHERE n = @i;
-    IF NOT EXISTS (SELECT 1 FROM torneo.pais WHERE codigo_iso = @codigo)
+    SET @pais_existente = NULL;
+    SELECT @pais_existente = pais_id FROM torneo.pais WHERE codigo_iso = @codigo;
+    IF @pais_existente IS NULL
         EXEC torneo.pais_insertar @codigo_iso = @codigo, @nombre = @nombre, @huso_horario = @huso,
              @pbi_per_capita = @pbi;
+    ELSE   -- el país ya existe (p. ej. lo creó la importación de la Entrega 6): se completa su PBI per cápita
+        EXEC torneo.pais_modificar @pais_id = @pais_existente, @codigo_iso = @codigo, @nombre = @nombre,
+             @huso_horario = @huso, @pbi_per_capita = @pbi;
     SET @i += 1;
 END;
 GO
@@ -588,27 +599,42 @@ GO
 PRINT '--- Lote 10: desarrollo del torneo';
 
 DROP TABLE IF EXISTS #tarjeta_extra;
+DROP TABLE IF EXISTS #tarjeta_extra_dt;
+-- Tarjetas a jugadores (se identifican por equipo y dorsal).
 CREATE TABLE #tarjeta_extra (
     id             INT IDENTITY(1, 1) PRIMARY KEY,
     n              INT NOT NULL,                 -- partido del fixture
     condicion      VARCHAR(9) COLLATE DATABASE_DEFAULT NOT NULL,
-    dorsal         INT NULL,                     -- NULL: director técnico
+    dorsal         INT NOT NULL,
     minuto         INT NOT NULL,
     periodo        VARCHAR(19) COLLATE DATABASE_DEFAULT NOT NULL,
     tipo           VARCHAR(8) COLLATE DATABASE_DEFAULT NOT NULL,
-    tipo_expulsion VARCHAR(14) COLLATE DATABASE_DEFAULT NULL,
+    tipo_expulsion VARCHAR(14) COLLATE DATABASE_DEFAULT NOT NULL,
     motivo         VARCHAR(150) COLLATE DATABASE_DEFAULT NOT NULL
 );
 INSERT INTO #tarjeta_extra (n, condicion, dorsal, minuto, periodo, tipo, tipo_expulsion, motivo) VALUES
-    ( 1, 'local',     5,    28, 'PT', 'amarilla', NULL,           'Falta táctica'),
-    ( 5, 'visitante', NULL, 55, 'ST', 'amarilla', NULL,           'Protestas reiteradas'),
-    ( 9, 'local',     5,    61, 'ST', 'amarilla', NULL,           'Demora en la reanudación'),
-    (11, 'visitante', 5,    38, 'PT', 'amarilla', NULL,           'Falta'),
-    (11, 'visitante', 5,    71, 'ST', 'amarilla', NULL,           'Mano intencional'),     -- 2.ª amarilla: doble amarilla
+    ( 1, 'local',     5,    28, 'PT', 'amarilla', 'sin_expulsar', 'Falta táctica'),
+    ( 9, 'local',     5,    61, 'ST', 'amarilla', 'sin_expulsar', 'Demora en la reanudación'),
+    (11, 'visitante', 5,    38, 'PT', 'amarilla', 'sin_expulsar', 'Falta'),
+    (11, 'visitante', 5,    71, 'ST', 'amarilla', 'sin_expulsar', 'Mano intencional'),     -- 2.ª amarilla: doble amarilla
     (15, 'visitante', 5,    63, 'ST', 'roja',     'roja_directa', 'Juego brusco grave'),
-    (26, 'local',     5,    44, 'PT', 'amarilla', NULL,           'Falta'),
+    (26, 'local',     5,    44, 'PT', 'amarilla', 'sin_expulsar', 'Falta'),
     (29, 'visitante', 5,    85, 'ST', 'roja',     'roja_directa', 'Agresión a un rival'),
-    (30, 'local',     5,    52, 'ST', 'amarilla', NULL,           'Conducta antideportiva');
+    (30, 'local',     5,    52, 'ST', 'amarilla', 'sin_expulsar', 'Conducta antideportiva');
+
+-- Tarjetas al director técnico (no tiene dorsal: se identifica por la selección).
+CREATE TABLE #tarjeta_extra_dt (
+    id             INT IDENTITY(1, 1) PRIMARY KEY,
+    n              INT NOT NULL,                 -- partido del fixture
+    condicion      VARCHAR(9) COLLATE DATABASE_DEFAULT NOT NULL,
+    minuto         INT NOT NULL,
+    periodo        VARCHAR(19) COLLATE DATABASE_DEFAULT NOT NULL,
+    tipo           VARCHAR(8) COLLATE DATABASE_DEFAULT NOT NULL,
+    tipo_expulsion VARCHAR(14) COLLATE DATABASE_DEFAULT NOT NULL,
+    motivo         VARCHAR(150) COLLATE DATABASE_DEFAULT NOT NULL
+);
+INSERT INTO #tarjeta_extra_dt (n, condicion, minuto, periodo, tipo, tipo_expulsion, motivo) VALUES
+    ( 5, 'visitante', 55, 'ST', 'amarilla', 'sin_expulsar', 'Protestas reiteradas');
 
 DECLARE @n INT = 1, @partido_id INT, @fase VARCHAR(13), @jugar BIT, @gl INT, @gv INT, @pl INT, @pv INT,
         @en_contra CHAR(1), @fecha DATE, @fecha_utc DATETIMEOFFSET, @pais_l INT, @pais_v INT, @capacidad INT,
@@ -750,19 +776,31 @@ BEGIN TRY
                        @tipo = tipo, @tipo_expulsion = tipo_expulsion, @motivo = motivo
                 FROM #tarjeta_extra WHERE id = @t;
 
-                SET @persona_id = NULL;
-                IF @dorsal IS NULL                         -- director técnico
-                    SELECT @persona_id = ct.persona_id
-                    FROM plantel.cuerpo_tecnico ct
-                    JOIN torneo.partido p ON p.partido_id = @partido_id
-                    WHERE ct.rol = 'director_tecnico'
-                      AND ct.seleccion_id = IIF(@condicion = 'local', p.seleccion_local_id, p.seleccion_visitante_id);
-
                 EXEC evento.registrar_tarjeta @partido_id = @partido_id, @minuto = @minuto, @periodo = @periodo,
-                     @tipo = @tipo, @motivo = @motivo, @persona_id = @persona_id, @condicion = @condicion,
+                     @tipo = @tipo, @motivo = @motivo, @condicion = @condicion,
                      @dorsal = @dorsal, @tipo_expulsion = @tipo_expulsion;
 
                 SET @t = (SELECT MIN(id) FROM #tarjeta_extra WHERE n = @n AND id > @t);
+            END;
+
+            -- e) Tarjetas al director técnico: se identifica por persona, no por dorsal.
+            SET @t = (SELECT MIN(id) FROM #tarjeta_extra_dt WHERE n = @n);
+            WHILE @t IS NOT NULL
+            BEGIN
+                SELECT @condicion = condicion, @minuto = minuto, @periodo = periodo,
+                       @tipo = tipo, @tipo_expulsion = tipo_expulsion, @motivo = motivo
+                FROM #tarjeta_extra_dt WHERE id = @t;
+
+                SELECT @persona_id = ct.persona_id
+                FROM plantel.cuerpo_tecnico ct
+                JOIN torneo.partido p ON p.partido_id = @partido_id
+                WHERE ct.rol = 'director_tecnico'
+                  AND ct.seleccion_id = IIF(@condicion = 'local', p.seleccion_local_id, p.seleccion_visitante_id);
+
+                EXEC evento.registrar_tarjeta @partido_id = @partido_id, @minuto = @minuto, @periodo = @periodo,
+                     @tipo = @tipo, @motivo = @motivo, @persona_id = @persona_id, @tipo_expulsion = @tipo_expulsion;
+
+                SET @t = (SELECT MIN(id) FROM #tarjeta_extra_dt WHERE n = @n AND id > @t);
             END;
 
             -- e) Una amarilla a un defensor en cancha y sin tarjeta en el partido: al local en los
@@ -915,11 +953,11 @@ FROM (VALUES
     ('Anunciantes',                             6, (SELECT COUNT(*) FROM publicidad.anunciante)),
     ('Expulsiones por doble amarilla',          1, (SELECT COUNT(*) FROM evento.tarjeta WHERE tipo_expulsion = 'doble_amarilla')),
     ('Expulsiones por roja directa',            1, (SELECT COUNT(*) FROM evento.tarjeta WHERE tipo_expulsion = 'roja_directa')),
-    ('Suspensiones por acumulación',            1, (SELECT COUNT(*) FROM evento.suspension WHERE criterio_id IS NOT NULL)),
+    ('Suspensiones por acumulación',            1, (SELECT COUNT(*) FROM evento.suspension s JOIN evento.criterio_suspension c ON c.criterio_id = s.criterio_id WHERE c.cantidad_amarillas > 0)),
     ('Cambios por lesión antes del minuto 20',  1, (SELECT COUNT(*) FROM evento.sustitucion WHERE motivo = 'lesion' AND minuto < 20))
 ) AS x (requisito, minimo, cargado);
 
-DROP TABLE IF EXISTS #sede, #seleccion, #pool, #nombre, #fixture, #tarjeta_extra;
+DROP TABLE IF EXISTS #sede, #seleccion, #pool, #nombre, #fixture, #tarjeta_extra, #tarjeta_extra_dt;
 GO
 
 SET NOEXEC OFF;

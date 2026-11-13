@@ -293,7 +293,8 @@ CREATE TABLE plantel.convocatoria (
     fecha_alta      DATE NOT NULL,
     motivo_alta     VARCHAR(150),
     fecha_baja      DATE,                              -- NULL si sigue activo
-    motivo_baja     VARCHAR(150),
+    motivo_baja     VARCHAR(150) NOT NULL
+        CONSTRAINT df_convocatoria_motivo_baja DEFAULT 'Convocado',   -- 'Convocado' mientras no tenga baja
 
     CONSTRAINT pk_convocatoria PRIMARY KEY (convocatoria_id),
     CONSTRAINT fk_convocatoria_seleccion FOREIGN KEY (seleccion_id)
@@ -303,7 +304,7 @@ CREATE TABLE plantel.convocatoria (
     CONSTRAINT chk_convocatoria_dorsal CHECK (dorsal BETWEEN 1 AND 99),
     CONSTRAINT chk_convocatoria_fechas CHECK (fecha_baja IS NULL OR fecha_baja >= fecha_alta),
     CONSTRAINT chk_convocatoria_baja CHECK
-        ((fecha_baja IS NULL AND motivo_baja IS NULL) OR fecha_baja IS NOT NULL)
+        ((fecha_baja IS NULL AND motivo_baja = 'Convocado') OR (fecha_baja IS NOT NULL AND motivo_baja <> 'Convocado'))
 );
 
 -- Índices únicos filtrados (WHERE fecha_baja IS NULL): garantizan dorsal y jugador únicos
@@ -450,7 +451,7 @@ CREATE TABLE evento.tarjeta (
     periodo        VARCHAR(19) NOT NULL,               -- tiempo del partido en que se mostró la tarjeta
     tipo           VARCHAR(8) NOT NULL,
     motivo         VARCHAR(150),
-    tipo_expulsion VARCHAR(14),
+    tipo_expulsion VARCHAR(14) NOT NULL DEFAULT 'sin_expulsar',   -- por defecto nadie está expulsado
 
     CONSTRAINT pk_tarjeta PRIMARY KEY (tarjeta_id),
     CONSTRAINT fk_tarjeta_partido FOREIGN KEY (partido_id)
@@ -463,7 +464,7 @@ CREATE TABLE evento.tarjeta (
          'alargue_1', 'adicional_alargue_1', 'alargue_2', 'adicional_alargue_2', 'penales')),
     CONSTRAINT chk_tarjeta_tipo CHECK (tipo IN ('amarilla', 'roja')),
     CONSTRAINT chk_tarjeta_tipo_expulsion CHECK
-        ((tipo = 'amarilla' AND tipo_expulsion IS NULL) OR
+        ((tipo = 'amarilla' AND tipo_expulsion = 'sin_expulsar') OR
          (tipo = 'roja' AND tipo_expulsion IN ('doble_amarilla', 'roja_directa')))
 );
 
@@ -472,32 +473,33 @@ CREATE TABLE evento.tarjeta (
 CREATE INDEX idx_tarjeta_persona ON evento.tarjeta (persona_id);
 
 -- Criterios de suspensión parametrizables (ej: 2 amarillas en grupos = 1 partido de sanción),
--- opcionalmente distintos para jugadores y cuerpo técnico.
+-- opcionalmente distintos para jugadores y cuerpo técnico. Incluyen la regla de expulsión
+-- (cantidad_amarillas = 0: una roja, directa o por doble amarilla, no necesita acumular amarillas):
+-- toda suspensión responde a un criterio, sea por acumulación de amarillas o por expulsión.
 
 CREATE TABLE evento.criterio_suspension (
     criterio_id            INT IDENTITY(1, 1),
-    fase_aplicable         VARCHAR(13),                -- NULL = aplica a todas las fases
-    tipo_persona_aplicable VARCHAR(14),                -- NULL = aplica a jugadores y cuerpo técnico
-    cantidad_amarillas     INT NOT NULL,
+    fase_aplicable         VARCHAR(13) NOT NULL,       -- una fila por fase: lo que vale para todas se carga fase por fase
+    tipo_persona_aplicable VARCHAR(14) NOT NULL,       -- una fila por tipo de persona (jugador o cuerpo técnico)
+    cantidad_amarillas     INT NOT NULL,               -- 0 = criterio de expulsión; mayor a 0 = acumulación
     partidos_suspension    INT NOT NULL,
     activo                 BIT NOT NULL DEFAULT 1,
 
     CONSTRAINT pk_criterio_suspension PRIMARY KEY (criterio_id),
     CONSTRAINT uq_criterio_suspension UNIQUE (fase_aplicable, tipo_persona_aplicable, cantidad_amarillas),
-    CONSTRAINT chk_criterio_fase CHECK (fase_aplicable IS NULL OR fase_aplicable IN
+    CONSTRAINT chk_criterio_fase CHECK (fase_aplicable IN
         ('grupos', 'dieciseisavos', 'octavos', 'cuartos', 'semifinal', 'tercer_puesto', 'final')),
-    CONSTRAINT chk_criterio_tipo_persona CHECK (tipo_persona_aplicable IS NULL OR
-        tipo_persona_aplicable IN ('jugador', 'cuerpo_tecnico')),
-    CONSTRAINT chk_criterio_amarillas CHECK (cantidad_amarillas > 0),
+    CONSTRAINT chk_criterio_tipo_persona CHECK (tipo_persona_aplicable IN ('jugador', 'cuerpo_tecnico')),
+    CONSTRAINT chk_criterio_amarillas CHECK (cantidad_amarillas >= 0),
     CONSTRAINT chk_criterio_partidos CHECK (partidos_suspension > 0)
 );
 
--- Suspensión efectiva, por acumulación o roja directa. La persona sancionada se obtiene
+-- Suspensión efectiva, por acumulación, doble amarilla o roja directa. La persona sancionada se obtiene
 -- de la tarjeta que la dispara (tarjeta.persona_id), por eso tarjeta_id es obligatoria.
 
 CREATE TABLE evento.suspension (
     suspension_id       INT IDENTITY(1, 1),
-    criterio_id         INT,                            -- NULL si viene de roja directa
+    criterio_id         INT NOT NULL,                   -- criterio que se aplicó
     tarjeta_id          INT NOT NULL,                   -- tarjeta que dispara la sanción
     partido_afectado_id INT,                            -- próximo partido que se pierde
     motivo              VARCHAR(150) NOT NULL,
@@ -567,7 +569,8 @@ CREATE TABLE arbitraje.informe_arbitral (
     designacion_id INT NOT NULL,
     fecha          DATETIMEOFFSET NOT NULL,
     contenido      VARCHAR(MAX) NOT NULL,
-    sancion        VARCHAR(150),                        -- NULL si no hubo sanción
+    sancion        VARCHAR(150) NOT NULL
+        CONSTRAINT df_informe_arbitral_sancion DEFAULT 'Sin sanción',   -- 'Sin sanción' si no hubo sanción
 
     CONSTRAINT pk_informe_arbitral PRIMARY KEY (informe_id),
     CONSTRAINT fk_informe_arbitral_designacion FOREIGN KEY (designacion_id)

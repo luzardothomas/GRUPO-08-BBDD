@@ -222,15 +222,19 @@ GO
 -- PRUEBA 1.3 - Banco Mundial: PBI per cápita 2020-2025
 -- -------------------------------------------------------------------------------------
 PRINT '--- 1.3 Banco Mundial: PBI per cápita 2020-2025';
--- Resultado esperado: indicadores de varios años por país, y el más reciente copiado a torneo.pais (todos
--- los países salvo Inglaterra y Escocia, que el Banco Mundial no publica por separado).
+-- Resultado esperado: importación parcial. Indicadores de varios años por país, y el más reciente copiado a torneo.pais
+-- (todos los países salvo Inglaterra y Escocia, que el Banco Mundial no publica por separado: esos dos quedan
+-- reportados en importacion.error como dato faltante en la fuente).
 -- Requiere: Lote 0.
 EXEC torneo.consultar_api_banco_mundial;
 SELECT TOP 10 codigo_iso, nombre, pbi_per_capita FROM torneo.pais ORDER BY pbi_per_capita DESC;
 INSERT INTO #resultado SELECT '1.3', 'banco mundial: PBI per cápita 2020-2025',
-       IIF(estado = 'completo' AND (SELECT COUNT(*) FROM torneo.pais WHERE pbi_per_capita > 0) >= 44
-           AND (SELECT COUNT(DISTINCT anio) FROM torneo.indicador_economico) >= 3, 'OK', 'FALLO'),
-       CONCAT((SELECT COUNT(*) FROM torneo.pais WHERE pbi_per_capita > 0), ' países con PBI')
+       IIF(estado = 'parcial' AND (SELECT COUNT(*) FROM torneo.pais WHERE pbi_per_capita > 0) >= 44
+           AND (SELECT COUNT(DISTINCT anio) FROM torneo.indicador_economico) >= 3
+           AND (SELECT COUNT(*) FROM importacion.error e WHERE e.lote_id = vw_ultimo_lote.lote_id
+                AND e.motivo LIKE 'Dato faltante en la fuente%' AND e.registro IN ('ENG | Inglaterra', 'SCO | Escocia')) = 2
+           AND rechazados = 2, 'OK', 'FALLO'),
+       CONCAT((SELECT COUNT(*) FROM torneo.pais WHERE pbi_per_capita > 0), ' países con PBI; ', rechazados, ' sin dato en la fuente')
 FROM importacion.vw_ultimo_lote WHERE proceso = 'torneo.consultar_api_banco_mundial';
 EXEC #informar '1.3';
 -- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
@@ -245,13 +249,13 @@ GO
 -- -------------------------------------------------------------------------------------
 PRINT '--- 1.4 Banco Mundial: serie histórica anterior (2015-2019)';
 -- Resultado esperado: se importan los años 2015-2019 en torneo.indicador_economico sin pisar el PBI
--- vigente (más reciente) registrado en torneo.pais.
+-- vigente (más reciente) registrado en torneo.pais. Lote parcial: Inglaterra y Escocia siguen sin dato en la fuente.
 -- Requiere: Lote 0 (si no hay PBI vigente, lo importa antes).
 EXEC #preparar 'pbi';
 DECLARE @pbi_arg NUMERIC(12,2) = (SELECT pbi_per_capita FROM torneo.pais WHERE codigo_iso = 'ARG');
 EXEC torneo.consultar_api_banco_mundial @anio_desde = 2015, @anio_hasta = 2019;
 INSERT INTO #resultado SELECT '1.4', 'banco mundial: histórico 2015-2019 sin pisar el vigente',
-       IIF(l.estado = 'completo' AND l.insertados + l.actualizados + l.sin_cambios >= 200
+       IIF(l.estado = 'parcial' AND l.rechazados = 2 AND l.insertados + l.actualizados + l.sin_cambios >= 200
            AND (SELECT pbi_per_capita FROM torneo.pais WHERE codigo_iso = 'ARG') = @pbi_arg
            AND EXISTS (SELECT 1 FROM torneo.indicador_economico i JOIN torneo.pais p ON p.pais_id = i.pais_id
                        WHERE p.codigo_iso = 'ARG' AND i.anio = 2015), 'OK', 'FALLO'),
@@ -401,8 +405,10 @@ GO
 -- PRUEBA 3.2 - Estadísticas de jugadores (players.csv, CSV)
 -- -------------------------------------------------------------------------------------
 PRINT '--- 3.2 Estadísticas de jugadores (players.csv, CSV)';
--- Resultado esperado: las 1248 filas, todas vinculadas a su selección y la gran mayoría a su jugador
--- (las que no coinciden por nombre, ej. 'Flaco López', quedan vinculadas sólo a la selección).
+-- Resultado esperado: importación parcial. De las 1248 filas se importan 1185, las que coinciden por nombre exacto con
+-- un convocado de su selección. Las 63 restantes (ej. 'Flaco López', que el plantel llama 'José Manuel López') se rechazan y
+-- quedan en importacion.error como error de coincidencia: las fuentes usan nombres distintos y no se fuerza el cruce.
+-- Los jugadores que no jugaron (0 partidos) se importan con sus estadísticas en 0, no en NULL.
 -- Requiere: Lote 0 (si faltan las selecciones o los planteles, los importa antes).
 EXEC #preparar 'planteles';
 DECLARE @ruta VARCHAR(500);
@@ -412,9 +418,12 @@ SELECT TOP 10 k.jugador, k.pais_equipo, k.goles, k.asistencias, k.minutos, j.fec
 FROM plantel.jugador_estadistica_kaggle k LEFT JOIN plantel.jugador j ON j.jugador_id = k.jugador_id
 ORDER BY k.goles DESC;
 INSERT INTO #resultado SELECT '3.2', 'kaggle players.csv: estadísticas vinculadas al modelo',
-       IIF(l.estado = 'completo' AND l.insertados + l.actualizados + l.sin_cambios = 1248
-           AND (SELECT COUNT(jugador_id) FROM plantel.jugador_estadistica_kaggle) >= 1100, 'OK', 'FALLO'),
-       CONCAT((SELECT COUNT(jugador_id) FROM plantel.jugador_estadistica_kaggle), ' de 1248 vinculadas a un jugador')
+       IIF(l.estado = 'parcial' AND l.insertados + l.actualizados + l.sin_cambios = 1185 AND l.rechazados = 63
+           AND (SELECT COUNT(*) FROM importacion.error e WHERE e.lote_id = l.lote_id AND e.motivo LIKE '%Error de coincidencia%') = 63
+           AND (SELECT COUNT(*) FROM plantel.jugador_estadistica_kaggle) = 1185
+           AND NOT EXISTS (SELECT 1 FROM plantel.jugador_estadistica_kaggle WHERE jugador = 'Flaco López')
+           AND EXISTS (SELECT 1 FROM plantel.jugador_estadistica_kaggle WHERE jugador = 'Gleison Bremer' OR jugador = 'Lionel Messi'), 'OK', 'FALLO'),
+       CONCAT((SELECT COUNT(*) FROM plantel.jugador_estadistica_kaggle), ' importadas y ', l.rechazados, ' rechazadas por error de coincidencia')
 FROM importacion.vw_ultimo_lote l WHERE l.proceso = 'plantel.importar_estadisticas_jugadores_kaggle_2026';
 EXEC #informar '3.2';
 -- Cambios de este lote: para verlos, seleccionar las consultas, descomentarlas (Ctrl+K, Ctrl+U) y ejecutar la seleccion.
@@ -603,7 +612,7 @@ GO
 -- PRUEBA 4.5 - Reimportación de players.csv
 -- -------------------------------------------------------------------------------------
 PRINT '--- 4.5 Reimportación de players.csv';
--- Resultado esperado: la segunda importación deja las 1248 filas sin cambios.
+-- Resultado esperado: la segunda importación deja las 1185 filas sin cambios y vuelve a rechazar las 63 que no coinciden.
 -- Requiere: Lote 0 (si faltan las selecciones o los planteles, los importa antes).
 EXEC #preparar 'planteles';
 DECLARE @ruta VARCHAR(500), @antes INT;
@@ -612,7 +621,7 @@ EXEC plantel.importar_estadisticas_jugadores_kaggle_2026 @ruta;
 SET @antes = (SELECT COUNT(*) FROM plantel.jugador_estadistica_kaggle);
 EXEC plantel.importar_estadisticas_jugadores_kaggle_2026 @ruta;
 INSERT INTO #resultado SELECT '4.5', 'reimportación de players.csv: sin altas ni cambios',
-       IIF(l.insertados + l.actualizados + l.rechazados = 0 AND l.sin_cambios = 1248
+       IIF(l.insertados + l.actualizados = 0 AND l.sin_cambios = 1185 AND l.rechazados = 63
            AND (SELECT COUNT(*) FROM plantel.jugador_estadistica_kaggle) = @antes, 'OK', 'FALLO'),
        CONCAT(l.sin_cambios, ' sin cambios; filas: ', @antes, ' -> ', (SELECT COUNT(*) FROM plantel.jugador_estadistica_kaggle))
 FROM importacion.vw_ultimo_lote l WHERE l.proceso = 'plantel.importar_estadisticas_jugadores_kaggle_2026';

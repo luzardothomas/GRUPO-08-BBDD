@@ -82,7 +82,7 @@ SELECT * FROM importacion.error ORDER BY error_id DESC;
 | Wikipedia, `https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_squads` | JSON (wikitext) → `scraping/planteles.json` | `plantel.importar_planteles` | `plantel.jugador`, `plantel.convocatoria`, `plantel.cuerpo_tecnico` |
 | Kaggle (`https://www.kaggle.com/datasets/swaptr/fifa-wc-2026-matches`, `teams.csv`) | CSV | `torneo.importar_estadisticas_equipos_kaggle_2026` | `torneo.seleccion_estadistica_kaggle`, vinculada a `torneo.seleccion` |
 | Kaggle (`https://www.kaggle.com/datasets/swaptr/fifa-wc-2026-players`, `players.csv`) | CSV | `plantel.importar_estadisticas_jugadores_kaggle_2026` | `plantel.jugador_estadistica_kaggle`, vinculada a selección y jugador |
-| openfootball (`https://github.com/openfootball/worldcup.json`, `worldcup.json`) | JSON | `torneo.importar_fixture` | `torneo.partido` (104 partidos y resultados con alargue y penales) |
+| openfootball (`https://github.com/openfootball/worldcup.json`, `worldcup.json`) | JSON | `torneo.importar_fixture` | `torneo.partido` (104 partidos y resultados con alargue y penales), `plantel.formacion` y `evento.gol` (goles del archivo, con alineaciones aleatorias; ver abajo) |
 | Tarifario comercial (`https://dossiermundial.netlify.app/`, `tarifas_publicidad.xml`) | XML | `publicidad.importar_tarifas` | `publicidad.anunciante`, `publicidad.campania`, `publicidad.campania_pais_interes`, `publicidad.pieza_publicitaria` (en USD) |
 | API Banco Mundial (`https://api.worldbank.org/v2/country/all/indicator/NY.GDP.PCAP.CD`) | JSON | `torneo.consultar_api_banco_mundial` | `torneo.indicador_economico`, `torneo.pais.pbi_per_capita` |
 | API Frankfurter (`https://api.frankfurter.dev/v1`) | JSON | `publicidad.consultar_api_frankfurter` | `publicidad.tipo_cambio` |
@@ -188,6 +188,16 @@ Entrega 5. Un archivo que no se puede leer o no trae el arreglo esperado deja el
    `importacion.pais_equivalencia`, `torneo.indicador_economico`, `publicidad.tipo_cambio`,
    `torneo.seleccion_estadistica`, `torneo.seleccion_estadistica_kaggle` y `plantel.jugador_estadistica_kaggle`.
    Conviene sumarlas al DER.
+7. **Dato faltante en la fuente.** Si una fila no trae un dato que la tabla destino necesita, se rechaza y queda en
+   `importacion.error` (importación parcial: se cargan los registros válidos y se reportan los demás):
+   - *Estadísticas de jugadores (Kaggle):* el cruce con el plantel es por nombre exacto dentro de la selección; si no
+     coincide ("Flaco López" frente a "José Manuel López"), se rechaza como error de coincidencia y no se fuerza el cruce.
+     Los blancos de un jugador con 0 partidos se cargan como 0, y un club en blanco se completa con el del plantel.
+   - *Banco Mundial:* los países del modelo sin ningún dato en la fuente (Inglaterra y Escocia) se reportan como dato faltante.
+   - *Excepciones, no obligatorios en la importación:* `anunciante.contacto` (el XML de tarifas no lo trae) y
+     `partido.asistencia_publico` (el JSON de partidos no lo trae). Ninguna de las dos fuentes provee esos datos, así que
+     exigirlos rechazaría todos los registros. Se completan por otro camino (la carga manual de la Entrega 7 y el
+     registro del resultado), y mientras tanto quedan en NULL.
 
 ## Cambios respecto del boceto anterior (`HEAD` — `branch_eksztein`)
 
@@ -243,3 +253,20 @@ completa en SQL Server 2025 Express sobre Windows 11 el 23/10/2026.
 
 - **Numerar los archivos** con dos dígitos y armar la **solución de SSMS**, igual que en la Entrega 5.
 - **Sumar las tablas nuevas al DER.**
+
+## Goles y formaciones del fixture (datos aleatorios)
+
+`worldcup.json` trae, además del marcador, el autor y el minuto de cada gol, pero no las alineaciones. Como los reportes de la
+Entrega 7 (goleadores, tarjetas, designaciones) parten de `evento.gol` y un gol sólo puede registrarse para un jugador que integra
+la formación del partido, `torneo.importar_fixture` llama a `importacion.cargar_detalle_partido` al dar de alta cada partido
+jugado, antes de finalizarlo con `torneo.registrar_resultado`. El enunciado admite estos datos: la Entrega 7 pide "suficientes datos
+(por importación, APIs, o mediante testing manual o carga de datos aleatorios)".
+
+- **Del archivo:** el marcador, el minuto de cada gol, si fue de penal o en contra y el nombre del autor.
+- **Autor:** el convocado de la selección cuyo nombre coincide con el del archivo; si ninguno coincide, un titular al azar (el gol y
+  el minuto siguen siendo los reales).
+- **Al azar:** las alineaciones (11 titulares con un arquero, más 7 suplentes), el tipo de los goles que no son de penal ni en contra
+  (jugada, cabezazo o tiro libre) y quién patea cada penal convertido de una tanda.
+- **Orden de carga:** necesita los planteles ya importados. Si una selección no tiene convocados a la fecha del partido, el partido se
+  importa sólo con su marcador (sin formaciones ni goles).
+- **Resultado con el fixture completo:** 208 formaciones y 333 goles (los 308 del marcador y 25 de tandas de penales), sin filas rechazadas.

@@ -119,7 +119,8 @@ GO
 
 /* Pasa una columna existente a VARBINARY cifrado, conservando su nombre y sus datos:
    1) agrega una columna VARBINARY y le guarda los valores actuales cifrados;
-   2) quita las restricciones CHECK que nombran la columna (se recrean igual al final);
+   2) quita las restricciones CHECK que nombran la columna (se recrean igual al final) y su DEFAULT
+      (un valor por defecto en texto plano no sirve en una columna cifrada: lo cifran los SP de alta);
    3) borra la columna plana y renombra la cifrada con el nombre original;
    4) si la columna era NOT NULL, la nueva también.
  Si la columna ya es VARBINARY, no hace nada (reejecutable). Una fecha se cifra como texto aaaa-mm-dd.
@@ -134,7 +135,7 @@ BEGIN
     SET NOCOUNT ON;
     DECLARE @objeto INT = OBJECT_ID(@tabla, 'U'), @tipo SYSNAME, @largo SMALLINT, @nulos BIT,
             @nombre NVARCHAR(400), @temporal SYSNAME = @columna + N'_cifrado', @sql NVARCHAR(MAX),
-            @checks NVARCHAR(MAX), @recrear NVARCHAR(MAX), @filas INT, @mensaje VARCHAR(500);
+            @checks NVARCHAR(MAX), @recrear NVARCHAR(MAX), @defecto NVARCHAR(MAX), @filas INT, @mensaje VARCHAR(500);
 
     SELECT @tipo = t.name, @largo = c.max_length, @nulos = c.is_nullable
     FROM sys.columns c JOIN sys.types t ON t.user_type_id = c.user_type_id
@@ -160,6 +161,12 @@ BEGIN
     FROM sys.check_constraints cc
     WHERE cc.parent_object_id = @objeto AND cc.definition LIKE N'%' + QUOTENAME(@columna) + N'%';
 
+    -- DEFAULT de la columna: se quita y no se recrea.
+    SELECT @defecto = N'ALTER TABLE ' + @nombre + N' DROP CONSTRAINT ' + QUOTENAME(dc.name) + N';'
+    FROM sys.default_constraints dc
+    JOIN sys.columns c ON c.object_id = dc.parent_object_id AND c.column_id = dc.parent_column_id
+    WHERE dc.parent_object_id = @objeto AND c.name = @columna;
+
     BEGIN TRANSACTION;
 
     SET @sql = N'ALTER TABLE ' + @nombre + N' ADD ' + QUOTENAME(@temporal)
@@ -174,6 +181,7 @@ BEGIN
     EXEC sp_executesql @sql, N'@filas INT OUTPUT', @filas = @filas OUTPUT;
 
     IF @checks IS NOT NULL EXEC sp_executesql @checks;
+    IF @defecto IS NOT NULL EXEC sp_executesql @defecto;
 
     SET @sql = N'ALTER TABLE ' + @nombre + N' DROP COLUMN ' + QUOTENAME(@columna) + N';';
     EXEC sp_executesql @sql;
@@ -200,6 +208,10 @@ GO
 -- ============================================================
 
 EXEC seguridad.cifrar_columna 'plantel.convocatoria', 'motivo_alta';
+-- chk_convocatoria_baja compara motivo_baja con 'Convocado': cifrada, la base ya no puede compararla, así que
+-- se quita. La regla la sigue validando plantel.convocatoria_validar, y los SP guardan 'Convocado' cifrado.
+IF OBJECT_ID('plantel.chk_convocatoria_baja', 'C') IS NOT NULL
+    ALTER TABLE plantel.convocatoria DROP CONSTRAINT chk_convocatoria_baja;
 EXEC seguridad.cifrar_columna 'plantel.convocatoria', 'motivo_baja';
 EXEC seguridad.cifrar_columna 'arbitraje.informe_arbitral', 'contenido';
 EXEC seguridad.cifrar_columna 'arbitraje.informe_arbitral', 'sancion';
@@ -216,7 +228,7 @@ GO
    * los que leen la columna la descifran con seguridad.fn_descifrar.
  Las validaciones no cambian: trabajan sobre los parámetros, que llegan en claro. */
 
--- plantel.convocatoria_insertar (Entrega 5): cifra el motivo de alta.
+-- plantel.convocatoria_insertar (Entrega 5): cifra el motivo de alta y guarda el motivo de baja 'Convocado' cifrado.
 ALTER PROCEDURE plantel.convocatoria_insertar
     @seleccion_id    INT,
     @jugador_id      INT,
@@ -238,13 +250,15 @@ BEGIN
         THROW 50001, @errores, 1;
     END;
 
-    -- [Entrega 8: cifrado] el motivo se guarda cifrado.
-    DECLARE @motivo_alta_cifrado VARBINARY(400);
+    -- [Entrega 8: cifrado] los motivos se guardan cifrados. El de baja nace en 'Convocado' (la columna cifrada
+    -- no tiene DEFAULT).
+    DECLARE @motivo_alta_cifrado VARBINARY(400), @motivo_baja_cifrado VARBINARY(400);
     SET @motivo_alta = NULLIF(LTRIM(RTRIM(@motivo_alta)), '');
     EXEC seguridad.cifrar_texto @motivo_alta, @motivo_alta_cifrado OUTPUT;
+    EXEC seguridad.cifrar_texto 'Convocado', @motivo_baja_cifrado OUTPUT;
 
-    INSERT INTO plantel.convocatoria (seleccion_id, jugador_id, dorsal, fecha_alta, motivo_alta)
-    VALUES (@seleccion_id, @jugador_id, @dorsal, @fecha_alta, @motivo_alta_cifrado);   -- [Entrega 8: cifrado]
+    INSERT INTO plantel.convocatoria (seleccion_id, jugador_id, dorsal, fecha_alta, motivo_alta, motivo_baja)
+    VALUES (@seleccion_id, @jugador_id, @dorsal, @fecha_alta, @motivo_alta_cifrado, @motivo_baja_cifrado);   -- [Entrega 8: cifrado]
 
     SET @convocatoria_id = SCOPE_IDENTITY();
 END;
@@ -285,6 +299,7 @@ BEGIN
     SET @motivo_alta = NULLIF(LTRIM(RTRIM(@motivo_alta)), '');
     EXEC seguridad.cifrar_texto @motivo_alta, @motivo_alta_cifrado OUTPUT;
     DECLARE @motivo_baja_cifrado VARBINARY(400);
+    SET @motivo_baja = IIF(@fecha_baja IS NULL, 'Convocado', LTRIM(RTRIM(@motivo_baja)));
     EXEC seguridad.cifrar_texto @motivo_baja, @motivo_baja_cifrado OUTPUT;
 
     UPDATE plantel.convocatoria
@@ -400,7 +415,7 @@ BEGIN
     DECLARE @contenido_cifrado VARBINARY(MAX);
     EXEC seguridad.cifrar_texto @contenido, @contenido_cifrado OUTPUT;
     DECLARE @sancion_cifrada VARBINARY(400);
-    SET @sancion = NULLIF(LTRIM(RTRIM(@sancion)), '');
+    SET @sancion = ISNULL(NULLIF(LTRIM(RTRIM(@sancion)), ''), 'Sin sanción');
     EXEC seguridad.cifrar_texto @sancion, @sancion_cifrada OUTPUT;
 
     INSERT INTO arbitraje.informe_arbitral (designacion_id, fecha, contenido, sancion)
@@ -438,7 +453,7 @@ BEGIN
     DECLARE @contenido_cifrado VARBINARY(MAX);
     EXEC seguridad.cifrar_texto @contenido, @contenido_cifrado OUTPUT;
     DECLARE @sancion_cifrada VARBINARY(400);
-    SET @sancion = NULLIF(LTRIM(RTRIM(@sancion)), '');
+    SET @sancion = ISNULL(NULLIF(LTRIM(RTRIM(@sancion)), ''), 'Sin sanción');
     EXEC seguridad.cifrar_texto @sancion, @sancion_cifrada OUTPUT;
 
     UPDATE arbitraje.informe_arbitral
