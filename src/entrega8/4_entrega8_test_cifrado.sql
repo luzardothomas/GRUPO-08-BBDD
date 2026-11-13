@@ -150,7 +150,7 @@ PRINT '--- 1.4 Nadie descifra por fuera de los SP, ni el administrador';
 -- seguridad.fn_descifrar el error 229: ningún rol tiene permiso sobre la clave ni sobre la función.
 DECLARE @valor VARBINARY(MAX);
 EXEC seguridad.cifrar_texto 'contacto.privado@mundial2026.com', @valor OUTPUT;
-DECLARE @adm_auto VARCHAR(200), @adm_open INT = 0, @adm_fn INT = 0, @pub_auto VARCHAR(200), @pub_fn INT = 0, @x VARCHAR(200);
+DECLARE @adm_auto VARCHAR(200), @adm_open INT = 0, @adm_fn INT = 0, @pub_auto VARCHAR(200), @pub_open INT = 0, @pub_fn INT = 0, @x VARCHAR(200);
 EXECUTE AS LOGIN = 'usr_administrador';
 SET @adm_auto = CONVERT(VARCHAR(200), DECRYPTBYKEYAUTOCERT(CERT_ID('cert_datos_sensibles'), NULL, @valor));
 BEGIN TRY OPEN SYMMETRIC KEY clave_datos_sensibles DECRYPTION BY CERTIFICATE cert_datos_sensibles; END TRY
@@ -160,15 +160,19 @@ BEGIN CATCH SET @adm_fn = ERROR_NUMBER(); PRINT CONCAT('usr_administrador, segur
 REVERT;
 EXECUTE AS LOGIN = 'usr_gestor_publicidad';
 SET @pub_auto = CONVERT(VARCHAR(200), DECRYPTBYKEYAUTOCERT(CERT_ID('cert_datos_sensibles'), NULL, @valor));
+BEGIN TRY OPEN SYMMETRIC KEY clave_datos_sensibles DECRYPTION BY CERTIFICATE cert_datos_sensibles; END TRY
+BEGIN CATCH SET @pub_open = ERROR_NUMBER(); PRINT CONCAT('usr_gestor_publicidad, OPEN SYMMETRIC KEY: ', ERROR_MESSAGE()); END CATCH;
 BEGIN TRY SET @x = seguridad.fn_descifrar(@valor); END TRY
 BEGIN CATCH SET @pub_fn = ERROR_NUMBER(); PRINT CONCAT('usr_gestor_publicidad, seguridad.fn_descifrar: ', ERROR_MESSAGE()); END CATCH;
 REVERT;
 SELECT 'usr_administrador' AS usuario, ISNULL(@adm_auto, 'NULL') AS decryptbykeyautocert, @adm_open AS error_open_symmetric_key, @adm_fn AS error_fn_descifrar
 UNION ALL
-SELECT 'usr_gestor_publicidad', ISNULL(@pub_auto, 'NULL'), NULL, @pub_fn;
+SELECT 'usr_gestor_publicidad', ISNULL(@pub_auto, 'NULL'), @pub_open, @pub_fn;
 INSERT INTO #resultado VALUES ('1.4', 'cifrado: sin permiso sobre la clave, nadie descifra directamente',
-       IIF(@adm_auto IS NULL AND @adm_open = 15151 AND @adm_fn = 229 AND @pub_auto IS NULL AND @pub_fn = 229, 'OK', 'FALLO'),
-       CONCAT('administrador: OPEN error ', @adm_open, ', fn_descifrar error ', @adm_fn, '; gestor de publicidad: fn_descifrar error ', @pub_fn));
+       IIF(@adm_auto IS NULL AND @adm_open = 15151 AND @adm_fn = 229
+           AND @pub_auto IS NULL AND @pub_open = 15151 AND @pub_fn = 229, 'OK', 'FALLO'),
+       CONCAT('administrador: OPEN error ', @adm_open, ', fn_descifrar error ', @adm_fn,
+              '; gestor de publicidad: OPEN error ', @pub_open, ', fn_descifrar error ', @pub_fn));
 GO
 
 -- ============================================================
@@ -179,7 +183,7 @@ PRINT '--- 1.5 Cada rol ve en claro sólo lo que le corresponde';
 -- Se da de alta un anunciante de prueba (dentro de una transacción que se deshace). El gestor de publicidad
 -- lo consulta con publicidad.consultar_anunciante; los demás intentan los SP de consulta que no les corresponden.
 -- Resultado esperado: el gestor ve el contacto en claro; el administrador y el comité arbitral ejecutan sus
--- consultas; consulta, planillero y VAR reciben el error 229.
+-- consultas y ven el motivo de alta y el contenido del informe en claro; consulta, planillero y VAR reciben el error 229.
 DECLARE @anunciantes TABLE (anunciante_id INT, nombre VARCHAR(100), razon_social VARCHAR(150), contacto VARCHAR(MAX));
 DECLARE @pub INT = 0, @adm INT = 0, @com INT = 0, @con INT = 0, @pla INT = 0, @var INT = 0, @id INT;
 BEGIN TRANSACTION;
@@ -189,12 +193,36 @@ BEGIN TRY INSERT INTO @anunciantes EXEC publicidad.consultar_anunciante @anuncia
 REVERT;
 ROLLBACK TRANSACTION;
 SELECT 'usr_gestor_publicidad ve:' AS quien, nombre, contacto FROM @anunciantes;
+-- El administrador consulta la convocatoria de una selección con motivos cargados, y el comité arbitral
+-- los informes de un árbitro que tiene informes: los dos tienen que ver el texto descifrado.
+-- Se elige, si existe, una selección con alguna baja y un árbitro con algún informe con sanción, para que
+-- también se vean descifrados un motivo de baja y una sanción reales. En las filas sin baja, motivo_baja dice
+-- 'Convocado', y en los informes sin sanción, sancion dice 'Sin sanción' (ninguna de las dos queda en NULL).
+DECLARE @convocatorias TABLE (convocatoria_id INT, seleccion VARCHAR(MAX), dorsal INT, nombre VARCHAR(MAX), apellido VARCHAR(MAX),
+                              fecha_alta VARCHAR(50), motivo_alta VARCHAR(MAX), fecha_baja VARCHAR(50), motivo_baja VARCHAR(MAX));
+DECLARE @informes TABLE (informe_id INT, arbitro VARCHAR(MAX), rol VARCHAR(MAX), partido_id INT, fecha VARCHAR(50),
+                         contenido VARCHAR(MAX), sancion VARCHAR(MAX));
+DECLARE @seleccion_id INT = (SELECT TOP (1) seleccion_id FROM plantel.convocatoria WHERE motivo_alta IS NOT NULL
+                             ORDER BY IIF(fecha_baja IS NULL, 1, 0), convocatoria_id);
+DECLARE @arbitro_id INT = (SELECT TOP (1) d.arbitro_id FROM arbitraje.informe_arbitral i
+                           JOIN arbitraje.designacion_arbitral d ON d.designacion_id = i.designacion_id
+                           ORDER BY IIF(seguridad.fn_descifrar(i.sancion) = 'Sin sanción', 1, 0), i.informe_id);
 EXECUTE AS LOGIN = 'usr_administrador';
-BEGIN TRY EXEC plantel.consultar_convocatoria @seleccion_id = -1; END TRY BEGIN CATCH SET @adm = ERROR_NUMBER(); END CATCH;
+BEGIN TRY INSERT INTO @convocatorias EXEC plantel.consultar_convocatoria @seleccion_id = @seleccion_id; END TRY BEGIN CATCH SET @adm = ERROR_NUMBER(); END CATCH;
 REVERT;
 EXECUTE AS LOGIN = 'usr_comite_arbitral';
-BEGIN TRY EXEC arbitraje.consultar_informes @arbitro_id = -1; END TRY BEGIN CATCH SET @com = ERROR_NUMBER(); END CATCH;
+BEGIN TRY INSERT INTO @informes EXEC arbitraje.consultar_informes @arbitro_id = @arbitro_id; END TRY BEGIN CATCH SET @com = ERROR_NUMBER(); END CATCH;
 REVERT;
+SELECT TOP (3) 'usr_administrador ve:' AS quien, convocatoria_id, seleccion, dorsal, nombre, apellido, motivo_alta, motivo_baja
+FROM @convocatorias ORDER BY IIF(motivo_baja = 'Convocado', 1, 0), convocatoria_id;
+SELECT TOP (3) 'usr_comite_arbitral ve:' AS quien, informe_id, arbitro, rol, partido_id, contenido, sancion
+FROM @informes ORDER BY IIF(sancion = 'Sin sanción', 1, 0), informe_id;
+DECLARE @conv_claro INT = (SELECT COUNT(*) FROM @convocatorias WHERE motivo_alta IS NOT NULL),
+        @baja_claro INT = (SELECT COUNT(*) FROM @convocatorias WHERE motivo_baja <> 'Convocado'),
+        @inf_claro INT = (SELECT COUNT(*) FROM @informes WHERE contenido IS NOT NULL),
+        @sancion_claro INT = (SELECT COUNT(*) FROM @informes WHERE sancion <> 'Sin sanción'),
+        @nulos INT = (SELECT COUNT(*) FROM @convocatorias WHERE motivo_baja IS NULL)
+                   + (SELECT COUNT(*) FROM @informes WHERE sancion IS NULL);
 EXECUTE AS LOGIN = 'usr_consulta';
 BEGIN TRY EXEC publicidad.consultar_anunciante; END TRY BEGIN CATCH SET @con = ERROR_NUMBER(); PRINT CONCAT('usr_consulta: ', ERROR_MESSAGE()); END CATCH;
 REVERT;
@@ -206,10 +234,11 @@ BEGIN TRY EXEC arbitraje.consultar_informes; END TRY BEGIN CATCH SET @var = ERRO
 REVERT;
 DECLARE @en_claro INT = (SELECT COUNT(*) FROM @anunciantes WHERE contacto = 'contacto.privado@mundial2026.com');
 INSERT INTO #resultado VALUES ('1.5', 'cifrado: cada rol ve en claro sólo lo que le corresponde',
-       IIF(@pub = 0 AND @en_claro = 1 AND @adm = 0 AND @com = 0 AND @con = 229 AND @pla = 229 AND @var = 229, 'OK', 'FALLO'),
+       IIF(@pub = 0 AND @en_claro = 1 AND @adm = 0 AND @conv_claro > 0 AND @com = 0 AND @inf_claro > 0 AND @nulos = 0
+           AND @con = 229 AND @pla = 229 AND @var = 229, 'OK', 'FALLO'),
        CONCAT('gestor de publicidad: consultar_anunciante ', IIF(@pub = 0, 'OK', CONCAT('error ', @pub)), ' (contacto en claro: ', IIF(@en_claro = 1, 'sí', 'no'), ')',
-              '; administrador: consultar_convocatoria ', IIF(@adm = 0, 'OK', CONCAT('error ', @adm)),
-              '; comité arbitral: consultar_informes ', IIF(@com = 0, 'OK', CONCAT('error ', @com)),
+              '; administrador: consultar_convocatoria ', IIF(@adm = 0, 'OK', CONCAT('error ', @adm)), ' (', @conv_claro, ' motivos de alta y ', @baja_claro, ' de baja en claro)',
+              '; comité arbitral: consultar_informes ', IIF(@com = 0, 'OK', CONCAT('error ', @com)), ' (', @inf_claro, ' informes y ', @sancion_claro, ' sanciones en claro; valores NULL: ', @nulos, ')',
               '; consulta: error ', @con, '; planillero: error ', @pla, '; VAR: error ', @var));
 GO
 

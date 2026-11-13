@@ -293,7 +293,8 @@ CREATE TABLE plantel.convocatoria (
     fecha_alta      DATE NOT NULL,
     motivo_alta     VARCHAR(150),
     fecha_baja      DATE,                              -- NULL si sigue activo
-    motivo_baja     VARCHAR(150),
+    motivo_baja     VARCHAR(150) NOT NULL
+        CONSTRAINT df_convocatoria_motivo_baja DEFAULT 'Convocado',   -- 'Convocado' mientras no tenga baja
 
     CONSTRAINT pk_convocatoria PRIMARY KEY (convocatoria_id),
     CONSTRAINT fk_convocatoria_seleccion FOREIGN KEY (seleccion_id)
@@ -303,7 +304,7 @@ CREATE TABLE plantel.convocatoria (
     CONSTRAINT chk_convocatoria_dorsal CHECK (dorsal BETWEEN 1 AND 99),
     CONSTRAINT chk_convocatoria_fechas CHECK (fecha_baja IS NULL OR fecha_baja >= fecha_alta),
     CONSTRAINT chk_convocatoria_baja CHECK
-        ((fecha_baja IS NULL AND motivo_baja IS NULL) OR fecha_baja IS NOT NULL)
+        ((fecha_baja IS NULL AND motivo_baja = 'Convocado') OR (fecha_baja IS NOT NULL AND motivo_baja <> 'Convocado'))
 );
 
 -- Índices únicos filtrados (WHERE fecha_baja IS NULL): garantizan dorsal y jugador únicos
@@ -568,7 +569,8 @@ CREATE TABLE arbitraje.informe_arbitral (
     designacion_id INT NOT NULL,
     fecha          DATETIMEOFFSET NOT NULL,
     contenido      VARCHAR(MAX) NOT NULL,
-    sancion        VARCHAR(150),                        -- NULL si no hubo sanción
+    sancion        VARCHAR(150) NOT NULL
+        CONSTRAINT df_informe_arbitral_sancion DEFAULT 'Sin sanción',   -- 'Sin sanción' si no hubo sanción
 
     CONSTRAINT pk_informe_arbitral PRIMARY KEY (informe_id),
     CONSTRAINT fk_informe_arbitral_designacion FOREIGN KEY (designacion_id)
