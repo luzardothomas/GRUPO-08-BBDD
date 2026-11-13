@@ -819,7 +819,7 @@ IF @x.value('count(/designaciones_arbitrales/arbitro)', 'INT') = 22
    AND CAST(@x.value('sum(/designaciones_arbitrales/arbitro/@rojas_mostradas)', 'FLOAT') AS INT) = 3
    AND @x.value('count(//tarjeta)', 'INT') = 39
    AND @x.value('count(//informe)', 'INT') = 4
-   AND @x.value('count(//informe[@sancion])', 'INT') = 1
+   AND @x.value('count(//informe[@sancion != "Sin sanción"])', 'INT') = 1
    AND @x.value('count(/designaciones_arbitrales/arbitro[@designaciones < 7 or @designaciones > 8])', 'INT') = 0
     INSERT INTO #resultado VALUES ('R3.1', 'arbitraje.reporte_designaciones (completo)', 'OK', '22 árbitros, 160 designaciones, 37 amarillas (la doble amarilla suma 2) y 3 rojas, 4 informes (1 con sanción).');
 ELSE

@@ -1176,9 +1176,10 @@ BEGIN
         SET @errores += '- La fecha de alta es obligatoria.' + @nl;
     IF @fecha_baja < @fecha_alta
         SET @errores += '- La fecha de baja no puede ser anterior a la fecha de alta.' + @nl;
-    IF @fecha_baja IS NULL AND @motivo_baja IS NOT NULL
+    -- Sin fecha de baja, el motivo queda en 'Convocado' (se acepta NULL o 'Convocado'); con baja, es obligatorio.
+    IF @fecha_baja IS NULL AND ISNULL(LTRIM(RTRIM(@motivo_baja)), 'Convocado') <> 'Convocado'
         SET @errores += '- No se puede informar motivo de baja sin fecha de baja.' + @nl;
-    IF @fecha_baja IS NOT NULL AND NULLIF(LTRIM(RTRIM(@motivo_baja)), '') IS NULL
+    IF @fecha_baja IS NOT NULL AND ISNULL(NULLIF(LTRIM(RTRIM(@motivo_baja)), ''), 'Convocado') = 'Convocado'
         SET @errores += '- La baja debe indicar su motivo.' + @nl;
 
     IF @fecha_baja IS NULL
@@ -1241,7 +1242,8 @@ END;
 GO
 
 /* Selección y jugador no se modifican (definen la convocatoria). Informar @fecha_baja y
- @motivo_baja registra la baja; pasarlos en NULL la deja (o la vuelve a dejar) vigente. */
+ @motivo_baja registra la baja; pasarlos en NULL la deja (o la vuelve a dejar) vigente, con el
+ motivo de baja en 'Convocado'. */
 
 CREATE OR ALTER PROCEDURE plantel.convocatoria_modificar
     @convocatoria_id INT,
@@ -1277,7 +1279,7 @@ BEGIN
         fecha_alta = @fecha_alta,
         motivo_alta = NULLIF(LTRIM(RTRIM(@motivo_alta)), ''),
         fecha_baja = @fecha_baja,
-        motivo_baja = @motivo_baja
+        motivo_baja = IIF(@fecha_baja IS NULL, 'Convocado', LTRIM(RTRIM(@motivo_baja)))
     WHERE convocatoria_id = @convocatoria_id;
 END;
 GO
@@ -2972,7 +2974,7 @@ BEGIN
     END;
 
     INSERT INTO arbitraje.informe_arbitral (designacion_id, fecha, contenido, sancion)
-    VALUES (@designacion_id, @fecha, @contenido, NULLIF(LTRIM(RTRIM(@sancion)), ''));
+    VALUES (@designacion_id, @fecha, @contenido, ISNULL(NULLIF(LTRIM(RTRIM(@sancion)), ''), 'Sin sanción'));
 
     SET @informe_id = SCOPE_IDENTITY();
 END;
@@ -3002,7 +3004,7 @@ BEGIN
     END;
 
     UPDATE arbitraje.informe_arbitral
-    SET fecha = @fecha, contenido = @contenido, sancion = NULLIF(LTRIM(RTRIM(@sancion)), '')
+    SET fecha = @fecha, contenido = @contenido, sancion = ISNULL(NULLIF(LTRIM(RTRIM(@sancion)), ''), 'Sin sanción')
     WHERE informe_id = @informe_id;
 END;
 GO
