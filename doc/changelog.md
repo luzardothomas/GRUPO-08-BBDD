@@ -5,6 +5,62 @@ Al principio siempre va a estar la fecha más actual, y en la misma está la obs
 
 ---
 
+## [13-11-2026]
+
+### Documentación de las políticas de backup (Entrega 8)
+
+#### Observación del cliente
+
+El cliente indicó que tiene que haber un documento con formato
+pdf en el cuál se detalle la estrategía adoptada para los backups.
+
+#### Solución adoptada
+
+Se agregó `doc/politica_backup.pdf`, un documento de 10 páginas que define la política sin incluir código, porque el TP solo pide definirla y documentarla. Establece:
+
+- **Objetivos:** pérdida máxima de datos (RPO) de 5 minutos durante la ventana de partidos y de 15 minutos fuera de ella; tiempo máximo de recuperación (RTO) de 30 minutos y de 2 horas respectivamente.
+- **Respaldos:** backup del log de transacciones cada 5 o 15 minutos según la ventana. Cuando termina el último partido del día se hace un último backup del log y un diferencial, que pasa a ser un full los domingos. Cada respaldo se verifica con `VERIFYONLY`.
+- **Resguardo y seguridad:** copias con la regla 3-2-1, backups cifrados con AES_256 mediante certificado y resguardo de la clave en un lugar separado.
+- **Restauración:** procedimiento paso a paso, incluida la restauración a un punto en el tiempo (`STOPAT`) y el error 4330 que aparece después, además de la verificación y las reglas de uso.
+
+Las decisiones quedaron registradas en `domain/entrega8.md`.
+
+### Mapa físico para ver la asistencia de los estadios (Entrega 9)
+
+#### Observación del cliente
+
+El cliente indicó que tiene que haber un mapa físico para poder
+observar los datos en el Power BI.
+
+#### Solución adoptada
+
+Se agregaron las columnas `latitud` y `longitud` a `torneo.sede` (`1_entrega9_sede_coordenadas.sql`) y se expusieron en `bi.vw_sedes`. El dashboard se reorganizó en tres páginas, todas en español:
+
+- **goles:** goles por equipo (los 16 con más goles), promedio de goles por partido en cada fase y suma total de goles por tipo.
+- **asistencia:** mapa de burbujas por sede, con zoom automático y un color por país; asistencia total por sede con los mismos colores que el mapa; partidos jugados en cada estadio; y asistencia del público por fecha.
+- **ingresos:** ingresos publicitarios facturados y estimados por sede.
+
+Los números van dentro de las barras, centrados y grandes, con punto como separador de miles, y los ejes muestran números completos en lugar de abreviaturas como "1.0M". `GUIA.md` describe las tres páginas.
+
+### Goles, asistencia y pauta en los partidos importados (Entrega 6)
+
+#### Observación del cliente
+
+El cliente indicó que no tiene sentido que la final y el tercer puesto figuren sin goles, y que los datos del dashboard tienen que salir de la importación y no de datos programados.
+
+#### Solución adoptada
+
+Los goles reales ya venían en `worldcup.json`; lo que mostraba ceros eran los datos programados de la carga de la Entrega 7, donde la final y el tercer puesto quedaban sin jugar. Al importar el archivo real aparecieron los goles (la final tiene 1 de promedio y el tercer puesto 10), pero la asistencia y los ingresos quedaban en cero porque el archivo no trae público ni pauta.
+
+Se agregó `importacion.cerrar_partido` en `1_entrega6_importacion.sql`, que `torneo.importar_fixture` usa para cerrar cada partido importado:
+
+- Asigna los espacios publicitarios, solo si ya hay piezas de campañas vigentes ese día.
+- Estima la asistencia entre el 88 % y el 99 % de la capacidad de la sede, con la misma regla de la carga de la Entrega 7.
+- Registra el resultado con `torneo.registrar_resultado`.
+- Factura la pauta exhibida, salvo en las semifinales, que quedan pendientes de facturar.
+
+No se modificó ningún archivo de `imports/`. Con esto la importación deja 104 partidos con asistencia total de 6.378.006 y 416 espacios publicitarios, 408 de ellos facturados, y el test de la Entrega 6 sigue en 25 OK y 0 FALLO.
+
 ## [6-11-2026]
 
 ### Tablas temporales en la importación (Entrega 6)
