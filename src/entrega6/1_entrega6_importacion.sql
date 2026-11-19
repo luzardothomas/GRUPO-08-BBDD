@@ -1337,6 +1337,40 @@ BEGIN
 END;
 GO
 
+/* Cierre de un partido importado.
+ El archivo trae marcador y goles, pero no el público ni la pauta. Igual que la carga de la Entrega 7, antes de
+ cerrar el partido se le asignan los espacios publicitarios (publicidad.asignar_espacios_partido), el público se
+ estima entre el 88 % y el 99 % de la capacidad de la sede, y después de registrar el resultado se factura la
+ pauta exhibida, salvo en las semifinales (quedan exhibidas, pendientes de facturar). */
+CREATE OR ALTER PROCEDURE importacion.cerrar_partido
+    @partido_id INT, @gl INT, @gv INT, @pl INT, @pv INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @asistencia INT, @fase VARCHAR(13);
+
+    SELECT @asistencia = s.capacidad * (88 + p.partido_id % 12) / 100, @fase = p.fase
+    FROM torneo.partido p
+    JOIN torneo.sede s ON s.sede_id = p.sede_id
+    WHERE p.partido_id = @partido_id;
+
+    -- La pauta se asigna sólo si ya hay piezas de campañas vigentes el día del partido (el tarifario se importa aparte).
+    IF NOT EXISTS (SELECT 1 FROM publicidad.espacio_publicitario WHERE partido_id = @partido_id)
+       AND EXISTS (SELECT 1
+                   FROM torneo.partido p
+                   JOIN publicidad.campania c ON CAST(p.fecha_hora_utc AS DATE) BETWEEN c.fecha_inicio AND c.fecha_fin
+                   JOIN publicidad.pieza_publicitaria pz ON pz.campania_id = c.campania_id
+                   WHERE p.partido_id = @partido_id)
+        EXEC publicidad.asignar_espacios_partido @partido_id = @partido_id, @mostrar_detalle = 0;
+
+    EXEC torneo.registrar_resultado @partido_id, @gl, @gv, @pl, @pv, @asistencia;
+
+    IF @fase <> 'semifinal'
+       AND EXISTS (SELECT 1 FROM publicidad.espacio_publicitario WHERE partido_id = @partido_id AND pieza_id IS NOT NULL)
+        EXEC publicidad.facturar_espacios_partido @partido_id = @partido_id;
+END;
+GO
+
 /* worldcup.json del repositorio público openfootball (JSON):
  Fuente: https://github.com/openfootball/worldcup.json
  Cada partido trae ronda, fecha, hora local con su huso ('13:00 UTC-6'), selecciones,
@@ -1344,7 +1378,8 @@ GO
  (ft = 90 minutos, et = alargue, p = penales).
  Clave natural: fase + local + visitante.
    * Nuevo: torneo.partido_insertar y, si ya se jugó, sus formaciones y goles
-     (importacion.cargar_detalle_partido) y torneo.registrar_resultado.
+     (importacion.cargar_detalle_partido) y su cierre (importacion.cerrar_partido: pauta, público y
+     torneo.registrar_resultado).
    * Existente programado: se reprograma (partido_modificar) si cambió sede u horario, y
      se carga el resultado si ya lo tiene.
    * Existente finalizado: el resultado registrado no se reescribe (registro histórico);
@@ -1498,7 +1533,7 @@ BEGIN
                 IF @gl IS NOT NULL
                 BEGIN
                     EXEC importacion.cargar_detalle_partido @partido_id, @goles_local, @goles_visitante, @pl, @pv, @detalle OUTPUT;
-                    EXEC torneo.registrar_resultado @partido_id, @gl, @gv, @pl, @pv;
+                    EXEC importacion.cerrar_partido @partido_id, @gl, @gv, @pl, @pv;
                 END;
                 SET @insertados += 1;
             END
@@ -1527,7 +1562,7 @@ BEGIN
                 BEGIN
                     IF NOT EXISTS (SELECT 1 FROM plantel.formacion WHERE partido_id = @partido_id)
                         EXEC importacion.cargar_detalle_partido @partido_id, @goles_local, @goles_visitante, @pl, @pv, @detalle OUTPUT;
-                    EXEC torneo.registrar_resultado @partido_id, @gl, @gv, @pl, @pv;
+                    EXEC importacion.cerrar_partido @partido_id, @gl, @gv, @pl, @pv;
                     SET @cambio = 1;
                 END;
                 IF @cambio = 1 SET @actualizados += 1; ELSE SET @sin_cambios += 1;
