@@ -130,20 +130,33 @@ Ingreso estimado (USD) = SUM ( vw_ocupacion_publicitaria[ingreso_estimado_usd] )
 `Goles` aplica el mismo criterio que el reporte de goleadores de la Entrega 7: no cuenta los goles en contra ni los
 de la tanda de penales.
 
-### Página del dashboard
+### Páginas del dashboard
+
+El informe tiene tres páginas, todas en español. En los gráficos de barras el número va dentro de la barra, con letra
+grande y en negrita; los miles se separan con punto y los ejes muestran números completos (sin "M").
+
+**Página "goles"**
 
 | Elemento | Tipo | Campos |
 |---|---|---|
-| Indicadores | Tarjetas | `Goles`, `Partidos jugados`, `Asistencia total`, `Ingreso facturado (USD)` |
-| **Gráfico 1**: goles por selección | Barras horizontales (las 10 primeras) | Eje: `vw_goles[seleccion]`; Valor: `Goles` |
-| **Gráfico 2**: ingresos publicitarios por sede | Columnas agrupadas | Eje: `vw_sedes[sede]`; Valores: `Ingreso facturado (USD)` e `Ingreso estimado (USD)` |
-| **Gráfico 3**: asistencia por fase | Líneas | Eje: `vw_partidos[fase]` (ordenada); Valor: promedio de `asistencia_publico` |
-| **Mapa de sedes** | Mapa (burbujas) | Latitud: `vw_sedes[latitud]`; Longitud: `vw_sedes[longitud]`; Tamaño: `Asistencia total`; Descripción: `vw_sedes[sede]` |
-| Reporte de resultados | Tabla | `vw_partidos`: `fase`, `fecha_hora_local`, `sede`, `local`, `goles_local`, `goles_visitante`, `visitante`, `estado` |
-| Filtros | Segmentaciones | `vw_partidos[fase]` y `vw_sedes[pais]` |
+| Goles por equipo | Barras horizontales (los 16 con más goles) | Eje: `vw_goles[seleccion]`; Valor: suma de `cuenta_para_goleador` |
+| Promedio de goles por partido jugado en cada fase | Columnas | Eje: `vw_partidos[fase]`; Valor: medida de promedio de goles por partido |
+| Suma total de goles | Circular, por tipo de gol | Leyenda: tipo de gol de `vw_goles`; Valor: goles |
 
-El enunciado pide al menos dos gráficos y un reporte de la Entrega 7: acá hay tres gráficos, el mapa opcional y el
-reporte de resultados.
+**Página "asistencia"**
+
+| Elemento | Tipo | Campos |
+|---|---|---|
+| Mapa de la asistencia en cada estadio por sede | Mapa (burbujas), con zoom automático sobre las sedes | Latitud: `vw_sedes[latitud]`; Longitud: `vw_sedes[longitud]` (categoría de datos Latitud/Longitud); Leyenda: `vw_sedes[pais]` (un color por país); Tamaño: suma de `asistencia_total` |
+| Asistencia total por sede | Barras horizontales apiladas, con los mismos colores por país que el mapa | Eje Y: `vw_sedes[sede]` y `vw_sedes[partidos]`; Valor: suma de `asistencia_total`; Leyenda: `vw_sedes[pais]` |
+| Partidos jugados en cada estadio | Barras horizontales apiladas, con los mismos colores por país | Eje Y: `vw_sedes[sede]`; Valor: suma de `partidos`; Leyenda: `vw_sedes[pais]` |
+| Asistencia del público | Líneas | Eje X: `vw_partidos[fecha_hora_local]`; Valor: suma de `asistencia_publico` |
+
+**Página "ingresos"**
+
+| Elemento | Tipo | Campos |
+|---|---|---|
+| Ingresos publicitarios por sede | Barras horizontales agrupadas | Eje Y: `vw_ocupacion_publicitaria[sede]`; Valores: `ingreso_facturado_usd` e `ingreso_estimado_usd` (formato sin decimales y con separador de miles) |
 
 ### Actualizar los datos
 

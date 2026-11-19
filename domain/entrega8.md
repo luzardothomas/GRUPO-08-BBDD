@@ -1,7 +1,7 @@
 # Análisis — Entrega 8 (Seguridad y Respaldo)
 
 Estado: **cifrado y roles implementados y probados** en `src/entrega8/`, en SQL Server 2025 para Linux y en
-SQL Server 2025 Express sobre Windows. Falta el **documento de la política de backup**.
+SQL Server 2025 Express sobre Windows. La **política de backup** está en `doc/politica_backup.pdf`.
 
 ## Qué pide el enunciado y dónde está resuelto
 
@@ -12,7 +12,7 @@ SQL Server 2025 Express sobre Windows. Falta el **documento de la política de b
 | 3 | Al menos tres roles con permisos granulares | Seis roles (`2_entrega8_roles.sql`) |
 | 4 | Cuadro con los permisos de cada rol | Sección "Cuadro de permisos"; generado desde la base con `seguridad.vw_cuadro_permisos` |
 | 5 | Un script de test por usuario, que muestre lo que puede y lo que no | `5_entrega8_test_usuarios.sql`: una parte por usuario (inicio de sesión, lo que puede, lo que no puede); cada lote se puede ejecutar solo después del Lote 0 |
-| 6 | Política de respaldo (RPO), considerando el pico de escritura en días de partido | Pendiente: documento en `doc/` |
+| 6 | Política de respaldo (RPO), considerando el pico de escritura en días de partido | `doc/politica_backup.pdf`. Ver "Política de backup (RPO)" |
 | 7 | Cifrado y roles implementados con SP | Cifrado: `seguridad.cifrar_columna`, `seguridad.cifrar_texto`, `seguridad.fn_descifrar`. Roles: `seguridad.crear_roles`, `seguridad.crear_usuario`... |
 
 ## Organización de los scripts
@@ -250,17 +250,26 @@ rutas absolutas ni distingue entre sistemas operativos: la importación del admi
 repositorio (`imports/scraping/sedes.json`), que el servidor no resuelve, así que prueba el permiso (se ejecuta y la
 rechaza su validación, error 50003) y no la lectura del archivo, que ya prueba `3_entrega6_test.sql`.
 
-## Política de backup (RPO) — pendiente
+## Política de backup (RPO)
 
-El documento tiene que cubrir (Unidad 5):
-- Modelo de recuperación `FULL` (ya configurado en `1_entrega5_db_definition.sql`), necesario para los backups de log.
-- **RPO y RTO**, diferenciando días con partido (más escritura: log cada 5 a 15 minutos) y sin partido.
-- Completo semanal, diferencial diario y log; respaldo del final del log (tail log) ante una falla.
-- Retención y ubicación: regla 3-2-1, fuera del disco de los datos.
-- **Respaldo de la master key y del certificado `cert_datos_sensibles`**, separados de los datos: sin ellos los
-  datos cifrados son irrecuperables.
-- Prueba de restauración periódica con `DBCC CHECKDB` sobre la base restaurada.
+Documento: `doc/politica_backup.pdf` (dirigido al DBA, mismo formato que `doc/config.pdf` de la Entrega 4). Se basa
+en las Unidades 3 y 5 y en las decisiones de la Entrega 4 (edición Standard con Agente, modelo `FULL`, `B:\SQLBackup`).
 
-## Pendientes
+| Decisión | Valor |
+|---|---|
+| Ventana de partido | Desde 2 h antes del primer partido de la jornada hasta que todos quedan `finalizado` o `suspendido` |
+| RPO | 5 minutos en la ventana (0 si se rescata el tail log); 15 fuera de ella; 1 hora si se pierde el sitio |
+| RTO | 30 minutos en el mismo servidor; 2 horas en un servidor nuevo |
+| Log | Cada 5 minutos en la ventana, cada 15 fuera. La ventana se calcula con `torneo.partido` |
+| Cierre de jornada | Al terminar el último partido: último log + diferencial (completo los domingos) + `VERIFYONLY` + copias. Si a las 05:00 el día anterior no se cerró, se cierra igual y avisa |
+| Completo | Al crear la base, línea base antes del torneo (10/6) y cierre de cada domingo |
+| Opciones | `CHECKSUM`, `COMPRESSION` y cifrado AES_256 con `cert_respaldos` (en `master`) |
+| Copias (3-2-1) | `B:` (2 semanas), NAS de la LAN (inmediata) y nube (cada hora) |
+| Claves | `cert_respaldos`, master key y `cert_datos_sensibles` respaldados aparte, en un medio extraíble |
 
-- Escribir el documento de la política de backup.
+El enunciado pide solo "presentar la política en un documento sencillo" (a diferencia del cifrado y los roles, que
+van con SP), así que el documento no incluye código. La política se validó en el contenedor sobre una copia de la
+base (ventana del log, cierre normal, por horario y forzado, completo del domingo, restauración con `STOPAT` y
+descifrado de la base restaurada). La prueba mostró que después de restaurar a un punto en el tiempo los logs
+anteriores ya no se pueden aplicar (error 4330): por eso la política exige un completo inmediatamente después de
+cada restauración.
