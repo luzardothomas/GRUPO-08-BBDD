@@ -1,7 +1,6 @@
 {
   "DB_SERVER": "localhost",
-  "DB_PORT": 1433,
-  "DB_PASSWORD": "<contraseña de usr_gestor_publicidad>",
-  "DB_ADMIN_PASSWORD": "<contraseña de usr_administrador>",
-  "IMPORT_DIR": "C:\\Users\\Public\\mundial_importaciones"
+  "DB_PORT": 9999,
+  "DB_PASSWORD": "CONTRASEÑA_USR_GESTOR_PUBLICIDAD",
+  "DB_ADMIN_PASSWORD": "CONTRASEÑA_USR_ADMINISTRADOR"
 }
